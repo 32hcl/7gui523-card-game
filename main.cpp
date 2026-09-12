@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QLoggingCategory>
 #include "ui/mainwindow.h"
 
 #ifdef _WIN32
@@ -7,6 +8,12 @@
 
 int main(int argc, char* argv[])
 {
+    // 屏蔽 Qt Multimedia FFmpeg 日志
+    QLoggingCategory::setFilterRules(
+        "qt.multimedia.ffmpeg=false\n"
+        "qt.multimedia.*=false\n"
+    );
+
 #ifdef _WIN32
     SetConsoleOutputCP(65001);
     SetConsoleCP(65001);

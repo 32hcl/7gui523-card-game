@@ -8,6 +8,7 @@
 #include <QTextEdit>
 #include <QMessageBox>
 #include <QTimer>
+#include <QStackedWidget>
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include "core/deck.h"
@@ -48,6 +49,7 @@ private:
     void initSounds();
     void playSound(QMediaPlayer* player);
     void animateCardToTable(CardWidget* sourceWidget);
+    void shakeWidget(QWidget* widget);
 
     Deck   m_deck;
     Player m_playerA;
@@ -59,6 +61,7 @@ private:
     bool m_gameOver = false;
     bool m_waitingForAI = false;
     bool m_isPicking = false;
+    bool m_shaking = false;
 
     AILevel m_aiLevel = AILevel::AI1_Simple;
     CardTracker m_tracker;
@@ -81,8 +84,10 @@ private:
     QPushButton* m_pickButton;
     QPushButton* m_newGameButton;
     QPushButton* m_difficultyButton;
+    QFrame* m_tableFrame = nullptr;
     std::vector<CardWidget*> m_playerACardWidgets;
     QTextEdit* m_logTextEdit;
+    QStackedWidget* m_buttonStack = nullptr;
 
     QMediaPlayer* m_soundSuccess = nullptr;
     QMediaPlayer* m_soundFailure = nullptr;

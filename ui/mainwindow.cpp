@@ -16,6 +16,7 @@
 #include <QTimer>
 #include <QPropertyAnimation>
 #include <QGraphicsOpacityEffect>
+#include <QStackedWidget>
 #include <QFile>
 #include <QCoreApplication>
 #include <QPixmap>
@@ -42,12 +43,13 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
     setWindowTitle("7鬼523斗地主变体");
-    setMinimumSize(1100, 720);
-    resize(1100, 720);
+    setMinimumSize(1200, 800);
+    resize(1200, 800);
 
     setStyleSheet(R"(
         QMainWindow {
-            background-color: #1B5E20;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #1B5E20, stop:0.5 #2E7D32, stop:1 #1B5E20);
         }
         QWidget {
             color: #FFFFFF;
@@ -60,11 +62,12 @@ MainWindow::MainWindow(QWidget* parent)
             background-color: #2E7D32;
             color: #FFFFFF;
             border: 2px solid #66BB6A;
-            border-radius: 8px;
-            padding: 6px 16px;
+            border-radius: 10px;
+            padding: 8px 20px;
             font-size: 14px;
             font-weight: bold;
-            min-width: 80px;
+            min-width: 90px;
+            min-height: 32px;
         }
         QPushButton:hover {
             background-color: #388E3C;
@@ -79,12 +82,13 @@ MainWindow::MainWindow(QWidget* parent)
             border-color: #777777;
         }
         QTextEdit {
-            background-color: #263238;
+            background-color: #1A2428;
             color: #ECEFF1;
-            border: 1px solid #455A64;
-            border-radius: 6px;
-            font-family: "Consolas", "Microsoft YaHei";
-            font-size: 12px;
+            border: 1px solid #37474F;
+            border-radius: 8px;
+            font-family: "Microsoft YaHei";
+            font-size: 13px;
+            padding: 8px;
         }
     )");
 
@@ -104,31 +108,41 @@ MainWindow::MainWindow(QWidget* parent)
 
     {
         auto* topBar = new QWidget;
+        topBar->setFixedHeight(50);
+        topBar->setStyleSheet("QWidget { background-color: #0D3B16; border-radius: 8px; }");
         auto* topLay = new QHBoxLayout(topBar);
-        topLay->setContentsMargins(0, 0, 0, 0);
+        topLay->setContentsMargins(20, 0, 20, 0);
 
         auto* titleLabel = new QLabel("7鬼523斗地主变体");
-        titleLabel->setStyleSheet("QLabel { color: #FFD700; font-size: 16px; font-weight: bold; }");
+        QFont titleFont = titleLabel->font();
+        titleFont.setPointSize(18);
+        titleFont.setBold(true);
+        titleLabel->setFont(titleFont);
+        titleLabel->setStyleSheet("QLabel { color: #FFD700; }");
 
-        m_deckCountLabel = new QLabel("牌堆剩余: --");
-        m_deckCountLabel->setStyleSheet("QLabel { color: #B0BEC5; font-size: 13px; }");
-        m_roundLabel      = new QLabel("回合: --");
-        m_roundLabel->setStyleSheet("QLabel { color: #B0BEC5; font-size: 13px; }");
+        m_deckCountLabel = new QLabel("牌堆: 44");
+        m_roundLabel = new QLabel("回合: 1");
+        QFont infoFont = m_deckCountLabel->font();
+        infoFont.setPointSize(14);
+        infoFont.setBold(true);
+        m_deckCountLabel->setFont(infoFont);
+        m_roundLabel->setFont(infoFont);
+        m_deckCountLabel->setStyleSheet("QLabel { color: #FFF59D; }");
+        m_roundLabel->setStyleSheet("QLabel { color: #FFF59D; }");
 
         topLay->addWidget(titleLabel);
         topLay->addStretch();
         topLay->addWidget(m_deckCountLabel);
-        topLay->addSpacing(20);
+        topLay->addSpacing(30);
         topLay->addWidget(m_roundLabel);
 
         leftLay->addWidget(topBar);
-        topBar->setFixedHeight(40);
     }
 
     {
         auto* labelB = new QLabel("玩家B");
         QFont playerFontB = labelB->font();
-        playerFontB.setPointSize(13);
+        playerFontB.setPointSize(15);
         playerFontB.setBold(true);
         labelB->setFont(playerFontB);
         labelB->setStyleSheet("QLabel { color: #FFD700; }");
@@ -145,50 +159,56 @@ MainWindow::MainWindow(QWidget* parent)
     }
 
     {
-        auto* tableFrame = new QFrame;
-        tableFrame->setFrameShape(QFrame::StyledPanel);
-        tableFrame->setStyleSheet(R"(
+        m_tableFrame = new QFrame;
+        m_tableFrame->setFrameShape(QFrame::StyledPanel);
+        m_tableFrame->setStyleSheet(R"(
             QFrame {
                 background-color: #0D3B16;
                 border: 3px solid #FFD700;
                 border-radius: 12px;
             }
         )");
-        tableFrame->setMinimumHeight(240);
+        m_tableFrame->setMinimumHeight(280);
 
-        auto* tableLay = new QVBoxLayout(tableFrame);
-        tableLay->setAlignment(Qt::AlignCenter);
+        auto* tableLay = new QVBoxLayout(m_tableFrame);
+        tableLay->setContentsMargins(20, 15, 20, 15);
+        tableLay->setSpacing(10);
 
-        m_handTypeLabel   = new QLabel("上一手牌型: 无");
+        // 顶部：上一手牌型
+        m_handTypeLabel = new QLabel("上一手牌型: 无");
         QFont tf = m_handTypeLabel->font();
-        tf.setPointSize(12);
+        tf.setPointSize(13);
         m_handTypeLabel->setFont(tf);
         m_handTypeLabel->setStyleSheet("QLabel { color: #B0BEC5; }");
+        m_handTypeLabel->setAlignment(Qt::AlignCenter);
         tableLay->addWidget(m_handTypeLabel);
 
+        // 中间：桌面牌显示区
         m_tableCardsWidget = new QWidget;
+        m_tableCardsWidget->setFixedHeight(180);
         m_tableCardsLayout = new QHBoxLayout(m_tableCardsWidget);
         m_tableCardsLayout->setContentsMargins(0, 0, 0, 0);
-        m_tableCardsLayout->setSpacing(6);
+        m_tableCardsLayout->setSpacing(8);
         m_tableCardsLayout->setAlignment(Qt::AlignCenter);
         tableLay->addWidget(m_tableCardsWidget);
-        m_tableCardsWidget->setFixedHeight(150);
 
-        m_tableScoreLabel = new QLabel("本回合桌面得分: 0 分");
+        // 底部：桌面分
+        m_tableScoreLabel = new QLabel("原始分: 0 分 | 奖励分: 0 分 | 合计: 0 分");
         QFont tableFont = m_tableScoreLabel->font();
-        tableFont.setPointSize(13);
+        tableFont.setPointSize(14);
         tableFont.setBold(true);
         m_tableScoreLabel->setFont(tableFont);
         m_tableScoreLabel->setStyleSheet("QLabel { color: #FFEB3B; }");
+        m_tableScoreLabel->setAlignment(Qt::AlignCenter);
         tableLay->addWidget(m_tableScoreLabel);
 
-        leftLay->addWidget(tableFrame);
+        leftLay->addWidget(m_tableFrame);
     }
 
     {
         auto* labelA = new QLabel("玩家A");
         QFont playerFontA = labelA->font();
-        playerFontA.setPointSize(13);
+        playerFontA.setPointSize(15);
         playerFontA.setBold(true);
         labelA->setFont(playerFontA);
         labelA->setStyleSheet("QLabel { color: #FFD700; }");
@@ -200,52 +220,63 @@ MainWindow::MainWindow(QWidget* parent)
         m_playerALayout->setSpacing(6);
 
         leftLay->addWidget(m_playerAHandWidget);
-        m_playerAHandWidget->setFixedHeight(160);
+        m_playerAHandWidget->setFixedHeight(150);
     }
 
+    QWidget* bottomBar = nullptr;
+
     {
-        auto* bottomBar = new QWidget;
-        auto* bottomLay = new QHBoxLayout(bottomBar);
-        bottomLay->setContentsMargins(0, 0, 0, 0);
+        bottomBar = new QWidget;
+        auto* bottomLay = new QVBoxLayout(bottomBar);
+        bottomLay->setContentsMargins(0, 8, 0, 0);
+        bottomLay->setSpacing(6);
 
-        m_scoreALabel = new QLabel("玩家A总分: 0");
-        m_scoreBLabel = new QLabel("玩家B总分: 0");
+        // 第一行：分数 A + 分数 B
+        auto* scoreRow = new QHBoxLayout;
+        m_scoreALabel = new QLabel("玩家A: 0 分");
+        m_scoreBLabel = new QLabel("玩家B: 0 分");
+        m_scoreALabel->setStyleSheet("QLabel { color: #FFD700; font-size: 14px; font-weight: bold; }");
+        m_scoreBLabel->setStyleSheet("QLabel { color: #FFD700; font-size: 14px; font-weight: bold; }");
+        scoreRow->addWidget(m_scoreALabel);
+        scoreRow->addStretch();
+        scoreRow->addWidget(m_scoreBLabel);
+        bottomLay->addLayout(scoreRow);
 
-        QFont scoreFont = m_scoreALabel->font();
-        scoreFont.setPointSize(14);
-        scoreFont.setBold(true);
-        m_scoreALabel->setFont(scoreFont);
-        m_scoreBLabel->setFont(scoreFont);
-        m_scoreALabel->setStyleSheet("QLabel { color: #FFD700; }");
-        m_scoreBLabel->setStyleSheet("QLabel { color: #FFD700; }");
+        // 第二行：按钮网格（两列）
+        auto* btnGrid = new QGridLayout;
+        btnGrid->setSpacing(6);
 
         m_playButton    = new QPushButton("出牌");
         m_passButton    = new QPushButton("不要");
         m_pickButton    = new QPushButton("选卡");
+        m_difficultyButton = new QPushButton("难度: AI1");
         m_newGameButton = new QPushButton("重新开始");
-        m_difficultyButton = new QPushButton("难度: AI1 简单");
 
-        connect(m_playButton,    &QPushButton::clicked, this, &MainWindow::onPlayButtonClicked);
-        connect(m_passButton,    &QPushButton::clicked, this, &MainWindow::onPassButtonClicked);
-        connect(m_pickButton,    &QPushButton::clicked, this, &MainWindow::onPickButtonClicked);
-        connect(m_newGameButton, &QPushButton::clicked, this, &MainWindow::onNewGameButtonClicked);
+        m_playButton->setMinimumHeight(34);
+        m_passButton->setMinimumHeight(34);
+        m_pickButton->setMinimumHeight(34);
+        m_difficultyButton->setMinimumHeight(34);
+        m_newGameButton->setMinimumHeight(34);
+
+        m_buttonStack = new QStackedWidget;
+        m_buttonStack->addWidget(m_passButton);  // index 0
+        m_buttonStack->addWidget(m_pickButton);  // index 1
+        m_buttonStack->setMinimumHeight(34);
+
+        connect(m_playButton,       &QPushButton::clicked, this, &MainWindow::onPlayButtonClicked);
+        connect(m_passButton,       &QPushButton::clicked, this, &MainWindow::onPassButtonClicked);
+        connect(m_pickButton,       &QPushButton::clicked, this, &MainWindow::onPickButtonClicked);
         connect(m_difficultyButton, &QPushButton::clicked, this, &MainWindow::onDifficultyButtonClicked);
+        connect(m_newGameButton,    &QPushButton::clicked, this, &MainWindow::onNewGameButtonClicked);
 
-        bottomLay->addWidget(m_scoreALabel);
-        bottomLay->addSpacing(12);
-        bottomLay->addWidget(m_scoreBLabel);
-        bottomLay->addStretch();
-        bottomLay->addWidget(m_playButton);
-        bottomLay->addSpacing(6);
-        bottomLay->addWidget(m_passButton);
-        bottomLay->addWidget(m_pickButton);
-        bottomLay->addSpacing(6);
-        bottomLay->addWidget(m_newGameButton);
-        bottomLay->addSpacing(6);
-        bottomLay->addWidget(m_difficultyButton);
+        btnGrid->addWidget(m_playButton,       0, 0);
+        btnGrid->addWidget(m_buttonStack,      0, 1);
+        btnGrid->addWidget(m_difficultyButton, 1, 0, 1, 2);
+        btnGrid->addWidget(m_newGameButton,    2, 0, 1, 2);
 
-        bottomBar->setFixedHeight(50);
-        leftLay->addWidget(bottomBar);
+        bottomLay->addLayout(btnGrid);
+
+        // 不在 leftPanel 中添加 bottomBar，后面会加入 rightPanel
     }
 
     rootLayout->addWidget(leftPanel, 1);
@@ -256,14 +287,20 @@ MainWindow::MainWindow(QWidget* parent)
         rightLay->setContentsMargins(0, 0, 0, 0);
 
         auto* logLabel = new QLabel("游戏日志");
-        logLabel->setStyleSheet("QLabel { color: #FFD700; font-size: 14px; font-weight: bold; }");
+        QFont logFont = logLabel->font();
+        logFont.setPointSize(15);
+        logFont.setBold(true);
+        logLabel->setFont(logFont);
+        logLabel->setStyleSheet("QLabel { color: #FFD700; }");
         rightLay->addWidget(logLabel);
 
         m_logTextEdit = new QTextEdit;
         m_logTextEdit->setReadOnly(true);
-        m_logTextEdit->setMaximumWidth(320);
-        m_logTextEdit->setMinimumWidth(240);
+        m_logTextEdit->setMinimumWidth(260);
+        m_logTextEdit->setMaximumWidth(400);
         rightLay->addWidget(m_logTextEdit, 1);
+
+        rightLay->addWidget(bottomBar);
 
         rootLayout->addWidget(rightPanel);
     }
@@ -278,8 +315,7 @@ void MainWindow::onPlayButtonClicked()
 
     if (m_isPicking) {
         m_isPicking = false;
-        m_pickButton->setVisible(false);
-        m_passButton->setVisible(true);
+        m_buttonStack->setCurrentIndex(0);
         appendLog("使用随机发牌");
     }
 
@@ -312,6 +348,11 @@ void MainWindow::onPlayButtonClicked()
         if (cw->isSelected()) {
             animateCardToTable(cw);
         }
+    }
+
+    // 炸弹/王炸 — 桌面抖动
+    if (result.type == CardType::Bomb || result.type == CardType::Rocket) {
+        shakeWidget(m_tableFrame);
     }
 
     for (const Card& c : selected) {
@@ -609,6 +650,11 @@ void MainWindow::doAITurn()
     m_lastPlay = parseCardType(chosen);
     m_lastPlayerName = "玩家B";
 
+    // 炸弹/王炸 — 桌面抖动
+    if (m_lastPlay.type == CardType::Bomb || m_lastPlay.type == CardType::Rocket) {
+        shakeWidget(m_tableFrame);
+    }
+
     m_tracker.recordPlayed(chosen);
 
     if (checkSpecialVictory(m_playerB)) {
@@ -724,9 +770,9 @@ void MainWindow::updateUI()
         QString("回合: %1").arg(m_roundCount));
 
     m_scoreALabel->setText(
-        QString("玩家A总分: %1").arg(m_playerA.totalScore));
+        QString("玩家A: %1 分").arg(m_playerA.totalScore));
     m_scoreBLabel->setText(
-        QString("玩家B总分: %1").arg(m_playerB.totalScore));
+        QString("玩家B: %1 分").arg(m_playerB.totalScore));
 
     if (m_lastPlay.type != CardType::Invalid) {
         QString typeStr = cardTypeToQString(m_lastPlay.type);
@@ -750,7 +796,15 @@ void MainWindow::updateUI()
         delete item;
     }
 
-    if (!m_lastPlay.cards.empty()) {
+    if (m_lastPlay.type == CardType::Invalid || m_lastPlay.cards.empty()) {
+        // 桌面为空，显示提示
+        QLabel* hint = new QLabel("等待出牌");
+        QFont hintFont = hint->font();
+        hintFont.setPointSize(16);
+        hint->setFont(hintFont);
+        hint->setStyleSheet("QLabel { color: #4CAF50; }");
+        m_tableCardsLayout->addWidget(hint);
+    } else {
         for (const Card& card : m_lastPlay.cards) {
             CardWidget* cw = new CardWidget(card);
             cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
@@ -800,12 +854,10 @@ void MainWindow::updateUI()
 
     if (!m_gameOver) {
         if (m_isPicking) {
-            m_pickButton->setVisible(true);
-            m_passButton->setVisible(false);
+            m_buttonStack->setCurrentIndex(1);  // 选卡
             m_playButton->setEnabled(!m_playerA.hand.empty());
         } else {
-            m_pickButton->setVisible(false);
-            m_passButton->setVisible(true);
+            m_buttonStack->setCurrentIndex(0);  // 不要
             m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
         }
         m_passButton->setEnabled(m_lastPlay.type != CardType::Invalid);
@@ -834,6 +886,23 @@ void MainWindow::endRound(Player& winner)
     appendLog(QString("--- 回合 %1 结束 ---").arg(m_roundCount));
 
     playSound(m_soundShine);
+
+    // 桌面边框闪光
+    if (m_tableFrame) {
+        QString savedStyle = m_tableFrame->styleSheet();
+        m_tableFrame->setStyleSheet(R"(
+            QFrame {
+                background-color: #0D3B16;
+                border: 3px solid #FFFFFF;
+                border-radius: 12px;
+            }
+        )");
+        QTimer::singleShot(250, this, [this, savedStyle]() {
+            if (m_tableFrame) {
+                m_tableFrame->setStyleSheet(savedStyle);
+            }
+        });
+    }
 
     updateUI();
 }
@@ -913,32 +982,22 @@ void MainWindow::appendLog(const QString& text)
 
 QWidget* MainWindow::createCardBack()
 {
+    const int w = 80;   // 比玩家A 的 100 小
+    const int h = 120;
+
     QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
 
-    if (QFile::exists(backPath)) {
-        QLabel* back = new QLabel;
-        back->setFixedSize(80, 120);
-        QPixmap pix(backPath);
-        back->setPixmap(pix.scaled(80, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-        back->setScaledContents(true);
-        return back;
-    }
+    QLabel* back = new QLabel;
+    back->setFixedSize(w, h);
+    back->setScaledContents(true);
 
-    QLabel* lbl = new QLabel;
-    lbl->setFixedSize(64, 90);
-    lbl->setAlignment(Qt::AlignCenter);
-    lbl->setText("背面");
-    lbl->setStyleSheet(
-        "QLabel {"
-        "  border: 2px solid #555;"
-        "  border-radius: 6px;"
-        "  background: qlineargradient(x1:0,y1:0,x2:1,y2:1,"
-        "    stop:0 #2c3e50, stop:0.5 #34495e, stop:1 #2c3e50);"
-        "  color: #ecf0f1;"
-        "  font-weight: bold;"
-        "  font-size: 13px;"
-        "}");
-    return lbl;
+    if (QFile::exists(backPath)) {
+        QPixmap pix(backPath);
+        back->setPixmap(pix.scaled(w, h, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    } else {
+        back->setStyleSheet("background-color: #888888; border: 2px solid #555555; border-radius: 8px;");
+    }
+    return back;
 }
 
 // ── 音效 ──────────────────────────────────────────────────────────
@@ -1006,4 +1065,31 @@ void MainWindow::animateCardToTable(CardWidget* sourceWidget)
 
     connect(anim, &QPropertyAnimation::finished, flyingCard, &QLabel::deleteLater);
     anim->start(QAbstractAnimation::DeleteWhenStopped);
+}
+
+// ── 控件抖动 ──────────────────────────────────────────────────
+
+void MainWindow::shakeWidget(QWidget* widget)
+{
+    if (!widget || m_shaking) return;
+    m_shaking = true;
+
+    QPoint orig = widget->pos();
+    QTimer* timer = new QTimer(this);
+    int* counter = new int(0);
+
+    connect(timer, &QTimer::timeout, this, [=]() mutable {
+        if (*counter >= 8) {
+            timer->stop();
+            widget->move(orig);
+            delete counter;
+            timer->deleteLater();
+            m_shaking = false;
+            return;
+        }
+        int dx = ((*counter) % 2 == 0) ? 4 : -4;
+        widget->move(orig.x() + dx, orig.y());
+        (*counter)++;
+    });
+    timer->start(30);
 }

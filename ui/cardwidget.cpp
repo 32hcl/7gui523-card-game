@@ -2,14 +2,21 @@
 #include <QPainter>
 #include <QPen>
 #include <QFontMetrics>
+#include <QPropertyAnimation>
 #include <QCoreApplication>
 #include <QFile>
 
 CardWidget::CardWidget(const Card& card, QWidget* parent)
-    : QWidget(parent), m_card(card)
+    : QWidget(parent), m_card(card), m_currentYOffset(21)
 {
-    setFixedSize(80, 140);
+    setFixedSize(100, 150);
     loadPixmap();
+
+    auto* shadow = new QGraphicsDropShadowEffect(this);
+    shadow->setBlurRadius(12);
+    shadow->setColor(QColor(0, 0, 0, 150));
+    shadow->setOffset(2, 2);
+    setGraphicsEffect(shadow);
 }
 
 Card CardWidget::getCard() const
@@ -21,7 +28,12 @@ void CardWidget::setSelected(bool selected)
 {
     if (m_selected != selected) {
         m_selected = selected;
-        update();
+        QPropertyAnimation* anim = new QPropertyAnimation(this, "currentYOffset");
+        anim->setDuration(150);
+        anim->setEasingCurve(QEasingCurve::OutCubic);
+        anim->setStartValue(m_currentYOffset);
+        anim->setEndValue(m_selected ? 1 : 21);
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
     }
 }
 
@@ -30,10 +42,23 @@ bool CardWidget::isSelected() const
     return m_selected;
 }
 
+void CardWidget::setCurrentYOffset(int v)
+{
+    m_currentYOffset = v;
+    update();
+}
+
 void CardWidget::mousePressEvent(QMouseEvent*)
 {
     m_selected = !m_selected;
-    update();
+
+    QPropertyAnimation* anim = new QPropertyAnimation(this, "currentYOffset");
+    anim->setDuration(150);
+    anim->setEasingCurve(QEasingCurve::OutCubic);
+    anim->setStartValue(m_currentYOffset);
+    anim->setEndValue(m_selected ? 1 : 21);
+    anim->start(QAbstractAnimation::DeleteWhenStopped);
+
     emit clicked();
 }
 
@@ -106,19 +131,21 @@ void CardWidget::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    const int w = width();
-    const int yOffset = m_selected ? 1 : 21;
+    const int w = width();      // 100
+    const int h = height();     // 150
+    const int yOffset = m_currentYOffset;  // 动画值
 
     if (!m_pixmap.isNull()) {
-        QPixmap scaled = m_pixmap.scaled(w, 118,
+        QPixmap scaled = m_pixmap.scaled(w - 4, 128,
                                          Qt::KeepAspectRatio,
                                          Qt::SmoothTransformation);
-        p.drawPixmap(0, yOffset, scaled);
+        int x = (w - scaled.width()) / 2;
+        p.drawPixmap(x, yOffset, scaled);
 
         if (m_selected) {
             p.setPen(QPen(QColor(255, 200, 0), 3));
             p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(1, yOffset, w - 2, 118, 8, 8);
+            p.drawRoundedRect(1, yOffset, w - 2, 128, 8, 8);
         }
     } else {
         if (m_selected) {
@@ -127,7 +154,7 @@ void CardWidget::paintEvent(QPaintEvent*)
             p.setPen(QPen(Qt::black, 2));
         }
         p.setBrush(Qt::white);
-        p.drawRoundedRect(1, yOffset, w - 2, 118, 8, 8);
+        p.drawRoundedRect(1, yOffset, w - 2, 128, 8, 8);
 
         const QColor color = textColor();
         p.setPen(color);
@@ -142,32 +169,32 @@ void CardWidget::paintEvent(QPaintEvent*)
 
         if (m_card.point != "大鬼" && m_card.point != "小鬼") {
             QFont centerFont = font();
-            centerFont.setPixelSize(32);
+            centerFont.setPixelSize(34);
             p.setFont(centerFont);
             p.setOpacity(0.20);
-            p.drawText(0, yOffset, w, 118, Qt::AlignCenter, suitSymbol());
+            p.drawText(0, yOffset, w, 128, Qt::AlignCenter, suitSymbol());
             p.setOpacity(1.0);
         }
 
         QFont suitFont = font();
-        suitFont.setPixelSize(14);
+        suitFont.setPixelSize(16);
         suitFont.setBold(true);
         p.setFont(suitFont);
         p.setPen(color);
 
-        p.drawText(w - 34, yOffset + 118 - 28, 30, 24,
+        p.drawText(w - 38, yOffset + 128 - 30, 34, 26,
                    Qt::AlignRight | Qt::AlignBottom, suitSymbol());
     }
 
     if (m_card.score > 0) {
         QFont scFont = font();
-        scFont.setPixelSize(11);
+        scFont.setPixelSize(12);
         scFont.setBold(true);
         p.setFont(scFont);
         p.setPen(QColor(255, 215, 0));
 
         QString scText = QString("%1分").arg(m_card.score);
-        QRect textRect(0, yOffset + 118 - 20, w, 16);
+        QRect textRect(0, yOffset + 128 - 22, w, 20);
         p.drawText(textRect, Qt::AlignCenter, scText);
     }
 }
