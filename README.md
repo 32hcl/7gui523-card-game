@@ -4,35 +4,6 @@ Copyright © 2026 32%Hcl 陈龙大王
 
 一个两人对战的扑克牌游戏。
 
-
-
-## 如何运行
-
-### 方式一：下载 Release
-
-1. 打开 Releases 页面
-2. 下载 `7gui523-v1.0-win64.zip`
-3. 解压到任意目录
-4. 双击 `game.exe` 运行
-
-### 方式二：从源码编译
-
-需要：
-- Qt 6.11.2
-- CMake 3.16+
-- MinGW 13.1
-- Ninja
-
-编译步骤：
-
-```bash
-mkdir build
-cd build
-cmake .. -G Ninja -DCMAKE_PREFIX_PATH=你的Qt路径
-cmake --build .
-windeployqt game.exe
-./game.exe
-
 操作
 选卡：游戏开始时点击"选卡"自定义起始手牌
 
@@ -84,6 +55,34 @@ windeployqt game.exe
 - 选卡开局：自定义 5 张起始手牌
 - 出牌动画、音效
 - 游戏日志面板
+
+## 如何运行
+
+### 方式一：下载 Release
+
+1. 打开 Releases 页面
+2. 下载 `7gui523-v1.0-win64.zip`
+3. 解压到任意目录
+4. 双击 `game.exe` 运行
+
+### 方式二：从源码编译
+
+需要：
+- Qt 6.11.2
+- CMake 3.16+
+- MinGW 13.1
+- Ninja
+
+编译步骤：
+
+```bash
+mkdir build
+cd build
+cmake .. -G Ninja -DCMAKE_PREFIX_PATH=你的Qt路径
+cmake --build .
+windeployqt game.exe
+./game.exe
+
 
 许可
 本项目使用 PolyForm Noncommercial License 1.0.0 授权。
