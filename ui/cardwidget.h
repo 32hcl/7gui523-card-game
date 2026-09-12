@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include <QMouseEvent>
+#include <QPixmap>
 #include "core/card.h"
 
 class CardWidget : public QWidget {
@@ -11,6 +12,8 @@ public:
     Card getCard() const;
     void setSelected(bool selected);
     bool isSelected() const;
+
+    static QString cardImageFileName(const Card& card);
 
 signals:
     void clicked();
@@ -22,7 +25,10 @@ protected:
 private:
     Card m_card;
     bool m_selected = false;
+    QPixmap m_pixmap;
+
     QColor textColor() const;
     QString suitSymbol() const;
     int pointFontSize() const;
+    void loadPixmap();
 };

@@ -8,6 +8,8 @@
 #include <QTextEdit>
 #include <QMessageBox>
 #include <QTimer>
+#include <QMediaPlayer>
+#include <QAudioOutput>
 #include "core/deck.h"
 #include "core/player.h"
 #include "core/cardtype.h"
@@ -43,6 +45,9 @@ private:
     void disableActionButtons();
     void enableActionButtons();
     void appendLog(const QString& text);
+    void initSounds();
+    void playSound(QMediaPlayer* player);
+    void animateCardToTable(CardWidget* sourceWidget);
 
     Deck   m_deck;
     Player m_playerA;
@@ -78,4 +83,20 @@ private:
     QPushButton* m_difficultyButton;
     std::vector<CardWidget*> m_playerACardWidgets;
     QTextEdit* m_logTextEdit;
+
+    QMediaPlayer* m_soundSuccess = nullptr;
+    QMediaPlayer* m_soundFailure = nullptr;
+    QMediaPlayer* m_soundCorrect = nullptr;
+    QMediaPlayer* m_soundWrong   = nullptr;
+    QMediaPlayer* m_soundClick   = nullptr;
+    QMediaPlayer* m_soundCasino  = nullptr;
+    QMediaPlayer* m_soundShine   = nullptr;
+
+    QAudioOutput* m_audioSuccess = nullptr;
+    QAudioOutput* m_audioFailure = nullptr;
+    QAudioOutput* m_audioCorrect = nullptr;
+    QAudioOutput* m_audioWrong   = nullptr;
+    QAudioOutput* m_audioClick   = nullptr;
+    QAudioOutput* m_audioCasino  = nullptr;
+    QAudioOutput* m_audioShine   = nullptr;
 };

@@ -14,6 +14,11 @@
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QTimer>
+#include <QPropertyAnimation>
+#include <QGraphicsOpacityEffect>
+#include <QFile>
+#include <QCoreApplication>
+#include <QPixmap>
 #include <algorithm>
 
 static QString cardsToString(const std::vector<Card>& cards) {
@@ -82,6 +87,8 @@ MainWindow::MainWindow(QWidget* parent)
             font-size: 12px;
         }
     )");
+
+    initSounds();
 
     auto* central = new QWidget(this);
     setCentralWidget(central);
@@ -291,12 +298,20 @@ void MainWindow::onPlayButtonClicked()
     CardTypeResult result = parseCardType(selected);
     if (result.type == CardType::Invalid) {
         QMessageBox::warning(this, "非法牌型", "你选的牌不构成合法牌型");
+        playSound(m_soundWrong);
         return;
     }
 
     if (m_lastPlay.type != CardType::Invalid && !canBeat(result, m_lastPlay)) {
         QMessageBox::warning(this, "无法压过", "你选的牌无法压过上一手");
+        playSound(m_soundWrong);
         return;
+    }
+
+    for (CardWidget* cw : m_playerACardWidgets) {
+        if (cw->isSelected()) {
+            animateCardToTable(cw);
+        }
     }
 
     for (const Card& c : selected) {
@@ -318,6 +333,7 @@ void MainWindow::onPlayButtonClicked()
 
     if (checkSpecialVictory(m_playerA)) {
         appendLog("玩家A 达成七鬼523，直接获胜！");
+        playSound(m_soundSuccess);
         showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
         disableActionButtons();
         return;
@@ -333,6 +349,12 @@ void MainWindow::onPlayButtonClicked()
         .arg(cardsToString(selected))
         .arg(cardTypeToQString(result.type))
         .arg(m_lastPlay.bonusScore > 0 ? QString(" 压分+%1").arg(m_lastPlay.bonusScore) : ""));
+
+    if (m_lastPlay.bonusScore > 0 || result.type == CardType::Bomb || result.type == CardType::Rocket) {
+        playSound(m_soundCasino);
+    } else {
+        playSound(m_soundCorrect);
+    }
 
     updateUI();
 
@@ -350,6 +372,7 @@ void MainWindow::onPlayButtonClicked()
         QString w = (m_playerA.totalScore >= m_playerB.totalScore) ? "玩家A" : "玩家B";
         appendLog(QString("最终胜者: %1").arg(w));
 
+        playSound(m_soundSuccess);
         showGameOverDialog(QString("玩家A 出完牌！\n玩家A: %1 分\n玩家B: %2 分")
             .arg(m_playerA.totalScore).arg(m_playerB.totalScore));
         disableActionButtons();
@@ -378,10 +401,12 @@ void MainWindow::onPlayButtonClicked()
 
 void MainWindow::onPassButtonClicked()
 {
+    playSound(m_soundClick);
     if (m_waitingForAI || m_gameOver) return;
 
     if (m_lastPlay.type == CardType::Invalid) {
         QMessageBox::warning(this, "提示", "首出不能不要");
+        playSound(m_soundWrong);
         return;
     }
 
@@ -399,12 +424,14 @@ void MainWindow::onPassButtonClicked()
 
         if (checkSpecialVictory(m_playerA)) {
             appendLog("玩家A 达成七鬼523，直接获胜！");
+            playSound(m_soundSuccess);
             showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
             disableActionButtons();
             return;
         }
         if (checkSpecialVictory(m_playerB)) {
             appendLog("玩家B 达成七鬼523，直接获胜！");
+            playSound(m_soundFailure);
             showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
             disableActionButtons();
             return;
@@ -425,12 +452,14 @@ void MainWindow::onPassButtonClicked()
 
     if (checkSpecialVictory(m_playerA)) {
         appendLog("玩家A 达成七鬼523，直接获胜！");
+        playSound(m_soundSuccess);
         showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
         disableActionButtons();
         return;
     }
     if (checkSpecialVictory(m_playerB)) {
         appendLog("玩家B 达成七鬼523，直接获胜！");
+        playSound(m_soundFailure);
         showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
         disableActionButtons();
         return;
@@ -446,12 +475,14 @@ void MainWindow::onPassButtonClicked()
 
 void MainWindow::onNewGameButtonClicked()
 {
+    playSound(m_soundClick);
     m_gameOver = false;
     startNewGame();
 }
 
 void MainWindow::onDifficultyButtonClicked()
 {
+    playSound(m_soundClick);
     switch (m_aiLevel) {
         case AILevel::AI1_Simple:
             m_aiLevel = AILevel::AI2_Rule;
@@ -471,6 +502,7 @@ void MainWindow::onDifficultyButtonClicked()
 
 void MainWindow::onPickButtonClicked()
 {
+    playSound(m_soundClick);
     CardPickerDialog dlg(this);
     if (dlg.exec() == QDialog::Accepted) {
         std::vector<Card> selected = dlg.selectedCards();
@@ -541,12 +573,14 @@ void MainWindow::doAITurn()
 
         if (checkSpecialVictory(m_playerA)) {
             appendLog("玩家A 达成七鬼523，直接获胜！");
+            playSound(m_soundSuccess);
             showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
             disableActionButtons();
             return;
         }
         if (checkSpecialVictory(m_playerB)) {
             appendLog("玩家B 达成七鬼523，直接获胜！");
+            playSound(m_soundFailure);
             showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
             disableActionButtons();
             return;
@@ -579,6 +613,7 @@ void MainWindow::doAITurn()
 
     if (checkSpecialVictory(m_playerB)) {
         appendLog("玩家B 达成七鬼523，直接获胜！");
+        playSound(m_soundFailure);
         showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
         disableActionButtons();
         return;
@@ -593,6 +628,12 @@ void MainWindow::doAITurn()
         .arg(cardsToString(chosen))
         .arg(cardTypeToQString(m_lastPlay.type))
         .arg(m_lastPlay.bonusScore > 0 ? QString(" 压分+%1").arg(m_lastPlay.bonusScore) : ""));
+
+    if (m_lastPlay.bonusScore > 0 || m_lastPlay.type == CardType::Bomb || m_lastPlay.type == CardType::Rocket) {
+        playSound(m_soundCasino);
+    } else {
+        playSound(m_soundCorrect);
+    }
 
     updateUI();
 
@@ -610,6 +651,7 @@ void MainWindow::doAITurn()
         QString w = (m_playerA.totalScore >= m_playerB.totalScore) ? "玩家A" : "玩家B";
         appendLog(QString("最终胜者: %1").arg(w));
 
+        playSound(m_soundFailure);
         showGameOverDialog(QString("玩家B 出完牌！\n玩家A: %1 分\n玩家B: %2 分")
             .arg(m_playerA.totalScore).arg(m_playerB.totalScore));
         disableActionButtons();
@@ -712,6 +754,15 @@ void MainWindow::updateUI()
         for (const Card& card : m_lastPlay.cards) {
             CardWidget* cw = new CardWidget(card);
             cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+
+            auto* effect = new QGraphicsOpacityEffect(cw);
+            cw->setGraphicsEffect(effect);
+            QPropertyAnimation* fade = new QPropertyAnimation(effect, "opacity");
+            fade->setDuration(300);
+            fade->setStartValue(0.0);
+            fade->setEndValue(1.0);
+            fade->start(QAbstractAnimation::DeleteWhenStopped);
+
             m_tableCardsLayout->addWidget(cw);
         }
     }
@@ -781,6 +832,9 @@ void MainWindow::endRound(Player& winner)
     m_lastPlay.keyPoint.clear();
     ++m_roundCount;
     appendLog(QString("--- 回合 %1 结束 ---").arg(m_roundCount));
+
+    playSound(m_soundShine);
+
     updateUI();
 }
 
@@ -859,6 +913,17 @@ void MainWindow::appendLog(const QString& text)
 
 QWidget* MainWindow::createCardBack()
 {
+    QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
+
+    if (QFile::exists(backPath)) {
+        QLabel* back = new QLabel;
+        back->setFixedSize(80, 120);
+        QPixmap pix(backPath);
+        back->setPixmap(pix.scaled(80, 120, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        back->setScaledContents(true);
+        return back;
+    }
+
     QLabel* lbl = new QLabel;
     lbl->setFixedSize(64, 90);
     lbl->setAlignment(Qt::AlignCenter);
@@ -874,4 +939,71 @@ QWidget* MainWindow::createCardBack()
         "  font-size: 13px;"
         "}");
     return lbl;
+}
+
+// ── 音效 ──────────────────────────────────────────────────────────
+
+void MainWindow::initSounds()
+{
+    auto createPlayer = [](const QString& path,
+                           QAudioOutput*& out,
+                           QMediaPlayer*& player) {
+        player = new QMediaPlayer();
+        out = new QAudioOutput();
+        player->setAudioOutput(out);
+        out->setVolume(0.6);
+        if (QFile::exists(path)) {
+            player->setSource(QUrl::fromLocalFile(path));
+        }
+    };
+
+    QString base = QCoreApplication::applicationDirPath() + "/music/";
+    createPlayer(base + "成功.mp3", m_audioSuccess, m_soundSuccess);
+    createPlayer(base + "失败.mp3", m_audioFailure, m_soundFailure);
+    createPlayer(base + "正确.mp3", m_audioCorrect, m_soundCorrect);
+    createPlayer(base + "错误.mp3", m_audioWrong,   m_soundWrong);
+    createPlayer(base + "点击.mp3", m_audioClick,   m_soundClick);
+    createPlayer(base + "赌场-弹珠机-老虎机.mp3", m_audioCasino, m_soundCasino);
+    createPlayer(base + "闪亮.mp3", m_audioShine,   m_soundShine);
+}
+
+void MainWindow::playSound(QMediaPlayer* player)
+{
+    if (!player) return;
+    if (player->source().isEmpty()) return;
+    player->stop();
+    player->setPosition(0);
+    player->play();
+}
+
+// ── 出牌飞行动画 ──────────────────────────────────────────────────
+
+void MainWindow::animateCardToTable(CardWidget* sourceWidget)
+{
+    if (!sourceWidget) return;
+
+    QPixmap pixmap(sourceWidget->size());
+    sourceWidget->render(&pixmap);
+
+    QLabel* flyingCard = new QLabel(this);
+    flyingCard->setPixmap(pixmap);
+    flyingCard->setFixedSize(sourceWidget->size());
+
+    QPoint startPos = sourceWidget->mapTo(this, QPoint(0, 0));
+    QPoint endPos = m_tableCardsWidget->mapTo(this, QPoint(
+        m_tableCardsWidget->width() / 2 - sourceWidget->width() / 2,
+        m_tableCardsWidget->height() / 2 - sourceWidget->height() / 2));
+
+    flyingCard->move(startPos);
+    flyingCard->show();
+    flyingCard->raise();
+
+    QPropertyAnimation* anim = new QPropertyAnimation(flyingCard, "pos");
+    anim->setDuration(400);
+    anim->setStartValue(startPos);
+    anim->setEndValue(endPos);
+    anim->setEasingCurve(QEasingCurve::OutCubic);
+
+    connect(anim, &QPropertyAnimation::finished, flyingCard, &QLabel::deleteLater);
+    anim->start(QAbstractAnimation::DeleteWhenStopped);
 }

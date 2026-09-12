@@ -1,4 +1,5 @@
 #include "cardpickerdialog.h"
+#include "cardwidget.h"
 #include "core/deck.h"
 
 #include <QVBoxLayout>
@@ -6,15 +7,20 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QCoreApplication>
+#include <QFile>
+#include <QIcon>
 
 CardPickerDialog::CardPickerDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle("选择起始手牌");
-    setMinimumWidth(800);
+    setMinimumWidth(900);
 
     Deck full = createStandardDeck();
     m_allCards = full.cards;
+
+    QString cardsDir = QCoreApplication::applicationDirPath() + "/cards/";
 
     auto* mainLayout = new QVBoxLayout(this);
 
@@ -37,11 +43,24 @@ CardPickerDialog::CardPickerDialog(QWidget* parent)
             for (size_t i = 0; i < m_allCards.size(); ++i) {
                 if (m_allCards[i].suit == suits[row] &&
                     m_allCards[i].point == points[col]) {
-                    QString text = QString::fromStdString(suits[row] + points[col]);
-                    auto* btn = new QPushButton(text);
-                    btn->setFixedSize(56, 48);
+
+                    QString fileName = CardWidget::cardImageFileName(m_allCards[i]);
+                    QString cardImgPath = cardsDir + fileName;
+
+                    auto* btn = new QPushButton;
+                    btn->setFixedSize(60, 84);
                     btn->setCheckable(true);
                     btn->setProperty("cardIndex", (int)i);
+
+                    if (QFile::exists(cardImgPath)) {
+                        btn->setIcon(QIcon(cardImgPath));
+                        btn->setIconSize(QSize(56, 80));
+                        btn->setStyleSheet("QPushButton { border: 1px solid #999; background: white; }");
+                    } else {
+                        QString text = QString::fromStdString(suits[row] + points[col]);
+                        btn->setText(text);
+                    }
+
                     connect(btn, &QPushButton::clicked,
                             this, &CardPickerDialog::onCardClicked);
                     grid->addWidget(btn, row, col);
@@ -57,11 +76,23 @@ CardPickerDialog::CardPickerDialog(QWidget* parent)
         int col = 0;
         for (size_t i = 0; i < m_allCards.size(); ++i) {
             if (m_allCards[i].point == "大鬼" || m_allCards[i].point == "小鬼") {
-                QString text = QString::fromStdString(m_allCards[i].point);
-                auto* btn = new QPushButton(text);
-                btn->setFixedSize(56, 48);
+                QString fileName = CardWidget::cardImageFileName(m_allCards[i]);
+                QString cardImgPath = cardsDir + fileName;
+
+                auto* btn = new QPushButton;
+                btn->setFixedSize(60, 84);
                 btn->setCheckable(true);
                 btn->setProperty("cardIndex", (int)i);
+
+                if (QFile::exists(cardImgPath)) {
+                    btn->setIcon(QIcon(cardImgPath));
+                    btn->setIconSize(QSize(56, 80));
+                    btn->setStyleSheet("QPushButton { border: 1px solid #999; background: white; }");
+                } else {
+                    QString text = QString::fromStdString(m_allCards[i].point);
+                    btn->setText(text);
+                }
+
                 connect(btn, &QPushButton::clicked,
                         this, &CardPickerDialog::onCardClicked);
                 grid->addWidget(btn, row, col);
@@ -98,7 +129,7 @@ void CardPickerDialog::onCardClicked() {
                         cardIndex);
     if (it != m_selectedIndices.end()) {
         m_selectedIndices.erase(it);
-        btn->setStyleSheet("");
+        btn->setStyleSheet("QPushButton { border: 1px solid #999; background: white; }");
     } else {
         if (m_selectedIndices.size() >= 5) {
             QMessageBox::information(this, "提示", "最多只能选择 5 张牌");
