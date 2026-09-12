@@ -53,6 +53,7 @@ private:
     std::string m_lastPlayerName;
     bool m_gameOver = false;
     bool m_waitingForAI = false;
+    bool m_isPicking = false;
 
     AILevel m_aiLevel = AILevel::AI1_Simple;
     CardTracker m_tracker;

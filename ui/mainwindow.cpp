@@ -37,8 +37,51 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
     setWindowTitle("7鬼523斗地主变体");
-    setMinimumSize(1000, 680);
-    resize(1000, 680);
+    setMinimumSize(1100, 720);
+    resize(1100, 720);
+
+    setStyleSheet(R"(
+        QMainWindow {
+            background-color: #1B5E20;
+        }
+        QWidget {
+            color: #FFFFFF;
+            font-family: "Microsoft YaHei";
+        }
+        QLabel {
+            color: #FFFFFF;
+        }
+        QPushButton {
+            background-color: #2E7D32;
+            color: #FFFFFF;
+            border: 2px solid #66BB6A;
+            border-radius: 8px;
+            padding: 6px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            min-width: 80px;
+        }
+        QPushButton:hover {
+            background-color: #388E3C;
+            border-color: #81C784;
+        }
+        QPushButton:pressed {
+            background-color: #1B5E20;
+        }
+        QPushButton:disabled {
+            background-color: #555555;
+            color: #999999;
+            border-color: #777777;
+        }
+        QTextEdit {
+            background-color: #263238;
+            color: #ECEFF1;
+            border: 1px solid #455A64;
+            border-radius: 6px;
+            font-family: "Consolas", "Microsoft YaHei";
+            font-size: 12px;
+        }
+    )");
 
     auto* central = new QWidget(this);
     setCentralWidget(central);
@@ -58,13 +101,12 @@ MainWindow::MainWindow(QWidget* parent)
         topLay->setContentsMargins(0, 0, 0, 0);
 
         auto* titleLabel = new QLabel("7鬼523斗地主变体");
-        QFont titleFont = titleLabel->font();
-        titleFont.setPointSize(14);
-        titleFont.setBold(true);
-        titleLabel->setFont(titleFont);
+        titleLabel->setStyleSheet("QLabel { color: #FFD700; font-size: 16px; font-weight: bold; }");
 
         m_deckCountLabel = new QLabel("牌堆剩余: --");
+        m_deckCountLabel->setStyleSheet("QLabel { color: #B0BEC5; font-size: 13px; }");
         m_roundLabel      = new QLabel("回合: --");
+        m_roundLabel->setStyleSheet("QLabel { color: #B0BEC5; font-size: 13px; }");
 
         topLay->addWidget(titleLabel);
         topLay->addStretch();
@@ -78,9 +120,11 @@ MainWindow::MainWindow(QWidget* parent)
 
     {
         auto* labelB = new QLabel("玩家B");
-        QFont f = labelB->font();
-        f.setBold(true);
-        labelB->setFont(f);
+        QFont playerFontB = labelB->font();
+        playerFontB.setPointSize(13);
+        playerFontB.setBold(true);
+        labelB->setFont(playerFontB);
+        labelB->setStyleSheet("QLabel { color: #FFD700; }");
         leftLay->addWidget(labelB);
 
         m_playerBHandWidget = new QWidget;
@@ -96,10 +140,14 @@ MainWindow::MainWindow(QWidget* parent)
     {
         auto* tableFrame = new QFrame;
         tableFrame->setFrameShape(QFrame::StyledPanel);
-        tableFrame->setStyleSheet(
-            "QFrame { background: #f0f0f0; border: 1px solid #ccc;"
-            "          border-radius: 6px; }");
-        tableFrame->setMinimumHeight(220);
+        tableFrame->setStyleSheet(R"(
+            QFrame {
+                background-color: #0D3B16;
+                border: 3px solid #FFD700;
+                border-radius: 12px;
+            }
+        )");
+        tableFrame->setMinimumHeight(240);
 
         auto* tableLay = new QVBoxLayout(tableFrame);
         tableLay->setAlignment(Qt::AlignCenter);
@@ -108,6 +156,7 @@ MainWindow::MainWindow(QWidget* parent)
         QFont tf = m_handTypeLabel->font();
         tf.setPointSize(12);
         m_handTypeLabel->setFont(tf);
+        m_handTypeLabel->setStyleSheet("QLabel { color: #B0BEC5; }");
         tableLay->addWidget(m_handTypeLabel);
 
         m_tableCardsWidget = new QWidget;
@@ -119,8 +168,11 @@ MainWindow::MainWindow(QWidget* parent)
         m_tableCardsWidget->setFixedHeight(150);
 
         m_tableScoreLabel = new QLabel("本回合桌面得分: 0 分");
-        m_tableScoreLabel->setFont(tf);
-        m_tableScoreLabel->setStyleSheet("color: black;");
+        QFont tableFont = m_tableScoreLabel->font();
+        tableFont.setPointSize(13);
+        tableFont.setBold(true);
+        m_tableScoreLabel->setFont(tableFont);
+        m_tableScoreLabel->setStyleSheet("QLabel { color: #FFEB3B; }");
         tableLay->addWidget(m_tableScoreLabel);
 
         leftLay->addWidget(tableFrame);
@@ -128,9 +180,11 @@ MainWindow::MainWindow(QWidget* parent)
 
     {
         auto* labelA = new QLabel("玩家A");
-        QFont f = labelA->font();
-        f.setBold(true);
-        labelA->setFont(f);
+        QFont playerFontA = labelA->font();
+        playerFontA.setPointSize(13);
+        playerFontA.setBold(true);
+        labelA->setFont(playerFontA);
+        labelA->setStyleSheet("QLabel { color: #FFD700; }");
         leftLay->addWidget(labelA);
 
         m_playerAHandWidget = new QWidget;
@@ -149,6 +203,14 @@ MainWindow::MainWindow(QWidget* parent)
 
         m_scoreALabel = new QLabel("玩家A总分: 0");
         m_scoreBLabel = new QLabel("玩家B总分: 0");
+
+        QFont scoreFont = m_scoreALabel->font();
+        scoreFont.setPointSize(14);
+        scoreFont.setBold(true);
+        m_scoreALabel->setFont(scoreFont);
+        m_scoreBLabel->setFont(scoreFont);
+        m_scoreALabel->setStyleSheet("QLabel { color: #FFD700; }");
+        m_scoreBLabel->setStyleSheet("QLabel { color: #FFD700; }");
 
         m_playButton    = new QPushButton("出牌");
         m_passButton    = new QPushButton("不要");
@@ -187,10 +249,7 @@ MainWindow::MainWindow(QWidget* parent)
         rightLay->setContentsMargins(0, 0, 0, 0);
 
         auto* logLabel = new QLabel("游戏日志");
-        QFont lf = logLabel->font();
-        lf.setBold(true);
-        lf.setPointSize(12);
-        logLabel->setFont(lf);
+        logLabel->setStyleSheet("QLabel { color: #FFD700; font-size: 14px; font-weight: bold; }");
         rightLay->addWidget(logLabel);
 
         m_logTextEdit = new QTextEdit;
@@ -273,7 +332,7 @@ void MainWindow::onPlayButtonClicked()
     bool playerAFinished = m_playerA.hand.empty();
 
     if (playerAFinished && m_deck.cards.empty()) {
-        endRound(m_playerA);   // ← endRound 内部已结算 bonus 并清零
+        endRound(m_playerA);
         finalSettlement(m_playerA, m_playerB, m_tableCards);
         compareAndAnnounce(m_playerA, m_playerB);
 
@@ -435,10 +494,9 @@ void MainWindow::onPickButtonClicked()
         appendLog("使用随机发牌");
     }
 
-    m_pickButton->setVisible(false);
-    m_passButton->setVisible(true);
-    m_playButton->setEnabled(true);
+    m_isPicking = false;
     updateUI();
+    enableActionButtons();
 }
 
 void MainWindow::doAITurn()
@@ -573,6 +631,7 @@ void MainWindow::startNewGame()
 {
     m_gameOver = false;
     m_waitingForAI = false;
+    m_isPicking = false;
     m_lastPlay.type = CardType::Invalid;
     m_lastPlay.cards.clear();
     m_lastPlay.keyPoint.clear();
@@ -602,13 +661,7 @@ void MainWindow::startNewGame()
     appendLog(QString("牌堆剩余: %1 张").arg(static_cast<int>(m_deck.cards.size())));
 
     if (static_cast<int>(m_deck.cards.size()) == 44) {
-        m_pickButton->setVisible(true);
-        m_passButton->setVisible(false);
-        m_playButton->setEnabled(false);
-    } else {
-        m_pickButton->setVisible(false);
-        m_passButton->setVisible(true);
-        m_playButton->setEnabled(true);
+        m_isPicking = true;
     }
 
     updateUI();
@@ -688,7 +741,15 @@ void MainWindow::updateUI()
     }
 
     if (!m_gameOver) {
-        m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
+        if (m_isPicking) {
+            m_pickButton->setVisible(true);
+            m_passButton->setVisible(false);
+            m_playButton->setEnabled(false);
+        } else {
+            m_pickButton->setVisible(false);
+            m_passButton->setVisible(true);
+            m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
+        }
         m_passButton->setEnabled(m_lastPlay.type != CardType::Invalid);
     }
 }
