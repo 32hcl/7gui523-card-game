@@ -15,12 +15,12 @@
 #include <QTextCursor>
 #include <QTimer>
 #include <QPropertyAnimation>
-#include <QGraphicsOpacityEffect>
 #include <QStackedWidget>
 #include <QFile>
 #include <QCoreApplication>
 #include <QPixmap>
 #include <algorithm>
+#include <map>
 
 static QString cardsToString(const std::vector<Card>& cards) {
     QString result;
@@ -37,6 +37,67 @@ static QString cardsToString(const std::vector<Card>& cards) {
 
 static QString cardTypeToQString(CardType type) {
     return QString::fromStdString(cardTypeToString(type));
+}
+
+// ── 卡牌图片文件名（与 CardWidget::cardImageFileName 一致） ──
+
+static QString cardImageFileName(const Card& card) {
+    if (card.point == "大鬼") return "card_joker_red.png";
+    if (card.point == "小鬼") return "card_joker_black.png";
+
+    QString suitKey;
+    if (card.suit == "黑桃") suitKey = "spades";
+    else if (card.suit == "红桃") suitKey = "hearts";
+    else if (card.suit == "梅花") suitKey = "clubs";
+    else if (card.suit == "方块") suitKey = "diamonds";
+    else return QString();
+
+    QString pointKey = QString::fromStdString(card.point);
+    if (pointKey != "A" && pointKey != "J" && pointKey != "Q" && pointKey != "K") {
+        bool ok = false;
+        int num = pointKey.toInt(&ok);
+        if (ok) pointKey = QString("%1").arg(num, 2, 10, QChar('0'));
+    }
+    return QString("card_%1_%2.png").arg(suitKey).arg(pointKey);
+}
+
+// ── 手牌智能排序 ──────────────────────────────────────────────────
+
+static void sortHandSmart(std::vector<Card>& hand) {
+    std::map<std::string, int> countMap;
+    for (const Card& c : hand) countMap[c.point]++;
+
+    auto getRank = [&](const Card& c) -> int {
+        auto it = RANK_MAP.find(c.point);
+        return (it != RANK_MAP.end()) ? it->second : 0;
+    };
+
+    auto getTypePriority = [&](const Card& c) -> int {
+        int count = countMap[c.point];
+        if (c.point == "大鬼" || c.point == "小鬼") {
+            bool hasBig   = countMap.count("大鬼") > 0;
+            bool hasSmall = countMap.count("小鬼") > 0;
+            if (hasBig && hasSmall) return 100;  // 王炸
+            return 50;
+        }
+        if (count == 4) return 90;   // 炸弹
+        if (count == 3) return 70;   // 三张
+        if (count == 2) return 50;   // 对子
+        return 30;                    // 单张
+    };
+
+    std::sort(hand.begin(), hand.end(),
+        [&](const Card& a, const Card& b) {
+            int pa = getTypePriority(a);
+            int pb = getTypePriority(b);
+            if (pa != pb) return pa > pb;
+
+            int ra = getRank(a);
+            int rb = getRank(b);
+            if (ra != rb) return ra > rb;
+
+            return a.suit < b.suit;
+        });
 }
 
 MainWindow::MainWindow(QWidget* parent)
@@ -140,13 +201,7 @@ MainWindow::MainWindow(QWidget* parent)
     }
 
     {
-        auto* labelB = new QLabel("玩家B");
-        QFont playerFontB = labelB->font();
-        playerFontB.setPointSize(15);
-        playerFontB.setBold(true);
-        labelB->setFont(playerFontB);
-        labelB->setStyleSheet("QLabel { color: #FFD700; }");
-        leftLay->addWidget(labelB);
+        // 玩家B 标签已删除
 
         m_playerBHandWidget = new QWidget;
         m_playerBLayout     = new QHBoxLayout(m_playerBHandWidget);
@@ -155,7 +210,7 @@ MainWindow::MainWindow(QWidget* parent)
         m_playerBLayout->addStretch();
 
         leftLay->addWidget(m_playerBHandWidget);
-        m_playerBHandWidget->setFixedHeight(120);
+        m_playerBHandWidget->setFixedHeight(100);
     }
 
     {
@@ -164,14 +219,19 @@ MainWindow::MainWindow(QWidget* parent)
         m_tableFrame->setStyleSheet(R"(
             QFrame {
                 background-color: #0D3B16;
-                border: 3px solid #FFD700;
+                border: 1px solid #1B5E20;
                 border-radius: 12px;
             }
         )");
         m_tableFrame->setMinimumHeight(280);
 
-        auto* tableLay = new QVBoxLayout(m_tableFrame);
-        tableLay->setContentsMargins(20, 15, 20, 15);
+        auto* tableOuterLay = new QHBoxLayout(m_tableFrame);
+        tableOuterLay->setContentsMargins(0, 0, 0, 0);
+
+        // ── 左侧：原有内容（70%） ──
+        auto* leftBox = new QWidget;
+        auto* tableLay = new QVBoxLayout(leftBox);
+        tableLay->setContentsMargins(20, 15, 10, 15);
         tableLay->setSpacing(10);
 
         // 顶部：上一手牌型
@@ -186,10 +246,7 @@ MainWindow::MainWindow(QWidget* parent)
         // 中间：桌面牌显示区
         m_tableCardsWidget = new QWidget;
         m_tableCardsWidget->setFixedHeight(180);
-        m_tableCardsLayout = new QHBoxLayout(m_tableCardsWidget);
-        m_tableCardsLayout->setContentsMargins(0, 0, 0, 0);
-        m_tableCardsLayout->setSpacing(8);
-        m_tableCardsLayout->setAlignment(Qt::AlignCenter);
+        m_tableCardsWidget->setAttribute(Qt::WA_StyledBackground, true);
         tableLay->addWidget(m_tableCardsWidget);
 
         // 底部：桌面分
@@ -202,17 +259,49 @@ MainWindow::MainWindow(QWidget* parent)
         m_tableScoreLabel->setAlignment(Qt::AlignCenter);
         tableLay->addWidget(m_tableScoreLabel);
 
+        tableOuterLay->addWidget(leftBox, 65);
+
+        // ── 右侧：牌堆显示区（35%） ──
+        m_deckDisplayWidget = new QWidget;
+        m_deckDisplayWidget->setStyleSheet("background-color: #0A2E12; border-left: 2px solid #558B2F;");
+        m_deckDisplayLayout = new QVBoxLayout(m_deckDisplayWidget);
+        m_deckDisplayLayout->setContentsMargins(10, 15, 10, 15);
+        m_deckDisplayLayout->setAlignment(Qt::AlignCenter);
+
+        auto* deckTitle = new QLabel("牌堆");
+        deckTitle->setAlignment(Qt::AlignCenter);
+        deckTitle->setStyleSheet("QLabel { color: #FFD700; font-size: 14px; font-weight: bold; }");
+        m_deckDisplayLayout->addWidget(deckTitle);
+
+        m_deckBackLabel = new QLabel;
+        m_deckBackLabel->setFixedSize(150, 220);
+        m_deckBackLabel->setAlignment(Qt::AlignCenter);
+        m_deckBackLabel->setStyleSheet("QLabel { background: transparent; border: none; }");
+        {
+            QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
+            if (QFile::exists(backPath)) {
+                QPixmap backPix(backPath);
+                m_deckBackLabel->setPixmap(
+                    backPix.scaled(146, 214, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            }
+        }
+        m_deckDisplayLayout->addWidget(m_deckBackLabel, 0, Qt::AlignCenter);
+
+        m_deckCountBigLabel = new QLabel("44 张");
+        m_deckCountBigLabel->setAlignment(Qt::AlignCenter);
+        m_deckCountBigLabel->setStyleSheet(
+            "QLabel { color: #FFEB3B; font-size: 16px; font-weight: bold; }");
+        m_deckDisplayLayout->addWidget(m_deckCountBigLabel);
+
+        m_deckDisplayLayout->addStretch();
+
+        tableOuterLay->addWidget(m_deckDisplayWidget, 30);
+
         leftLay->addWidget(m_tableFrame);
     }
 
     {
-        auto* labelA = new QLabel("玩家A");
-        QFont playerFontA = labelA->font();
-        playerFontA.setPointSize(15);
-        playerFontA.setBold(true);
-        labelA->setFont(playerFontA);
-        labelA->setStyleSheet("QLabel { color: #FFD700; }");
-        leftLay->addWidget(labelA);
+        // 玩家A 标签已删除
 
         m_playerAHandWidget = new QWidget;
         m_playerALayout     = new QHBoxLayout(m_playerAHandWidget);
@@ -220,7 +309,7 @@ MainWindow::MainWindow(QWidget* parent)
         m_playerALayout->setSpacing(6);
 
         leftLay->addWidget(m_playerAHandWidget);
-        m_playerAHandWidget->setFixedHeight(150);
+        m_playerAHandWidget->setFixedHeight(180);
     }
 
     QWidget* bottomBar = nullptr;
@@ -344,23 +433,46 @@ void MainWindow::onPlayButtonClicked()
         return;
     }
 
+    // ── 飞行动画：手牌中的 CardWidget 飞到桌面 ──
+    std::vector<CardWidget*> selectedWidgets;
     for (CardWidget* cw : m_playerACardWidgets) {
         if (cw->isSelected()) {
-            animateCardToTable(cw);
+            selectedWidgets.push_back(cw);
         }
     }
 
-    // 炸弹/王炸 — 桌面抖动
-    if (result.type == CardType::Bomb || result.type == CardType::Rocket) {
-        shakeWidget(m_tableFrame);
+    // 从手牌布局和列表移除
+    for (CardWidget* cw : selectedWidgets) {
+        m_playerALayout->removeWidget(cw);
+        m_playerALayout->update();
+        auto it = std::find(m_playerACardWidgets.begin(),
+                            m_playerACardWidgets.end(), cw);
+        if (it != m_playerACardWidgets.end()) {
+            m_playerACardWidgets.erase(it);
+        }
     }
 
+    // 清空当前桌面牌（上一手残留）
+    for (CardWidget* cw : m_tableCardWidgets) {
+        cw->deleteLater();
+    }
+    m_tableCardWidgets.clear();
+
+    // 飞行动画
+    flyCardsToTable(selectedWidgets);
+
+    // 从手牌数据移除
     for (const Card& c : selected) {
         auto it = std::find_if(m_playerA.hand.begin(), m_playerA.hand.end(),
             [&](const Card& h) {
                 return h.point == c.point && h.suit == c.suit;
             });
         if (it != m_playerA.hand.end()) m_playerA.hand.erase(it);
+    }
+
+    // 炸弹/王炸 — 桌面抖动
+    if (result.type == CardType::Bomb || result.type == CardType::Rocket) {
+        shakeWidget(m_tableFrame);
     }
 
     for (const Card& c : selected) {
@@ -434,7 +546,7 @@ void MainWindow::onPlayButtonClicked()
     }
 
     m_waitingForAI = true;
-    QTimer::singleShot(800, this, &MainWindow::doAITurn);
+    QTimer::singleShot(700, this, &MainWindow::doAITurn);
     if (playerAFinished) {
         m_playButton->setEnabled(false);
     }
@@ -479,7 +591,7 @@ void MainWindow::onPassButtonClicked()
         }
 
         m_waitingForAI = true;
-        QTimer::singleShot(800, this, &MainWindow::doAITurn);
+        QTimer::singleShot(700, this, &MainWindow::doAITurn);
         return;
     }
 
@@ -511,12 +623,16 @@ void MainWindow::onPassButtonClicked()
     m_lastPlay.keyPoint.clear();
     m_lastPlayerName.clear();
     m_waitingForAI = true;
-    QTimer::singleShot(800, this, &MainWindow::doAITurn);
+    QTimer::singleShot(700, this, &MainWindow::doAITurn);
 }
 
 void MainWindow::onNewGameButtonClicked()
 {
     playSound(m_soundClick);
+    for (CardWidget* cw : m_tableCardWidgets) {
+        cw->deleteLater();
+    }
+    m_tableCardWidgets.clear();
     m_gameOver = false;
     startNewGame();
 }
@@ -561,6 +677,7 @@ void MainWindow::onPickButtonClicked()
         shuffleDeck(fullDeck);
 
         m_playerA.hand = selected;
+        sortHandSmart(m_playerA.hand);
         m_deck = fullDeck;
 
         m_playerB.hand.clear();
@@ -657,6 +774,18 @@ void MainWindow::doAITurn()
 
     m_tracker.recordPlayed(chosen);
 
+    // AI 出牌：清空桌面并创建新的 CardWidget
+    for (CardWidget* cw : m_tableCardWidgets) {
+        cw->deleteLater();
+    }
+    m_tableCardWidgets.clear();
+    for (const Card& card : chosen) {
+        CardWidget* cw = new CardWidget(card, m_tableCardsWidget);
+        cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        m_tableCardWidgets.push_back(cw);
+    }
+    layoutTableCards();
+
     if (checkSpecialVictory(m_playerB)) {
         appendLog("玩家B 达成七鬼523，直接获胜！");
         playSound(m_soundFailure);
@@ -714,7 +843,7 @@ void MainWindow::doAITurn()
         m_lastPlayerName.clear();
         updateUI();
         m_waitingForAI = true;
-        QTimer::singleShot(800, this, &MainWindow::doAITurn);
+        QTimer::singleShot(700, this, &MainWindow::doAITurn);
         return;
     }
 
@@ -724,6 +853,11 @@ void MainWindow::doAITurn()
 
 void MainWindow::startNewGame()
 {
+    for (CardWidget* cw : m_tableCardWidgets) {
+        cw->deleteLater();
+    }
+    m_tableCardWidgets.clear();
+
     m_gameOver = false;
     m_waitingForAI = false;
     m_isPicking = false;
@@ -746,6 +880,7 @@ void MainWindow::startNewGame()
 
     dealCards(m_playerA, m_deck, 5);
     dealCards(m_playerB, m_deck, 5);
+    sortHandSmart(m_playerA.hand);
     m_roundCount = 1;
 
     m_logTextEdit->clear();
@@ -766,6 +901,10 @@ void MainWindow::updateUI()
 {
     m_deckCountLabel->setText(
         QString("牌堆剩余: %1").arg(static_cast<int>(m_deck.cards.size())));
+    if (m_deckCountBigLabel) {
+        m_deckCountBigLabel->setText(
+            QString("%1 张").arg(static_cast<int>(m_deck.cards.size())));
+    }
     m_roundLabel->setText(
         QString("回合: %1").arg(m_roundCount));
 
@@ -791,33 +930,21 @@ void MainWindow::updateUI()
         .arg(originalScore)
         .arg(m_tableBonus)
         .arg(tableScore));
-    while (QLayoutItem* item = m_tableCardsLayout->takeAt(0)) {
-        if (QWidget* w = item->widget()) w->deleteLater();
-        delete item;
-    }
-
-    if (m_lastPlay.type == CardType::Invalid || m_lastPlay.cards.empty()) {
-        // 桌面为空，显示提示
-        QLabel* hint = new QLabel("等待出牌");
-        QFont hintFont = hint->font();
-        hintFont.setPointSize(16);
-        hint->setFont(hintFont);
-        hint->setStyleSheet("QLabel { color: #4CAF50; }");
-        m_tableCardsLayout->addWidget(hint);
-    } else {
-        for (const Card& card : m_lastPlay.cards) {
-            CardWidget* cw = new CardWidget(card);
-            cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-
-            auto* effect = new QGraphicsOpacityEffect(cw);
-            cw->setGraphicsEffect(effect);
-            QPropertyAnimation* fade = new QPropertyAnimation(effect, "opacity");
-            fade->setDuration(300);
-            fade->setStartValue(0.0);
-            fade->setEndValue(1.0);
-            fade->start(QAbstractAnimation::DeleteWhenStopped);
-
-            m_tableCardsLayout->addWidget(cw);
+    // ── 桌面牌 ──
+    // 玩家出牌由 flyCardsToTable 管理，AI 出牌由 doAITurn 管理，
+    // updateUI 只负责显示"等待出牌"提示（m_tableCardWidgets 为空时）
+    if (m_tableCardWidgets.empty()) {
+        if (m_lastPlay.type == CardType::Invalid || m_lastPlay.cards.empty()) {
+            auto children = m_tableCardsWidget->findChildren<QLabel*>();
+            for (QLabel* lbl : children) lbl->deleteLater();
+            QLabel* hint = new QLabel("等待出牌", m_tableCardsWidget);
+            hint->setAlignment(Qt::AlignCenter);
+            hint->setGeometry(0, 0, m_tableCardsWidget->width(), m_tableCardsWidget->height());
+            QFont hintFont = hint->font();
+            hintFont.setPointSize(16);
+            hint->setFont(hintFont);
+            hint->setStyleSheet("QLabel { color: #4CAF50; }");
+            hint->show();
         }
     }
 
@@ -879,6 +1006,10 @@ void MainWindow::endRound(Player& winner)
 
     m_tableCards.clear();
     m_tableBonus = 0;
+    for (CardWidget* cw : m_tableCardWidgets) {
+        cw->deleteLater();
+    }
+    m_tableCardWidgets.clear();
     m_lastPlay.type = CardType::Invalid;
     m_lastPlay.cards.clear();
     m_lastPlay.keyPoint.clear();
@@ -919,6 +1050,8 @@ void MainWindow::refillBoth(Player& winner, Player& loser)
     appendLog(QString("补牌: %1 +%2张 → %3张, %4 +%5张 → %6张")
         .arg(QString::fromStdString(winner.name)).arg(gotW).arg(static_cast<int>(winner.hand.size()))
         .arg(QString::fromStdString(loser.name)).arg(gotL).arg(static_cast<int>(loser.hand.size())));
+
+    sortHandSmart(m_playerA.hand);
 }
 
 bool MainWindow::checkGameEnd(Player& finisher, Player& opponent)
@@ -982,8 +1115,8 @@ void MainWindow::appendLog(const QString& text)
 
 QWidget* MainWindow::createCardBack()
 {
-    const int w = 80;   // 比玩家A 的 100 小
-    const int h = 120;
+    const int w = 65;   // 比玩家A 的 100 小
+    const int h = 95;
 
     QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
 
@@ -1035,36 +1168,54 @@ void MainWindow::playSound(QMediaPlayer* player)
     player->play();
 }
 
-// ── 出牌飞行动画 ──────────────────────────────────────────────────
+// ── 出牌飞行动画：CardWidget 从手牌飞到桌面 ──
 
-void MainWindow::animateCardToTable(CardWidget* sourceWidget)
-{
-    if (!sourceWidget) return;
+void MainWindow::flyCardsToTable(const std::vector<CardWidget*>& cards) {
+    if (cards.empty()) return;
 
-    QPixmap pixmap(sourceWidget->size());
-    sourceWidget->render(&pixmap);
+    int n = (int)cards.size();
+    int cardW = 100;
+    int spacing = 20;
+    int totalWidth = n * cardW + (n - 1) * spacing;
+    int tableW = m_tableCardsWidget->width();
+    int tableH = m_tableCardsWidget->height();
 
-    QLabel* flyingCard = new QLabel(this);
-    flyingCard->setPixmap(pixmap);
-    flyingCard->setFixedSize(sourceWidget->size());
+    QPoint tableOrigin = m_tableCardsWidget->mapTo(this, QPoint(0, 0));
+    int startX = tableOrigin.x() + (tableW - totalWidth) / 2;
+    int targetY = tableOrigin.y() + (tableH - 150) / 2;
 
-    QPoint startPos = sourceWidget->mapTo(this, QPoint(0, 0));
-    QPoint endPos = m_tableCardsWidget->mapTo(this, QPoint(
-        m_tableCardsWidget->width() / 2 - sourceWidget->width() / 2,
-        m_tableCardsWidget->height() / 2 - sourceWidget->height() / 2));
+    for (int i = 0; i < n; ++i) {
+        CardWidget* cw = cards[i];
 
-    flyingCard->move(startPos);
-    flyingCard->show();
-    flyingCard->raise();
+        QPoint startPos = cw->mapTo(this, QPoint(0, 0));
 
-    QPropertyAnimation* anim = new QPropertyAnimation(flyingCard, "pos");
-    anim->setDuration(400);
-    anim->setStartValue(startPos);
-    anim->setEndValue(endPos);
-    anim->setEasingCurve(QEasingCurve::OutCubic);
+        cw->setParent(this);
+        cw->move(startPos);
+        cw->show();
+        cw->raise();
+        cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        cw->setFlying(true);
 
-    connect(anim, &QPropertyAnimation::finished, flyingCard, &QLabel::deleteLater);
-    anim->start(QAbstractAnimation::DeleteWhenStopped);
+        QPoint endPos(startX + i * (cardW + spacing), targetY);
+
+        QPropertyAnimation* anim = new QPropertyAnimation(cw, "pos");
+        anim->setDuration(400);
+        anim->setEasingCurve(QEasingCurve::OutCubic);
+        anim->setStartValue(startPos);
+        anim->setEndValue(endPos);
+
+        connect(anim, &QPropertyAnimation::finished, this,
+            [this, cw, endPos]() {
+                cw->setParent(m_tableCardsWidget);
+                QPoint relPos = endPos - m_tableCardsWidget->mapTo(this, QPoint(0, 0));
+                cw->move(relPos);
+                cw->show();
+                cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+                m_tableCardWidgets.push_back(cw);
+            });
+
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
+    }
 }
 
 // ── 控件抖动 ──────────────────────────────────────────────────
@@ -1092,4 +1243,33 @@ void MainWindow::shakeWidget(QWidget* widget)
         (*counter)++;
     });
     timer->start(30);
+}
+
+// ── 桌面牌布局 ──
+
+void MainWindow::layoutTableCards() {
+    if (m_tableCardWidgets.empty()) return;
+
+    int n = (int)m_tableCardWidgets.size();
+    int cardW = 100;
+    int spacing = 20;
+    int totalWidth = n * cardW + (n - 1) * spacing;
+
+    int startX = (m_tableCardsWidget->width() - totalWidth) / 2;
+    int y = (m_tableCardsWidget->height() - 150) / 2;
+
+    for (int i = 0; i < n; ++i) {
+        CardWidget* cw = m_tableCardWidgets[i];
+        cw->setParent(m_tableCardsWidget);
+        cw->move(startX + i * (cardW + spacing), y);
+        cw->show();
+        cw->raise();
+    }
+}
+
+// ── 窗口大小变化 ──
+
+void MainWindow::resizeEvent(QResizeEvent* event) {
+    QMainWindow::resizeEvent(event);
+    layoutTableCards();
 }

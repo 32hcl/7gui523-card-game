@@ -27,6 +27,9 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(QWidget* parent = nullptr);
 
+protected:
+    void resizeEvent(QResizeEvent* event) override;
+
 private slots:
     void onPlayButtonClicked();
     void onPassButtonClicked();
@@ -48,7 +51,8 @@ private:
     void appendLog(const QString& text);
     void initSounds();
     void playSound(QMediaPlayer* player);
-    void animateCardToTable(CardWidget* sourceWidget);
+    void flyCardsToTable(const std::vector<CardWidget*>& cards);
+    void layoutTableCards();
     void shakeWidget(QWidget* widget);
 
     Deck   m_deck;
@@ -73,7 +77,7 @@ private:
     QHBoxLayout* m_playerBLayout;
     QLabel* m_handTypeLabel;
     QWidget*     m_tableCardsWidget;
-    QHBoxLayout* m_tableCardsLayout;
+    std::vector<CardWidget*> m_tableCardWidgets;
     QLabel* m_tableScoreLabel;
     QWidget*    m_playerAHandWidget;
     QHBoxLayout* m_playerALayout;
@@ -85,6 +89,11 @@ private:
     QPushButton* m_newGameButton;
     QPushButton* m_difficultyButton;
     QFrame* m_tableFrame = nullptr;
+    QWidget*     m_deckDisplayWidget = nullptr;
+    QVBoxLayout* m_deckDisplayLayout = nullptr;
+    QLabel*      m_deckBackLabel = nullptr;
+    QLabel*      m_deckCountBigLabel = nullptr;
+    QLabel*      m_deckDisplayCountLabel = nullptr;
     std::vector<CardWidget*> m_playerACardWidgets;
     QTextEdit* m_logTextEdit;
     QStackedWidget* m_buttonStack = nullptr;

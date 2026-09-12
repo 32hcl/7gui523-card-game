@@ -27,10 +27,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/music")
     )
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/kenney_playing-cards-pack/PNG/Cards (medium)")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/kenney_playing-cards-pack/PNG/Cards (large)")
     add_custom_command(TARGET game POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/kenney_playing-cards-pack/PNG/Cards (medium)"
+            "${CMAKE_CURRENT_SOURCE_DIR}/kenney_playing-cards-pack/PNG/Cards (large)"
             "$<TARGET_FILE_DIR:game>/cards"
     )
 endif()

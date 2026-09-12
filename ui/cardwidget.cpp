@@ -9,14 +9,8 @@
 CardWidget::CardWidget(const Card& card, QWidget* parent)
     : QWidget(parent), m_card(card), m_currentYOffset(21)
 {
-    setFixedSize(100, 150);
+    setFixedSize(110, 165);
     loadPixmap();
-
-    auto* shadow = new QGraphicsDropShadowEffect(this);
-    shadow->setBlurRadius(12);
-    shadow->setColor(QColor(0, 0, 0, 150));
-    shadow->setOffset(2, 2);
-    setGraphicsEffect(shadow);
 }
 
 Card CardWidget::getCard() const
@@ -132,29 +126,29 @@ void CardWidget::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing);
 
     const int w = width();      // 100
-    const int h = height();     // 150
+    const int h = height();     // 165
     const int yOffset = m_currentYOffset;  // 动画值
 
     if (!m_pixmap.isNull()) {
-        QPixmap scaled = m_pixmap.scaled(w - 4, 128,
+        QPixmap scaled = m_pixmap.scaled(w - 4, 143,
                                          Qt::KeepAspectRatio,
                                          Qt::SmoothTransformation);
         int x = (w - scaled.width()) / 2;
         p.drawPixmap(x, yOffset, scaled);
 
-        if (m_selected) {
+        if (m_selected && !m_flying) {
             p.setPen(QPen(QColor(255, 200, 0), 3));
             p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(1, yOffset, w - 2, 128, 8, 8);
+            p.drawRoundedRect(1, yOffset, w - 2, 143, 8, 8);
         }
     } else {
-        if (m_selected) {
+        if (m_selected && !m_flying) {
             p.setPen(QPen(QColor(255, 200, 0), 3));
         } else {
             p.setPen(QPen(Qt::black, 2));
         }
         p.setBrush(Qt::white);
-        p.drawRoundedRect(1, yOffset, w - 2, 128, 8, 8);
+        p.drawRoundedRect(1, yOffset, w - 2, 143, 8, 8);
 
         const QColor color = textColor();
         p.setPen(color);
@@ -172,7 +166,7 @@ void CardWidget::paintEvent(QPaintEvent*)
             centerFont.setPixelSize(34);
             p.setFont(centerFont);
             p.setOpacity(0.20);
-            p.drawText(0, yOffset, w, 128, Qt::AlignCenter, suitSymbol());
+            p.drawText(0, yOffset, w, 143, Qt::AlignCenter, suitSymbol());
             p.setOpacity(1.0);
         }
 
@@ -182,7 +176,7 @@ void CardWidget::paintEvent(QPaintEvent*)
         p.setFont(suitFont);
         p.setPen(color);
 
-        p.drawText(w - 38, yOffset + 128 - 30, 34, 26,
+        p.drawText(w - 38, yOffset + 143 - 30, 34, 26,
                    Qt::AlignRight | Qt::AlignBottom, suitSymbol());
     }
 
@@ -194,7 +188,7 @@ void CardWidget::paintEvent(QPaintEvent*)
         p.setPen(QColor(255, 215, 0));
 
         QString scText = QString("%1分").arg(m_card.score);
-        QRect textRect(0, yOffset + 128 - 22, w, 20);
+        QRect textRect(0, yOffset + 143 - 22, w, 20);
         p.drawText(textRect, Qt::AlignCenter, scText);
     }
 }

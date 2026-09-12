@@ -20,9 +20,9 @@ private:
     std::vector<Card> m_allCards;
     std::vector<int>  m_selectedIndices;
     std::vector<QPushButton*> m_cardButtons;
-    QPushButton* m_okButton;
-    QPushButton* m_cancelButton;
-    QLabel* m_hintLabel;
+    QPushButton* m_okButton = nullptr;
+    QPushButton* m_cancelButton = nullptr;
+    QLabel* m_hintLabel = nullptr;
 
     void updateButtonStates();
     void updateHint();

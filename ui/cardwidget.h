@@ -3,7 +3,6 @@
 #include <QWidget>
 #include <QMouseEvent>
 #include <QPixmap>
-#include <QGraphicsDropShadowEffect>
 #include "core/card.h"
 
 class CardWidget : public QWidget {
@@ -19,6 +18,7 @@ public:
 
     int currentYOffset() const { return m_currentYOffset; }
     void setCurrentYOffset(int v);
+    void setFlying(bool flying) { m_flying = flying; update(); }
 
 signals:
     void clicked();
@@ -30,6 +30,7 @@ protected:
 private:
     Card m_card;
     bool m_selected = false;
+    bool m_flying = false;
     int  m_currentYOffset = 21;
     QPixmap m_pixmap;
 

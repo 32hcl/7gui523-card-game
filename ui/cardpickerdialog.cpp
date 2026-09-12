@@ -1,5 +1,4 @@
 #include "cardpickerdialog.h"
-#include "cardwidget.h"
 #include "core/deck.h"
 
 #include <QVBoxLayout>
@@ -10,17 +9,17 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QIcon>
+#include <QPixmap>
+#include <QScrollArea>
 
 CardPickerDialog::CardPickerDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle("选择起始手牌");
-    setMinimumWidth(900);
+    setMinimumSize(1000, 750);
 
     Deck full = createStandardDeck();
     m_allCards = full.cards;
-
-    QString cardsDir = QCoreApplication::applicationDirPath() + "/cards/";
 
     auto* mainLayout = new QVBoxLayout(this);
 
@@ -30,13 +29,16 @@ CardPickerDialog::CardPickerDialog(QWidget* parent)
     m_hintLabel->setFont(hintFont);
     mainLayout->addWidget(m_hintLabel);
 
-    auto* gridWidget = new QWidget;
-    auto* grid = new QGridLayout(gridWidget);
+    // 卡牌网格
+    auto* page = new QWidget;
+    auto* grid = new QGridLayout(page);
     grid->setSpacing(4);
 
     std::vector<std::string> suits = {"黑桃", "红桃", "梅花", "方块"};
     std::vector<std::string> points = {"A", "2", "3", "4", "5", "6", "7",
                                         "8", "9", "10", "J", "Q", "K"};
+
+    QString cardsDir = QCoreApplication::applicationDirPath() + "/cards/";
 
     for (int row = 0; row < 4; ++row) {
         for (int col = 0; col < 13; ++col) {
@@ -44,25 +46,35 @@ CardPickerDialog::CardPickerDialog(QWidget* parent)
                 if (m_allCards[i].suit == suits[row] &&
                     m_allCards[i].point == points[col]) {
 
-                    QString fileName = CardWidget::cardImageFileName(m_allCards[i]);
-                    QString cardImgPath = cardsDir + fileName;
-
                     auto* btn = new QPushButton;
-                    btn->setFixedSize(60, 84);
+                    btn->setFixedSize(64, 90);
                     btn->setCheckable(true);
                     btn->setProperty("cardIndex", (int)i);
 
-                    if (QFile::exists(cardImgPath)) {
-                        btn->setIcon(QIcon(cardImgPath));
-                        btn->setIconSize(QSize(56, 80));
-                        btn->setStyleSheet("QPushButton { border: 1px solid #999; background: white; }");
+                    QString suitKey;
+                    if (suits[row] == "黑桃") suitKey = "spades";
+                    else if (suits[row] == "红桃") suitKey = "hearts";
+                    else if (suits[row] == "梅花") suitKey = "clubs";
+                    else suitKey = "diamonds";
+
+                    QString pointKey = QString::fromStdString(points[col]);
+                    if (pointKey != "A" && pointKey != "J" &&
+                        pointKey != "Q" && pointKey != "K") {
+                        int n = pointKey.toInt();
+                        pointKey = QString("%1").arg(n, 2, 10, QChar('0'));
+                    }
+                    QString path = cardsDir + QString("card_%1_%2.png").arg(suitKey).arg(pointKey);
+
+                    if (QFile::exists(path)) {
+                        btn->setIcon(QIcon(path));
+                        btn->setIconSize(QSize(60, 86));
+                        btn->setStyleSheet("QPushButton { border: none; background: transparent; }");
                     } else {
-                        QString text = QString::fromStdString(suits[row] + points[col]);
-                        btn->setText(text);
+                        btn->setText(QString::fromStdString(points[col]));
+                        btn->setStyleSheet("QPushButton { border: none; background: transparent; color: #000; }");
                     }
 
-                    connect(btn, &QPushButton::clicked,
-                            this, &CardPickerDialog::onCardClicked);
+                    connect(btn, &QPushButton::clicked, this, &CardPickerDialog::onCardClicked);
                     grid->addWidget(btn, row, col);
                     m_cardButtons.push_back(btn);
                     break;
@@ -71,30 +83,30 @@ CardPickerDialog::CardPickerDialog(QWidget* parent)
         }
     }
 
+    // 鬼牌
     {
-        int row = 4;
-        int col = 0;
+        int row = 4, col = 0;
         for (size_t i = 0; i < m_allCards.size(); ++i) {
             if (m_allCards[i].point == "大鬼" || m_allCards[i].point == "小鬼") {
-                QString fileName = CardWidget::cardImageFileName(m_allCards[i]);
-                QString cardImgPath = cardsDir + fileName;
-
                 auto* btn = new QPushButton;
-                btn->setFixedSize(60, 84);
+                btn->setFixedSize(64, 90);
                 btn->setCheckable(true);
                 btn->setProperty("cardIndex", (int)i);
 
-                if (QFile::exists(cardImgPath)) {
-                    btn->setIcon(QIcon(cardImgPath));
-                    btn->setIconSize(QSize(56, 80));
-                    btn->setStyleSheet("QPushButton { border: 1px solid #999; background: white; }");
+                QString fileName = (m_allCards[i].point == "大鬼")
+                    ? "card_joker_red.png" : "card_joker_black.png";
+                QString path = cardsDir + fileName;
+
+                if (QFile::exists(path)) {
+                    btn->setIcon(QIcon(path));
+                    btn->setIconSize(QSize(60, 86));
+                    btn->setStyleSheet("QPushButton { border: none; background: transparent; }");
                 } else {
-                    QString text = QString::fromStdString(m_allCards[i].point);
-                    btn->setText(text);
+                    btn->setText(QString::fromStdString(m_allCards[i].point));
+                    btn->setStyleSheet("QPushButton { border: none; background: transparent; color: #000; }");
                 }
 
-                connect(btn, &QPushButton::clicked,
-                        this, &CardPickerDialog::onCardClicked);
+                connect(btn, &QPushButton::clicked, this, &CardPickerDialog::onCardClicked);
                 grid->addWidget(btn, row, col);
                 m_cardButtons.push_back(btn);
                 col++;
@@ -102,8 +114,14 @@ CardPickerDialog::CardPickerDialog(QWidget* parent)
         }
     }
 
-    mainLayout->addWidget(gridWidget);
+    auto* scroll = new QScrollArea;
+    scroll->setWidget(page);
+    scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    mainLayout->addWidget(scroll, 1);
 
+    // 底部按钮
     auto* bottomLayout = new QHBoxLayout;
     bottomLayout->addStretch();
 
@@ -125,20 +143,17 @@ void CardPickerDialog::onCardClicked() {
 
     int cardIndex = btn->property("cardIndex").toInt();
 
-    auto it = std::find(m_selectedIndices.begin(), m_selectedIndices.end(),
-                        cardIndex);
+    auto it = std::find(m_selectedIndices.begin(), m_selectedIndices.end(), cardIndex);
     if (it != m_selectedIndices.end()) {
         m_selectedIndices.erase(it);
-        btn->setStyleSheet("QPushButton { border: 1px solid #999; background: white; }");
+        btn->setStyleSheet("QPushButton { border: none; background: transparent; }");
     } else {
         if (m_selectedIndices.size() >= 5) {
             QMessageBox::information(this, "提示", "最多只能选择 5 张牌");
             return;
         }
         m_selectedIndices.push_back(cardIndex);
-        btn->setStyleSheet(
-            "QPushButton { background-color: #FFD700;"
-            " border: 2px solid #FF6600; }");
+        btn->setStyleSheet("QPushButton { background-color: rgba(255,215,0,0.4); border: 2px solid #FFD700; }");
     }
 
     updateButtonStates();
