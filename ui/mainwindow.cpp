@@ -269,6 +269,13 @@ void MainWindow::onPlayButtonClicked()
 {
     if (m_waitingForAI || m_gameOver) return;
 
+    if (m_isPicking) {
+        m_isPicking = false;
+        m_pickButton->setVisible(false);
+        m_passButton->setVisible(true);
+        appendLog("使用随机发牌");
+    }
+
     std::vector<Card> selected;
     for (CardWidget* cw : m_playerACardWidgets) {
         if (cw->isSelected()) {
@@ -744,7 +751,7 @@ void MainWindow::updateUI()
         if (m_isPicking) {
             m_pickButton->setVisible(true);
             m_passButton->setVisible(false);
-            m_playButton->setEnabled(false);
+            m_playButton->setEnabled(!m_playerA.hand.empty());
         } else {
             m_pickButton->setVisible(false);
             m_passButton->setVisible(true);
