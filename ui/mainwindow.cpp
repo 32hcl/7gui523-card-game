@@ -1,0 +1,809 @@
+﻿#include "mainwindow.h"
+#include "cardwidget.h"
+#include "cardpickerdialog.h"
+#include "../core/ai.h"
+#include "../core/cardtype.h"
+#include "../core/score.h"
+#include "../core/special.h"
+#include "../core/game.h"
+
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QFrame>
+#include <QMessageBox>
+#include <QTextEdit>
+#include <QTextCursor>
+#include <QTimer>
+#include <algorithm>
+
+static QString cardsToString(const std::vector<Card>& cards) {
+    QString result;
+    for (size_t i = 0; i < cards.size(); ++i) {
+        if (i > 0) result += " ";
+        QString cardStr = QString::fromStdString(cards[i].suit + cards[i].point);
+        if (cards[i].score > 0) {
+            cardStr += QString("(%1分)").arg(cards[i].score);
+        }
+        result += cardStr;
+    }
+    return result;
+}
+
+static QString cardTypeToQString(CardType type) {
+    return QString::fromStdString(cardTypeToString(type));
+}
+
+MainWindow::MainWindow(QWidget* parent)
+    : QMainWindow(parent)
+{
+    setWindowTitle("7鬼523斗地主变体");
+    setMinimumSize(1000, 680);
+    resize(1000, 680);
+
+    auto* central = new QWidget(this);
+    setCentralWidget(central);
+
+    auto* rootLayout = new QHBoxLayout(central);
+    rootLayout->setContentsMargins(8, 4, 8, 4);
+    rootLayout->setSpacing(10);
+
+    auto* leftPanel = new QWidget;
+    auto* leftLay   = new QVBoxLayout(leftPanel);
+    leftLay->setContentsMargins(4, 4, 4, 4);
+    leftLay->setSpacing(10);
+
+    {
+        auto* topBar = new QWidget;
+        auto* topLay = new QHBoxLayout(topBar);
+        topLay->setContentsMargins(0, 0, 0, 0);
+
+        auto* titleLabel = new QLabel("7鬼523斗地主变体");
+        QFont titleFont = titleLabel->font();
+        titleFont.setPointSize(14);
+        titleFont.setBold(true);
+        titleLabel->setFont(titleFont);
+
+        m_deckCountLabel = new QLabel("牌堆剩余: --");
+        m_roundLabel      = new QLabel("回合: --");
+
+        topLay->addWidget(titleLabel);
+        topLay->addStretch();
+        topLay->addWidget(m_deckCountLabel);
+        topLay->addSpacing(20);
+        topLay->addWidget(m_roundLabel);
+
+        leftLay->addWidget(topBar);
+        topBar->setFixedHeight(40);
+    }
+
+    {
+        auto* labelB = new QLabel("玩家B");
+        QFont f = labelB->font();
+        f.setBold(true);
+        labelB->setFont(f);
+        leftLay->addWidget(labelB);
+
+        m_playerBHandWidget = new QWidget;
+        m_playerBLayout     = new QHBoxLayout(m_playerBHandWidget);
+        m_playerBLayout->setContentsMargins(0, 0, 0, 0);
+        m_playerBLayout->setSpacing(6);
+        m_playerBLayout->addStretch();
+
+        leftLay->addWidget(m_playerBHandWidget);
+        m_playerBHandWidget->setFixedHeight(120);
+    }
+
+    {
+        auto* tableFrame = new QFrame;
+        tableFrame->setFrameShape(QFrame::StyledPanel);
+        tableFrame->setStyleSheet(
+            "QFrame { background: #f0f0f0; border: 1px solid #ccc;"
+            "          border-radius: 6px; }");
+        tableFrame->setMinimumHeight(220);
+
+        auto* tableLay = new QVBoxLayout(tableFrame);
+        tableLay->setAlignment(Qt::AlignCenter);
+
+        m_handTypeLabel   = new QLabel("上一手牌型: 无");
+        QFont tf = m_handTypeLabel->font();
+        tf.setPointSize(12);
+        m_handTypeLabel->setFont(tf);
+        tableLay->addWidget(m_handTypeLabel);
+
+        m_tableCardsWidget = new QWidget;
+        m_tableCardsLayout = new QHBoxLayout(m_tableCardsWidget);
+        m_tableCardsLayout->setContentsMargins(0, 0, 0, 0);
+        m_tableCardsLayout->setSpacing(6);
+        m_tableCardsLayout->setAlignment(Qt::AlignCenter);
+        tableLay->addWidget(m_tableCardsWidget);
+        m_tableCardsWidget->setFixedHeight(150);
+
+        m_tableScoreLabel = new QLabel("本回合桌面得分: 0 分");
+        m_tableScoreLabel->setFont(tf);
+        m_tableScoreLabel->setStyleSheet("color: black;");
+        tableLay->addWidget(m_tableScoreLabel);
+
+        leftLay->addWidget(tableFrame);
+    }
+
+    {
+        auto* labelA = new QLabel("玩家A");
+        QFont f = labelA->font();
+        f.setBold(true);
+        labelA->setFont(f);
+        leftLay->addWidget(labelA);
+
+        m_playerAHandWidget = new QWidget;
+        m_playerALayout     = new QHBoxLayout(m_playerAHandWidget);
+        m_playerALayout->setContentsMargins(0, 0, 0, 0);
+        m_playerALayout->setSpacing(6);
+
+        leftLay->addWidget(m_playerAHandWidget);
+        m_playerAHandWidget->setFixedHeight(160);
+    }
+
+    {
+        auto* bottomBar = new QWidget;
+        auto* bottomLay = new QHBoxLayout(bottomBar);
+        bottomLay->setContentsMargins(0, 0, 0, 0);
+
+        m_scoreALabel = new QLabel("玩家A总分: 0");
+        m_scoreBLabel = new QLabel("玩家B总分: 0");
+
+        m_playButton    = new QPushButton("出牌");
+        m_passButton    = new QPushButton("不要");
+        m_pickButton    = new QPushButton("选卡");
+        m_newGameButton = new QPushButton("重新开始");
+        m_difficultyButton = new QPushButton("难度: AI1 简单");
+
+        connect(m_playButton,    &QPushButton::clicked, this, &MainWindow::onPlayButtonClicked);
+        connect(m_passButton,    &QPushButton::clicked, this, &MainWindow::onPassButtonClicked);
+        connect(m_pickButton,    &QPushButton::clicked, this, &MainWindow::onPickButtonClicked);
+        connect(m_newGameButton, &QPushButton::clicked, this, &MainWindow::onNewGameButtonClicked);
+        connect(m_difficultyButton, &QPushButton::clicked, this, &MainWindow::onDifficultyButtonClicked);
+
+        bottomLay->addWidget(m_scoreALabel);
+        bottomLay->addSpacing(12);
+        bottomLay->addWidget(m_scoreBLabel);
+        bottomLay->addStretch();
+        bottomLay->addWidget(m_playButton);
+        bottomLay->addSpacing(6);
+        bottomLay->addWidget(m_passButton);
+        bottomLay->addWidget(m_pickButton);
+        bottomLay->addSpacing(6);
+        bottomLay->addWidget(m_newGameButton);
+        bottomLay->addSpacing(6);
+        bottomLay->addWidget(m_difficultyButton);
+
+        bottomBar->setFixedHeight(50);
+        leftLay->addWidget(bottomBar);
+    }
+
+    rootLayout->addWidget(leftPanel, 1);
+
+    {
+        auto* rightPanel = new QWidget;
+        auto* rightLay   = new QVBoxLayout(rightPanel);
+        rightLay->setContentsMargins(0, 0, 0, 0);
+
+        auto* logLabel = new QLabel("游戏日志");
+        QFont lf = logLabel->font();
+        lf.setBold(true);
+        lf.setPointSize(12);
+        logLabel->setFont(lf);
+        rightLay->addWidget(logLabel);
+
+        m_logTextEdit = new QTextEdit;
+        m_logTextEdit->setReadOnly(true);
+        m_logTextEdit->setMaximumWidth(320);
+        m_logTextEdit->setMinimumWidth(240);
+        rightLay->addWidget(m_logTextEdit, 1);
+
+        rootLayout->addWidget(rightPanel);
+    }
+
+    startNewGame();
+}
+
+
+void MainWindow::onPlayButtonClicked()
+{
+    if (m_waitingForAI || m_gameOver) return;
+
+    std::vector<Card> selected;
+    for (CardWidget* cw : m_playerACardWidgets) {
+        if (cw->isSelected()) {
+            selected.push_back(cw->getCard());
+        }
+    }
+
+    if (selected.empty()) {
+        QMessageBox::warning(this, "提示", "请先选择要出的牌");
+        return;
+    }
+
+    CardTypeResult result = parseCardType(selected);
+    if (result.type == CardType::Invalid) {
+        QMessageBox::warning(this, "非法牌型", "你选的牌不构成合法牌型");
+        return;
+    }
+
+    if (m_lastPlay.type != CardType::Invalid && !canBeat(result, m_lastPlay)) {
+        QMessageBox::warning(this, "无法压过", "你选的牌无法压过上一手");
+        return;
+    }
+
+    for (const Card& c : selected) {
+        auto it = std::find_if(m_playerA.hand.begin(), m_playerA.hand.end(),
+            [&](const Card& h) {
+                return h.point == c.point && h.suit == c.suit;
+            });
+        if (it != m_playerA.hand.end()) m_playerA.hand.erase(it);
+    }
+
+    for (const Card& c : selected) {
+        m_tableCards.push_back(c);
+    }
+    CardTypeResult oldLastPlay = m_lastPlay;
+    m_lastPlay = result;
+    m_lastPlayerName = "玩家A";
+
+    m_tracker.recordPlayed(selected);
+
+    if (checkSpecialVictory(m_playerA)) {
+        appendLog("玩家A 达成七鬼523，直接获胜！");
+        showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
+        disableActionButtons();
+        return;
+    }
+
+    int bonus = calculatePressureBonus(result, oldLastPlay);
+    if (bonus > 0) {
+        m_lastPlay.bonusScore = bonus;
+        m_tableBonus += bonus;
+    }
+
+    appendLog(QString("玩家A 出牌: %1 (%2%3)")
+        .arg(cardsToString(selected))
+        .arg(cardTypeToQString(result.type))
+        .arg(m_lastPlay.bonusScore > 0 ? QString(" 压分+%1").arg(m_lastPlay.bonusScore) : ""));
+
+    updateUI();
+
+    bool playerAFinished = m_playerA.hand.empty();
+
+    if (playerAFinished && m_deck.cards.empty()) {
+        endRound(m_playerA);   // ← endRound 内部已结算 bonus 并清零
+        finalSettlement(m_playerA, m_playerB, m_tableCards);
+        compareAndAnnounce(m_playerA, m_playerB);
+
+        appendLog("========== 游戏结束 ==========");
+        appendLog("出完牌者: 玩家A");
+        appendLog(QString("玩家A 总分: %1").arg(m_playerA.totalScore));
+        appendLog(QString("玩家B 总分: %1").arg(m_playerB.totalScore));
+        QString w = (m_playerA.totalScore >= m_playerB.totalScore) ? "玩家A" : "玩家B";
+        appendLog(QString("最终胜者: %1").arg(w));
+
+        showGameOverDialog(QString("玩家A 出完牌！\n玩家A: %1 分\n玩家B: %2 分")
+            .arg(m_playerA.totalScore).arg(m_playerB.totalScore));
+        disableActionButtons();
+        return;
+    }
+
+    if (m_playerB.hand.empty() && !m_deck.cards.empty()) {
+        appendLog("玩家A 出牌回应，玩家A 赢得本回合");
+        endRound(m_playerA);
+        refillBoth(m_playerA, m_playerB);
+        m_lastPlay.type = CardType::Invalid;
+        m_lastPlay.cards.clear();
+        m_lastPlay.keyPoint.clear();
+        m_lastPlayerName.clear();
+        updateUI();
+        enableActionButtons();
+        return;
+    }
+
+    m_waitingForAI = true;
+    QTimer::singleShot(800, this, &MainWindow::doAITurn);
+    if (playerAFinished) {
+        m_playButton->setEnabled(false);
+    }
+}
+
+void MainWindow::onPassButtonClicked()
+{
+    if (m_waitingForAI || m_gameOver) return;
+
+    if (m_lastPlay.type == CardType::Invalid) {
+        QMessageBox::warning(this, "提示", "首出不能不要");
+        return;
+    }
+
+    appendLog("玩家A 不要");
+
+    if (m_playerB.hand.empty() && !m_deck.cards.empty()) {
+        appendLog("玩家B 赢得本回合");
+        endRound(m_playerB);
+        refillBoth(m_playerB, m_playerA);
+        m_lastPlay.type = CardType::Invalid;
+        m_lastPlay.cards.clear();
+        m_lastPlay.keyPoint.clear();
+        m_lastPlayerName.clear();
+        updateUI();
+
+        if (checkSpecialVictory(m_playerA)) {
+            appendLog("玩家A 达成七鬼523，直接获胜！");
+            showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
+            disableActionButtons();
+            return;
+        }
+        if (checkSpecialVictory(m_playerB)) {
+            appendLog("玩家B 达成七鬼523，直接获胜！");
+            showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
+            disableActionButtons();
+            return;
+        }
+
+        m_waitingForAI = true;
+        QTimer::singleShot(800, this, &MainWindow::doAITurn);
+        return;
+    }
+
+    endRound(m_playerB);
+
+    if (!m_deck.cards.empty()) {
+        refillBoth(m_playerB, m_playerA);
+    }
+
+    updateUI();
+
+    if (checkSpecialVictory(m_playerA)) {
+        appendLog("玩家A 达成七鬼523，直接获胜！");
+        showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
+        disableActionButtons();
+        return;
+    }
+    if (checkSpecialVictory(m_playerB)) {
+        appendLog("玩家B 达成七鬼523，直接获胜！");
+        showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
+        disableActionButtons();
+        return;
+    }
+
+    m_lastPlay.type = CardType::Invalid;
+    m_lastPlay.cards.clear();
+    m_lastPlay.keyPoint.clear();
+    m_lastPlayerName.clear();
+    m_waitingForAI = true;
+    QTimer::singleShot(800, this, &MainWindow::doAITurn);
+}
+
+void MainWindow::onNewGameButtonClicked()
+{
+    m_gameOver = false;
+    startNewGame();
+}
+
+void MainWindow::onDifficultyButtonClicked()
+{
+    switch (m_aiLevel) {
+        case AILevel::AI1_Simple:
+            m_aiLevel = AILevel::AI2_Rule;
+            m_difficultyButton->setText("难度: AI2 规则");
+            break;
+        case AILevel::AI2_Rule:
+            m_aiLevel = AILevel::AI3_Tracker;
+            m_difficultyButton->setText("难度: AI3 记牌");
+            break;
+        case AILevel::AI3_Tracker:
+            m_aiLevel = AILevel::AI1_Simple;
+            m_difficultyButton->setText("难度: AI1 简单");
+            break;
+    }
+    appendLog(QString("AI 难度切换为: %1").arg(m_difficultyButton->text()));
+}
+
+void MainWindow::onPickButtonClicked()
+{
+    CardPickerDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        std::vector<Card> selected = dlg.selectedCards();
+        if (selected.size() != 5) return;
+
+        Deck fullDeck = createStandardDeck();
+        for (const Card& c : selected) {
+            auto it = std::find_if(fullDeck.cards.begin(), fullDeck.cards.end(),
+                [&](const Card& h) {
+                    return h.point == c.point && h.suit == c.suit;
+                });
+            if (it != fullDeck.cards.end()) fullDeck.cards.erase(it);
+        }
+
+        shuffleDeck(fullDeck);
+
+        m_playerA.hand = selected;
+        m_deck = fullDeck;
+
+        m_playerB.hand.clear();
+        dealCards(m_playerB, m_deck, 5);
+
+        appendLog("========== 自选起始手牌 ==========");
+        appendLog(QString("玩家A 手牌: %1").arg(cardsToString(m_playerA.hand)));
+        appendLog(QString("玩家B 手牌: %1").arg(cardsToString(m_playerB.hand)));
+        appendLog(QString("牌堆剩余: %1 张").arg(static_cast<int>(m_deck.cards.size())));
+    } else {
+        appendLog("使用随机发牌");
+    }
+
+    m_pickButton->setVisible(false);
+    m_passButton->setVisible(true);
+    m_playButton->setEnabled(true);
+    updateUI();
+}
+
+void MainWindow::doAITurn()
+{
+    m_waitingForAI = false;
+    if (m_gameOver) return;
+
+    int tableScore = calculateScore(m_tableCards);
+    std::vector<Card> chosen = aiChoosePlay(
+        m_playerB, m_playerA, m_lastPlay, m_deck, tableScore, m_tracker);
+
+    if (chosen.empty()) {
+        appendLog("玩家B 不要");
+
+        if (m_playerA.hand.empty() && !m_deck.cards.empty()) {
+            appendLog("玩家A 赢得本回合");
+            endRound(m_playerA);
+            refillBoth(m_playerA, m_playerB);
+            m_lastPlay.type = CardType::Invalid;
+            m_lastPlay.cards.clear();
+            m_lastPlay.keyPoint.clear();
+            m_lastPlayerName.clear();
+            updateUI();
+            enableActionButtons();
+            return;
+        }
+
+        endRound(m_playerA);
+
+        if (!m_deck.cards.empty()) {
+            refillBoth(m_playerA, m_playerB);
+        }
+
+        updateUI();
+
+        if (checkSpecialVictory(m_playerA)) {
+            appendLog("玩家A 达成七鬼523，直接获胜！");
+            showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
+            disableActionButtons();
+            return;
+        }
+        if (checkSpecialVictory(m_playerB)) {
+            appendLog("玩家B 达成七鬼523，直接获胜！");
+            showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
+            disableActionButtons();
+            return;
+        }
+
+        m_lastPlay.type = CardType::Invalid;
+        m_lastPlay.cards.clear();
+        m_lastPlay.keyPoint.clear();
+        m_lastPlayerName.clear();
+        enableActionButtons();
+        updateUI();
+        return;
+    }
+
+    for (const Card& c : chosen) {
+        auto it = std::find_if(m_playerB.hand.begin(), m_playerB.hand.end(),
+            [&](const Card& h) {
+                return h.point == c.point && h.suit == c.suit;
+            });
+        if (it != m_playerB.hand.end()) m_playerB.hand.erase(it);
+    }
+    for (const Card& c : chosen) {
+        m_tableCards.push_back(c);
+    }
+    CardTypeResult oldLastPlay = m_lastPlay;
+    m_lastPlay = parseCardType(chosen);
+    m_lastPlayerName = "玩家B";
+
+    m_tracker.recordPlayed(chosen);
+
+    if (checkSpecialVictory(m_playerB)) {
+        appendLog("玩家B 达成七鬼523，直接获胜！");
+        showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
+        disableActionButtons();
+        return;
+    }
+
+    int bonus = calculatePressureBonus(m_lastPlay, oldLastPlay);
+    if (bonus > 0) {
+        m_lastPlay.bonusScore = bonus;
+        m_tableBonus += bonus;
+    }
+    appendLog(QString("玩家B 出牌: %1 (%2%3)")
+        .arg(cardsToString(chosen))
+        .arg(cardTypeToQString(m_lastPlay.type))
+        .arg(m_lastPlay.bonusScore > 0 ? QString(" 压分+%1").arg(m_lastPlay.bonusScore) : ""));
+
+    updateUI();
+
+    bool playerBFinished = m_playerB.hand.empty();
+
+    if (playerBFinished && m_deck.cards.empty()) {
+        endRound(m_playerB);
+        finalSettlement(m_playerB, m_playerA, m_tableCards);
+        compareAndAnnounce(m_playerA, m_playerB);
+
+        appendLog("========== 游戏结束 ==========");
+        appendLog("出完牌者: 玩家B");
+        appendLog(QString("玩家A 总分: %1").arg(m_playerA.totalScore));
+        appendLog(QString("玩家B 总分: %1").arg(m_playerB.totalScore));
+        QString w = (m_playerA.totalScore >= m_playerB.totalScore) ? "玩家A" : "玩家B";
+        appendLog(QString("最终胜者: %1").arg(w));
+
+        showGameOverDialog(QString("玩家B 出完牌！\n玩家A: %1 分\n玩家B: %2 分")
+            .arg(m_playerA.totalScore).arg(m_playerB.totalScore));
+        disableActionButtons();
+        return;
+    }
+
+    if (m_playerA.hand.empty() && !m_deck.cards.empty()) {
+        appendLog("玩家B 出牌回应，玩家B 赢得本回合");
+        endRound(m_playerB);
+        refillBoth(m_playerB, m_playerA);
+        m_lastPlay.type = CardType::Invalid;
+        m_lastPlay.cards.clear();
+        m_lastPlay.keyPoint.clear();
+        m_lastPlayerName.clear();
+        updateUI();
+        m_waitingForAI = true;
+        QTimer::singleShot(800, this, &MainWindow::doAITurn);
+        return;
+    }
+
+    enableActionButtons();
+    updateUI();
+}
+
+void MainWindow::startNewGame()
+{
+    m_gameOver = false;
+    m_waitingForAI = false;
+    m_lastPlay.type = CardType::Invalid;
+    m_lastPlay.cards.clear();
+    m_lastPlay.keyPoint.clear();
+    m_tableCards.clear();
+    m_lastPlayerName.clear();
+    m_playerACardWidgets.clear();
+
+    m_deck = createStandardDeck();
+    shuffleDeck(m_deck);
+
+    m_playerA = createPlayer("玩家A");
+    m_playerB = createPlayer("玩家B");
+    m_playerA.isHuman = true;
+    m_playerB.aiLevel = m_aiLevel;
+
+    m_tracker.reset();
+
+    dealCards(m_playerA, m_deck, 5);
+    dealCards(m_playerB, m_deck, 5);
+    m_roundCount = 1;
+
+    m_logTextEdit->clear();
+    appendLog("========== 新游戏开始 ==========");
+    appendLog(QString("玩家A 初始手牌: %1").arg(cardsToString(m_playerA.hand)));
+    appendLog(QString("玩家B 初始手牌: %1").arg(cardsToString(m_playerB.hand)));
+    appendLog("随机先手: 玩家A");
+    appendLog(QString("牌堆剩余: %1 张").arg(static_cast<int>(m_deck.cards.size())));
+
+    if (static_cast<int>(m_deck.cards.size()) == 44) {
+        m_pickButton->setVisible(true);
+        m_passButton->setVisible(false);
+        m_playButton->setEnabled(false);
+    } else {
+        m_pickButton->setVisible(false);
+        m_passButton->setVisible(true);
+        m_playButton->setEnabled(true);
+    }
+
+    updateUI();
+}
+
+void MainWindow::updateUI()
+{
+    m_deckCountLabel->setText(
+        QString("牌堆剩余: %1").arg(static_cast<int>(m_deck.cards.size())));
+    m_roundLabel->setText(
+        QString("回合: %1").arg(m_roundCount));
+
+    m_scoreALabel->setText(
+        QString("玩家A总分: %1").arg(m_playerA.totalScore));
+    m_scoreBLabel->setText(
+        QString("玩家B总分: %1").arg(m_playerB.totalScore));
+
+    if (m_lastPlay.type != CardType::Invalid) {
+        QString typeStr = cardTypeToQString(m_lastPlay.type);
+        if (!m_lastPlay.keyPoint.empty())
+            typeStr += QString(" [%1]").arg(QString::fromStdString(m_lastPlay.keyPoint));
+        m_handTypeLabel->setText(
+            QString("上一手牌型: %1（%2）").arg(typeStr)
+                .arg(QString::fromStdString(m_lastPlayerName)));
+    } else {
+        m_handTypeLabel->setText("上一手牌型: 无");
+    }
+
+    int originalScore = calculateScore(m_tableCards);
+    int tableScore = calculateTableScore(m_tableCards, m_tableBonus);
+    m_tableScoreLabel->setText(QString("原始分: %1 分 | 奖励分: %2 分 | 合计: %3 分")
+        .arg(originalScore)
+        .arg(m_tableBonus)
+        .arg(tableScore));
+    while (QLayoutItem* item = m_tableCardsLayout->takeAt(0)) {
+        if (QWidget* w = item->widget()) w->deleteLater();
+        delete item;
+    }
+
+    if (!m_lastPlay.cards.empty()) {
+        for (const Card& card : m_lastPlay.cards) {
+            CardWidget* cw = new CardWidget(card);
+            cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+            m_tableCardsLayout->addWidget(cw);
+        }
+    }
+
+    {
+        QLayoutItem* child;
+        while ((child = m_playerBLayout->takeAt(0)) != nullptr) {
+            delete child->widget();
+            delete child;
+        }
+        m_playerBLayout->addStretch();
+        for (size_t i = 0; i < m_playerB.hand.size(); ++i)
+            m_playerBLayout->insertWidget(
+                static_cast<int>(m_playerBLayout->count() - 1),
+                createCardBack());
+    }
+
+    {
+        m_playerACardWidgets.clear();
+        while (QLayoutItem* item = m_playerALayout->takeAt(0)) {
+            if (QWidget* w = item->widget()) w->deleteLater();
+            delete item;
+        }
+
+        for (const Card& card : m_playerA.hand) {
+            CardWidget* cw = new CardWidget(card);
+            connect(cw, &CardWidget::clicked, this, [this]() {
+                update();
+            });
+            m_playerALayout->addWidget(cw);
+            m_playerACardWidgets.push_back(cw);
+        }
+        m_playerALayout->addStretch();
+    }
+
+    if (!m_gameOver) {
+        m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
+        m_passButton->setEnabled(m_lastPlay.type != CardType::Invalid);
+    }
+}
+
+void MainWindow::endRound(Player& winner)
+{
+    settleScoreCards(winner, m_tableCards);
+    winner.totalScore += m_tableBonus;
+
+    int score = calculateTableScore(m_tableCards, m_tableBonus);
+    if (score > 0) {
+        appendLog(QString("%1 获得 %2 分%3")
+            .arg(QString::fromStdString(winner.name))
+            .arg(score)
+            .arg(m_tableBonus > 0 ? QString(" (压分奖励 %1)").arg(m_tableBonus) : ""));
+    }
+
+    m_tableCards.clear();
+    m_tableBonus = 0;
+    m_lastPlay.type = CardType::Invalid;
+    m_lastPlay.cards.clear();
+    m_lastPlay.keyPoint.clear();
+    ++m_roundCount;
+    appendLog(QString("--- 回合 %1 结束 ---").arg(m_roundCount));
+    updateUI();
+}
+
+void MainWindow::refillBoth(Player& winner, Player& loser)
+{
+    int beforeW = static_cast<int>(winner.hand.size());
+    int beforeL = static_cast<int>(loser.hand.size());
+    refillToFive(winner, m_deck);
+    refillToFive(loser, m_deck);
+    int gotW = static_cast<int>(winner.hand.size()) - beforeW;
+    int gotL = static_cast<int>(loser.hand.size()) - beforeL;
+
+    appendLog(QString("补牌: %1 +%2张 → %3张, %4 +%5张 → %6张")
+        .arg(QString::fromStdString(winner.name)).arg(gotW).arg(static_cast<int>(winner.hand.size()))
+        .arg(QString::fromStdString(loser.name)).arg(gotL).arg(static_cast<int>(loser.hand.size())));
+}
+
+bool MainWindow::checkGameEnd(Player& finisher, Player& opponent)
+{
+    if (!finisher.hand.empty()) return false;
+    if (!m_deck.cards.empty()) return false;
+
+    endRound(finisher);
+    finalSettlement(finisher, opponent, m_tableCards);
+    compareAndAnnounce(m_playerA, m_playerB);
+
+    appendLog("========== 游戏结束 ==========");
+    appendLog(QString("出完牌者: %1").arg(QString::fromStdString(finisher.name)));
+    appendLog(QString("玩家A 总分: %1").arg(m_playerA.totalScore));
+    appendLog(QString("玩家B 总分: %1").arg(m_playerB.totalScore));
+
+    QString w = (m_playerA.totalScore >= m_playerB.totalScore)
+        ? "玩家A" : "玩家B";
+    appendLog(QString("最终胜者: %1").arg(w));
+
+    showGameOverDialog(QString("%1 出完牌！\n玩家A: %2 分\n玩家B: %3 分")
+        .arg(QString::fromStdString(finisher.name))
+        .arg(m_playerA.totalScore)
+        .arg(m_playerB.totalScore));
+    return true;
+}
+
+void MainWindow::showGameOverDialog(const QString& message)
+{
+    m_gameOver = true;
+    disableActionButtons();
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("游戏结束");
+    msgBox.setText(message);
+    msgBox.setStandardButtons(QMessageBox::Ok);
+    msgBox.setDefaultButton(QMessageBox::Ok);
+    msgBox.exec();
+}
+
+void MainWindow::disableActionButtons()
+{
+    m_playButton->setEnabled(false);
+    m_passButton->setEnabled(false);
+}
+
+void MainWindow::enableActionButtons()
+{
+    if (m_gameOver) return;
+    m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
+    m_passButton->setEnabled(!m_waitingForAI && m_lastPlay.type != CardType::Invalid);
+}
+
+void MainWindow::appendLog(const QString& text)
+{
+    if (!m_logTextEdit) return;
+    m_logTextEdit->append(text);
+    QTextCursor cursor = m_logTextEdit->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    m_logTextEdit->setTextCursor(cursor);
+}
+
+QWidget* MainWindow::createCardBack()
+{
+    QLabel* lbl = new QLabel;
+    lbl->setFixedSize(64, 90);
+    lbl->setAlignment(Qt::AlignCenter);
+    lbl->setText("背面");
+    lbl->setStyleSheet(
+        "QLabel {"
+        "  border: 2px solid #555;"
+        "  border-radius: 6px;"
+        "  background: qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+        "    stop:0 #2c3e50, stop:0.5 #34495e, stop:1 #2c3e50);"
+        "  color: #ecf0f1;"
+        "  font-weight: bold;"
+        "  font-size: 13px;"
+        "}");
+    return lbl;
+}
