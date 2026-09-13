@@ -251,6 +251,36 @@ MainWindow::MainWindow(QWidget* parent)
         m_tableCardsWidget->setAttribute(Qt::WA_StyledBackground, true);
         tableLay->addWidget(m_tableCardsWidget);
 
+        // ── 先手选择控件（覆盖桌面牌区域）──
+        m_firstChoiceWidget = new QWidget(m_tableCardsWidget);
+        m_firstChoiceWidget->setGeometry(0, 0, 400, 160);
+        m_firstChoiceWidget->setStyleSheet("background: transparent;");
+        auto* fcLayout = new QHBoxLayout(m_firstChoiceWidget);
+        fcLayout->setAlignment(Qt::AlignCenter);
+        fcLayout->setSpacing(20);
+
+        auto* fb = new QPushButton("先手");
+        auto* rb = new QPushButton("随机");
+        auto* sb = new QPushButton("后手");
+        {
+            QFont f = fb->font();
+            f.setPointSize(16); f.setBold(true);
+            fb->setFont(f); rb->setFont(f); sb->setFont(f);
+        }
+        fb->setMinimumSize(120, 50);
+        rb->setMinimumSize(120, 50);
+        sb->setMinimumSize(120, 50);
+
+        fcLayout->addWidget(fb);
+        fcLayout->addWidget(rb);
+        fcLayout->addWidget(sb);
+
+        connect(fb, &QPushButton::clicked, this, &MainWindow::onFirstBtnClicked);
+        connect(rb, &QPushButton::clicked, this, &MainWindow::onRandomBtnClicked);
+        connect(sb, &QPushButton::clicked, this, &MainWindow::onSecondBtnClicked);
+
+        m_firstChoiceWidget->hide();
+
         // 底部：桌面分
         m_tableScoreLabel = new QLabel("原始分: 0 分 | 奖励分: 0 分 | 合计: 0 分");
         QFont tableFont = m_tableScoreLabel->font();
@@ -340,9 +370,7 @@ MainWindow::MainWindow(QWidget* parent)
         m_pickButton    = new QPushButton("选卡");
         m_difficultyButton = new QPushButton("难度: AI1");
         m_newGameButton = new QPushButton("重新开始");
-        m_firstBtn      = new QPushButton("先手");
-        m_randomBtn     = new QPushButton("随机");
-        m_secondBtn     = new QPushButton("后手");
+        
 
         m_playButton->setMinimumHeight(34);
         m_passButton->setMinimumHeight(34);
@@ -360,17 +388,10 @@ MainWindow::MainWindow(QWidget* parent)
         connect(m_pickButton,       &QPushButton::clicked, this, &MainWindow::onPickButtonClicked);
         connect(m_difficultyButton, &QPushButton::clicked, this, &MainWindow::onDifficultyButtonClicked);
         connect(m_newGameButton,    &QPushButton::clicked, this, &MainWindow::onNewGameButtonClicked);
-        connect(m_firstBtn,         &QPushButton::clicked, this, &MainWindow::onFirstBtnClicked);
-        connect(m_randomBtn,        &QPushButton::clicked, this, &MainWindow::onRandomBtnClicked);
-        connect(m_secondBtn,        &QPushButton::clicked, this, &MainWindow::onSecondBtnClicked);
-
         btnGrid->addWidget(m_playButton,       0, 0);
         btnGrid->addWidget(m_buttonStack,      0, 1);
-        btnGrid->addWidget(m_firstBtn,         1, 0);
-        btnGrid->addWidget(m_randomBtn,        1, 1);
-        btnGrid->addWidget(m_secondBtn,        2, 0, 1, 2);
-        btnGrid->addWidget(m_difficultyButton, 3, 0, 1, 2);
-        btnGrid->addWidget(m_newGameButton,    4, 0, 1, 2);
+        btnGrid->addWidget(m_difficultyButton, 1, 0, 1, 2);
+        btnGrid->addWidget(m_newGameButton,    2, 0, 1, 2);
 
         bottomLay->addLayout(btnGrid);
 
@@ -410,12 +431,6 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::onPlayButtonClicked()
 {
     if (m_waitingForAI || m_gameOver) return;
-
-    if (m_isPicking) {
-        m_isPicking = false;
-        m_buttonStack->setCurrentIndex(0);
-        appendLog("使用随机发牌");
-    }
 
     std::vector<Card> selected;
     for (CardWidget* cw : m_playerACardWidgets) {
@@ -667,92 +682,90 @@ void MainWindow::onDifficultyButtonClicked()
     appendLog(QString("AI 难度切换为: %1").arg(m_difficultyButton->text()));
 }
 
-void MainWindow::onFirstBtnClicked()
-{
+void MainWindow::onFirstBtnClicked()  { playSound(m_soundClick); startGameWithFirst(true); }
+void MainWindow::onSecondBtnClicked() { playSound(m_soundClick); startGameWithFirst(false); }
+void MainWindow::onRandomBtnClicked() {
     playSound(m_soundClick);
-    startGameWithFirst(true);
-}
-
-void MainWindow::onRandomBtnClicked()
-{
-    playSound(m_soundClick);
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::uniform_int_distribution<> dist(0, 1);
-    startGameWithFirst(dist(g) == 0);
-}
-
-void MainWindow::onSecondBtnClicked()
-{
-    playSound(m_soundClick);
-    startGameWithFirst(false);
+    std::random_device rd; std::mt19937 g(rd());
+    std::uniform_int_distribution<> d(0, 1);
+    startGameWithFirst(d(g) == 0);
 }
 
 void MainWindow::startGameWithFirst(bool playerAFirst)
 {
+    if (!m_pendingPick) return;
+    m_pendingPick = false;
     m_playerAIsFirst = playerAFirst;
-    m_waitingForFirstChoice = false;
 
-    m_firstBtn->setVisible(false);
-    m_randomBtn->setVisible(false);
-    m_secondBtn->setVisible(false);
+    if (m_firstChoiceWidget) m_firstChoiceWidget->hide();
 
-    m_difficultyButton->setEnabled(true);
-    m_newGameButton->setEnabled(true);
+    // 从牌堆中删掉玩家已选的牌
+    for (const Card& c : m_pickedCards) {
+        auto it = std::find_if(m_deck.cards.begin(), m_deck.cards.end(),
+            [&](const Card& h) { return h.point == c.point && h.suit == c.suit; });
+        if (it != m_deck.cards.end()) m_deck.cards.erase(it);
+    }
 
+    shuffleDeck(m_deck);
+
+    // 玩家A：先放已选的牌，再补齐 5 张
+    m_playerA.hand = m_pickedCards;
+    int needA = 5 - (int)m_playerA.hand.size();
+    if (needA > 0) dealCards(m_playerA, m_deck, needA);
+    sortHandSmart(m_playerA.hand);
+
+    // 玩家B：5 张
+    dealCards(m_playerB, m_deck, 5);
+
+    appendLog(QString("玩家A 手牌: %1").arg(cardsToString(m_playerA.hand)));
+    appendLog(QString("玩家B 手牌: %1").arg(cardsToString(m_playerB.hand)));
+    appendLog(QString("牌堆剩余: %1 张").arg((int)m_deck.cards.size()));
     appendLog(QString("先手: %1").arg(playerAFirst ? "玩家A" : "玩家B"));
 
-    if (playerAFirst) {
-        enableActionButtons();
+    // 禁用所有按钮
+    m_difficultyButton->setEnabled(false);
+    m_newGameButton->setEnabled(false);
+    m_buttonStack->setEnabled(false);
+    m_playButton->setEnabled(false);
+    m_passButton->setEnabled(false);
+
+    // 播放摸牌动画
+    playDealAnimation();
+
+    // 动画结束后恢复
+    int animDuration = 10 * 60 + 300;
+    QTimer::singleShot(animDuration, this, [this, playerAFirst]() {
+        m_dealAnimating = false;
+        m_difficultyButton->setEnabled(true);
+        m_newGameButton->setEnabled(true);
+        m_buttonStack->setEnabled(true);
+        m_buttonStack->setCurrentIndex(0);  // 显示"不要"
+
+        if (playerAFirst) {
+            m_waitingForAI = false;
+            enableActionButtons();
+        } else {
+            m_waitingForAI = true;
+            disableActionButtons();
+            QTimer::singleShot(300, this, &MainWindow::doAITurn);
+        }
         updateUI();
-    } else {
-        m_waitingForAI = true;
-        disableActionButtons();
-        updateUI();
-        QTimer::singleShot(700, this, &MainWindow::doAITurn);
-    }
+    });
 }
 
 void MainWindow::onPickButtonClicked()
 {
     playSound(m_soundClick);
-    CardPickerDialog dlg(this);
-    if (dlg.exec() == QDialog::Accepted) {
-        std::vector<Card> selected = dlg.selectedCards();
-
-        Deck fullDeck = createStandardDeck();
-        for (const Card& c : selected) {
-            auto it = std::find_if(fullDeck.cards.begin(), fullDeck.cards.end(),
-                [&](const Card& h) {
-                    return h.point == c.point && h.suit == c.suit;
-                });
-            if (it != fullDeck.cards.end()) fullDeck.cards.erase(it);
-        }
-
-        shuffleDeck(fullDeck);
-
-        m_playerA.hand = selected;
-        int need = 5 - (int)selected.size();
-        if (need > 0) {
-            dealCards(m_playerA, fullDeck, need);
-        }
-        sortHandSmart(m_playerA.hand);
-        m_deck = fullDeck;
-
-        m_playerB.hand.clear();
-        dealCards(m_playerB, m_deck, 5);
-
-        appendLog("========== 自选起始手牌 ==========");
-        appendLog(QString("玩家A 手牌: %1").arg(cardsToString(m_playerA.hand)));
-        appendLog(QString("玩家B 手牌: %1").arg(cardsToString(m_playerB.hand)));
-        appendLog(QString("牌堆剩余: %1 张").arg(static_cast<int>(m_deck.cards.size())));
-    } else {
-        appendLog("使用随机发牌");
+    if (!m_pendingPick) {
+        QMessageBox::information(this, "提示", "已发牌，不能选卡");
+        return;
     }
 
-    m_isPicking = false;
-    updateUI();
-    enableActionButtons();
+    CardPickerDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        m_pickedCards = dlg.selectedCards();
+        appendLog(QString("已选 %1 张起始手牌").arg(m_pickedCards.size()));
+    }
 }
 
 void MainWindow::doAITurn()
@@ -906,58 +919,102 @@ void MainWindow::doAITurn()
 
 void MainWindow::startNewGame()
 {
-    for (CardWidget* cw : m_tableCardWidgets) {
-        cw->deleteLater();
-    }
+    for (CardWidget* cw : m_tableCardWidgets) cw->deleteLater();
     m_tableCardWidgets.clear();
 
     m_gameOver = false;
-    m_waitingForAI = false;
-    m_isPicking = false;
-    m_lastPlay.type = CardType::Invalid;
-    m_lastPlay.cards.clear();
-    m_lastPlay.keyPoint.clear();
+    m_waitingForAI = true;
+    m_dealAnimating = false;
+    m_pendingPick = true;
+    m_lastPlay = CardTypeResult{};
     m_tableCards.clear();
+    m_tableBonus = 0;
     m_lastPlayerName.clear();
     m_playerACardWidgets.clear();
+    m_pickedCards.clear();
 
+    // 牌堆 54 张，未洗牌，未发牌
     m_deck = createStandardDeck();
-    shuffleDeck(m_deck);
 
     m_playerA = createPlayer("玩家A");
     m_playerB = createPlayer("玩家B");
     m_playerA.isHuman = true;
     m_playerB.aiLevel = m_aiLevel;
-
     m_tracker.reset();
-
-    dealCards(m_playerA, m_deck, 5);
-    dealCards(m_playerB, m_deck, 5);
-    sortHandSmart(m_playerA.hand);
     m_roundCount = 1;
 
     m_logTextEdit->clear();
     appendLog("========== 新游戏开始 ==========");
-    appendLog(QString("玩家A 初始手牌: %1").arg(cardsToString(m_playerA.hand)));
-    appendLog(QString("玩家B 初始手牌: %1").arg(cardsToString(m_playerB.hand)));
-    appendLog("请选择先手方");
-    appendLog(QString("牌堆剩余: %1 张").arg(static_cast<int>(m_deck.cards.size())));
+    appendLog("请选择先手方（可先选卡）");
 
-    if (static_cast<int>(m_deck.cards.size()) == 44) {
-        m_isPicking = true;
+    // 显示先手按钮
+    if (m_firstChoiceWidget) {
+        m_firstChoiceWidget->setVisible(true);
+        m_firstChoiceWidget->raise();
     }
 
-    m_waitingForFirstChoice = true;
-    m_playerAIsFirst = true;
-    m_firstBtn->setVisible(true);
-    m_randomBtn->setVisible(true);
-    m_secondBtn->setVisible(true);
+    // 全部禁用出牌相关
     m_playButton->setEnabled(false);
     m_passButton->setEnabled(false);
-    m_difficultyButton->setEnabled(false);
-    m_newGameButton->setEnabled(false);
+    m_buttonStack->setCurrentIndex(1);  // 显示"选卡"
 
     updateUI();
+}
+
+// ── 发牌动画 ──────────────────────────────────────────────────
+
+void MainWindow::playDealAnimation()
+{
+    if (!m_deckBackLabel || !m_playerAHandWidget || !m_playerBHandWidget) return;
+    m_dealAnimating = true;
+
+    QPoint deckPos = m_deckBackLabel->mapTo(this, QPoint(0, 0));
+    QPoint startPos(deckPos.x() + m_deckBackLabel->width() / 2,
+                    deckPos.y() + m_deckBackLabel->height() / 2);
+
+    QPoint aPos = m_playerAHandWidget->mapTo(this, QPoint(0, 0));
+    QPoint endA(aPos.x() + m_playerAHandWidget->width() / 2,
+                aPos.y() + m_playerAHandWidget->height() / 2);
+
+    QPoint bPos = m_playerBHandWidget->mapTo(this, QPoint(0, 0));
+    QPoint endB(bPos.x() + m_playerBHandWidget->width() / 2,
+                bPos.y() + m_playerBHandWidget->height() / 2);
+
+    const int cw = 60, ch = 84;
+    const int delayPerCard = 60;
+    const int flyDuration = 280;
+
+    QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
+    QPixmap backPix;
+    if (QFile::exists(backPath)) backPix.load(backPath);
+
+    for (int i = 0; i < 10; ++i) {
+        bool toA = (i % 2 == 0);
+        QPoint target = toA ? endA : endB;
+
+        QTimer::singleShot(i * delayPerCard, this, [=]() {
+            QLabel* card = new QLabel(this);
+            card->setFixedSize(cw, ch);
+            card->setScaledContents(true);
+            if (!backPix.isNull()) card->setPixmap(backPix);
+            else card->setStyleSheet("background:#888; border:1px solid #555; border-radius:4px;");
+
+            QPoint from = startPos - QPoint(cw / 2, ch / 2);
+            QPoint to   = target   - QPoint(cw / 2, ch / 2);
+
+            card->move(from);
+            card->show();
+            card->raise();
+
+            QPropertyAnimation* anim = new QPropertyAnimation(card, "pos");
+            anim->setDuration(flyDuration);
+            anim->setEasingCurve(QEasingCurve::OutCubic);
+            anim->setStartValue(from);
+            anim->setEndValue(to);
+            connect(anim, &QPropertyAnimation::finished, card, &QLabel::deleteLater);
+            anim->start(QAbstractAnimation::DeleteWhenStopped);
+        });
+    }
 }
 
 void MainWindow::updateUI()
@@ -998,7 +1055,8 @@ void MainWindow::updateUI()
         .arg(originalScore)
         .arg(m_tableBonus)
         .arg(tableScore));
-    if (m_tableCardWidgets.empty()) {
+    // 先手选择时，不显示"等待出牌"
+    if (!m_waitingForFirstChoice && !m_pendingPick && m_tableCardWidgets.empty()) {
         if (m_lastPlay.type == CardType::Invalid || m_lastPlay.cards.empty()) {
             auto children = m_tableCardsWidget->findChildren<QLabel*>();
             for (QLabel* lbl : children) lbl->deleteLater();
@@ -1026,6 +1084,9 @@ void MainWindow::updateUI()
                 createCardBack());
     }
 
+    // 动画期间不刷新手牌
+    if (m_dealAnimating) return;
+
     {
         m_playerACardWidgets.clear();
         while (QLayoutItem* item = m_playerALayout->takeAt(0)) {
@@ -1045,9 +1106,9 @@ void MainWindow::updateUI()
     }
 
     if (!m_gameOver) {
-        if (m_isPicking) {
+        if (m_pendingPick) {
             m_buttonStack->setCurrentIndex(1);
-            m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
+            m_playButton->setEnabled(false);
         } else {
             m_buttonStack->setCurrentIndex(0);
             m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
@@ -1588,6 +1649,12 @@ void MainWindow::showBonusFloat(int bonus) {
 // ── 桌面牌布局 ──
 
 void MainWindow::layoutTableCards() {
+    // 保持先手选择控件铺满桌面区域
+    if (m_firstChoiceWidget) {
+        m_firstChoiceWidget->setGeometry(0, 0,
+            m_tableCardsWidget->width(), m_tableCardsWidget->height());
+    }
+
     if (m_tableCardWidgets.empty()) return;
 
     int n = (int)m_tableCardWidgets.size();
@@ -1611,5 +1678,8 @@ void MainWindow::layoutTableCards() {
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
     QMainWindow::resizeEvent(event);
+    if (m_firstChoiceWidget && m_tableCardsWidget) {
+        m_firstChoiceWidget->setGeometry(m_tableCardsWidget->rect());
+    }
     layoutTableCards();
 }

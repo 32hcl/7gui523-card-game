@@ -58,6 +58,7 @@ private:
     void flyCardsToTable(const std::vector<CardWidget*>& cards);
     void flyAICardsToTable(const std::vector<Card>& cards);
     void layoutTableCards();
+    void playDealAnimation();
     void shakeWidget(QWidget* widget);
     void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
     void showBonusFloat(int bonus);
@@ -72,10 +73,13 @@ private:
     std::string m_lastPlayerName;
     bool m_gameOver = false;
     bool m_waitingForAI = false;
-    bool m_isPicking = false;
+    bool m_pendingPick = true;        // 是否处于"未发牌"阶段
+    bool m_dealAnimating = false;     // 是否正在播摸牌动画
     bool m_shaking = false;
     bool m_playerAIsFirst = true;
     bool m_waitingForFirstChoice = true;
+
+    std::vector<Card> m_pickedCards;
 
     AILevel m_aiLevel = AILevel::AI1_Simple;
     CardTracker m_tracker;
@@ -98,9 +102,7 @@ private:
     QPushButton* m_pickButton;
     QPushButton* m_newGameButton;
     QPushButton* m_difficultyButton;
-    QPushButton* m_firstBtn = nullptr;
-    QPushButton* m_randomBtn = nullptr;
-    QPushButton* m_secondBtn = nullptr;
+    QWidget*     m_firstChoiceWidget = nullptr;
     QFrame* m_tableFrame = nullptr;
     QWidget*     m_deckDisplayWidget = nullptr;
     QVBoxLayout* m_deckDisplayLayout = nullptr;
