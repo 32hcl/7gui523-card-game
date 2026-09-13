@@ -1,0 +1,29 @@
+{
+  "configurations": [
+    {
+      "name": "Qt-MinGW",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "D:/app/qt-c++/6.11.2/mingw_64/include/**",
+        "D:/app/qt-c++/6.11.2/mingw_64/include/QtCore",
+        "D:/app/qt-c++/6.11.2/mingw_64/include/QtGui",
+        "D:/app/qt-c++/6.11.2/mingw_64/include/QtWidgets",
+        "D:/app/qt-c++/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include",
+        "D:/app/qt-c++/Tools/mingw1310_64/include",
+        "D:/app/qt-c++/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++"
+      ],
+      "defines": [
+        "UNICODE",
+        "_UNICODE",
+        "QT_WIDGETS_LIB",
+        "QT_GUI_LIB",
+        "QT_CORE_LIB"
+      ],
+      "compilerPath": "D:/app/qt-c++/Tools/mingw1310_64/bin/g++.exe",
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-gcc-x64"
+    }
+  ],
+  "version": 4
+}

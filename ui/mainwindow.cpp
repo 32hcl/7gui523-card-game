@@ -11,15 +11,18 @@
 #include <QHBoxLayout>
 #include <QFrame>
 #include <QMessageBox>
+#include <QDialog>
 #include <QTextEdit>
 #include <QTextCursor>
 #include <QTimer>
 #include <QPropertyAnimation>
 #include <QStackedWidget>
 #include <QGraphicsDropShadowEffect>
+#include <QGraphicsOpacityEffect>
 #include <QFile>
 #include <QCoreApplication>
 #include <QPixmap>
+#include <random>
 #include <algorithm>
 #include <map>
 
@@ -202,8 +205,6 @@ MainWindow::MainWindow(QWidget* parent)
     }
 
     {
-        // 玩家B 标签已删除
-
         m_playerBHandWidget = new QWidget;
         m_playerBLayout     = new QHBoxLayout(m_playerBHandWidget);
         m_playerBLayout->setContentsMargins(0, 0, 0, 0);
@@ -302,8 +303,6 @@ MainWindow::MainWindow(QWidget* parent)
     }
 
     {
-        // 玩家A 标签已删除
-
         m_playerAHandWidget = new QWidget;
         m_playerALayout     = new QHBoxLayout(m_playerAHandWidget);
         m_playerALayout->setContentsMargins(0, 0, 0, 0);
@@ -341,6 +340,9 @@ MainWindow::MainWindow(QWidget* parent)
         m_pickButton    = new QPushButton("选卡");
         m_difficultyButton = new QPushButton("难度: AI1");
         m_newGameButton = new QPushButton("重新开始");
+        m_firstBtn      = new QPushButton("先手");
+        m_randomBtn     = new QPushButton("随机");
+        m_secondBtn     = new QPushButton("后手");
 
         m_playButton->setMinimumHeight(34);
         m_passButton->setMinimumHeight(34);
@@ -358,11 +360,17 @@ MainWindow::MainWindow(QWidget* parent)
         connect(m_pickButton,       &QPushButton::clicked, this, &MainWindow::onPickButtonClicked);
         connect(m_difficultyButton, &QPushButton::clicked, this, &MainWindow::onDifficultyButtonClicked);
         connect(m_newGameButton,    &QPushButton::clicked, this, &MainWindow::onNewGameButtonClicked);
+        connect(m_firstBtn,         &QPushButton::clicked, this, &MainWindow::onFirstBtnClicked);
+        connect(m_randomBtn,        &QPushButton::clicked, this, &MainWindow::onRandomBtnClicked);
+        connect(m_secondBtn,        &QPushButton::clicked, this, &MainWindow::onSecondBtnClicked);
 
         btnGrid->addWidget(m_playButton,       0, 0);
         btnGrid->addWidget(m_buttonStack,      0, 1);
-        btnGrid->addWidget(m_difficultyButton, 1, 0, 1, 2);
-        btnGrid->addWidget(m_newGameButton,    2, 0, 1, 2);
+        btnGrid->addWidget(m_firstBtn,         1, 0);
+        btnGrid->addWidget(m_randomBtn,        1, 1);
+        btnGrid->addWidget(m_secondBtn,        2, 0, 1, 2);
+        btnGrid->addWidget(m_difficultyButton, 3, 0, 1, 2);
+        btnGrid->addWidget(m_newGameButton,    4, 0, 1, 2);
 
         bottomLay->addLayout(btnGrid);
 
@@ -498,6 +506,7 @@ void MainWindow::onPlayButtonClicked()
         m_lastPlay.bonusScore = bonus;
         m_tableBonus += bonus;
     }
+    if (bonus > 0) showBonusFloat(bonus);
 
     appendLog(QString("玩家A 出牌: %1 (%2%3)")
         .arg(cardsToString(selected))
@@ -647,11 +656,61 @@ void MainWindow::onDifficultyButtonClicked()
             m_difficultyButton->setText("难度: AI3 记牌");
             break;
         case AILevel::AI3_Tracker:
+            m_aiLevel = AILevel::AI4_Expert;
+            m_difficultyButton->setText("难度: AI4 专家");
+            break;
+        case AILevel::AI4_Expert:
             m_aiLevel = AILevel::AI1_Simple;
             m_difficultyButton->setText("难度: AI1 简单");
             break;
     }
     appendLog(QString("AI 难度切换为: %1").arg(m_difficultyButton->text()));
+}
+
+void MainWindow::onFirstBtnClicked()
+{
+    playSound(m_soundClick);
+    startGameWithFirst(true);
+}
+
+void MainWindow::onRandomBtnClicked()
+{
+    playSound(m_soundClick);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::uniform_int_distribution<> dist(0, 1);
+    startGameWithFirst(dist(g) == 0);
+}
+
+void MainWindow::onSecondBtnClicked()
+{
+    playSound(m_soundClick);
+    startGameWithFirst(false);
+}
+
+void MainWindow::startGameWithFirst(bool playerAFirst)
+{
+    m_playerAIsFirst = playerAFirst;
+    m_waitingForFirstChoice = false;
+
+    m_firstBtn->setVisible(false);
+    m_randomBtn->setVisible(false);
+    m_secondBtn->setVisible(false);
+
+    m_difficultyButton->setEnabled(true);
+    m_newGameButton->setEnabled(true);
+
+    appendLog(QString("先手: %1").arg(playerAFirst ? "玩家A" : "玩家B"));
+
+    if (playerAFirst) {
+        enableActionButtons();
+        updateUI();
+    } else {
+        m_waitingForAI = true;
+        disableActionButtons();
+        updateUI();
+        QTimer::singleShot(700, this, &MainWindow::doAITurn);
+    }
 }
 
 void MainWindow::onPickButtonClicked()
@@ -772,17 +831,12 @@ void MainWindow::doAITurn()
 
     m_tracker.recordPlayed(chosen);
 
-    // AI 出牌：清空桌面并创建新的 CardWidget
+    // AI 出牌：清空桌面 + 飞行动画
     for (CardWidget* cw : m_tableCardWidgets) {
         cw->deleteLater();
     }
     m_tableCardWidgets.clear();
-    for (const Card& card : chosen) {
-        CardWidget* cw = new CardWidget(card, m_tableCardsWidget);
-        cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-        m_tableCardWidgets.push_back(cw);
-    }
-    layoutTableCards();
+    flyAICardsToTable(chosen);
 
     // 检查刚打出的牌型是否为 Special523
     if (m_lastPlay.type == CardType::Special523) {
@@ -797,6 +851,7 @@ void MainWindow::doAITurn()
         m_lastPlay.bonusScore = bonus;
         m_tableBonus += bonus;
     }
+    if (bonus > 0) showBonusFloat(bonus);
     appendLog(QString("玩家B 出牌: %1 (%2%3)")
         .arg(cardsToString(chosen))
         .arg(cardTypeToQString(m_lastPlay.type))
@@ -885,18 +940,33 @@ void MainWindow::startNewGame()
     appendLog("========== 新游戏开始 ==========");
     appendLog(QString("玩家A 初始手牌: %1").arg(cardsToString(m_playerA.hand)));
     appendLog(QString("玩家B 初始手牌: %1").arg(cardsToString(m_playerB.hand)));
-    appendLog("随机先手: 玩家A");
+    appendLog("请选择先手方");
     appendLog(QString("牌堆剩余: %1 张").arg(static_cast<int>(m_deck.cards.size())));
 
     if (static_cast<int>(m_deck.cards.size()) == 44) {
         m_isPicking = true;
     }
 
+    m_waitingForFirstChoice = true;
+    m_playerAIsFirst = true;
+    m_firstBtn->setVisible(true);
+    m_randomBtn->setVisible(true);
+    m_secondBtn->setVisible(true);
+    m_playButton->setEnabled(false);
+    m_passButton->setEnabled(false);
+    m_difficultyButton->setEnabled(false);
+    m_newGameButton->setEnabled(false);
+
     updateUI();
 }
 
 void MainWindow::updateUI()
 {
+    if (m_waitingForFirstChoice) {
+        m_playButton->setEnabled(false);
+        m_passButton->setEnabled(false);
+    }
+
     m_deckCountLabel->setText(
         QString("牌堆剩余: %1").arg(static_cast<int>(m_deck.cards.size())));
     if (m_deckCountBigLabel) {
@@ -928,9 +998,6 @@ void MainWindow::updateUI()
         .arg(originalScore)
         .arg(m_tableBonus)
         .arg(tableScore));
-    // ── 桌面牌 ──
-    // 玩家出牌由 flyCardsToTable 管理，AI 出牌由 doAITurn 管理，
-    // updateUI 只负责显示"等待出牌"提示（m_tableCardWidgets 为空时）
     if (m_tableCardWidgets.empty()) {
         if (m_lastPlay.type == CardType::Invalid || m_lastPlay.cards.empty()) {
             auto children = m_tableCardsWidget->findChildren<QLabel*>();
@@ -979,10 +1046,10 @@ void MainWindow::updateUI()
 
     if (!m_gameOver) {
         if (m_isPicking) {
-            m_buttonStack->setCurrentIndex(1);  // 选卡
-            m_playButton->setEnabled(!m_playerA.hand.empty());
+            m_buttonStack->setCurrentIndex(1);
+            m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
         } else {
-            m_buttonStack->setCurrentIndex(0);  // 不要
+            m_buttonStack->setCurrentIndex(0);
             m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
         }
         m_passButton->setEnabled(m_lastPlay.type != CardType::Invalid);
@@ -1081,12 +1148,112 @@ void MainWindow::showGameOverDialog(const QString& message)
 {
     m_gameOver = true;
     disableActionButtons();
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle("游戏结束");
-    msgBox.setText(message);
-    msgBox.setStandardButtons(QMessageBox::Ok);
-    msgBox.setDefaultButton(QMessageBox::Ok);
-    msgBox.exec();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("游戏结束");
+    dlg.setMinimumSize(420, 360);
+    dlg.setStyleSheet(R"(
+        QDialog { background-color: #1B5E20; }
+        QLabel { color: #FFFFFF; font-size: 16px; }
+        QPushButton {
+            background-color: #2E7D32;
+            color: #FFFFFF;
+            border: 2px solid #66BB6A;
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        QPushButton:hover { background-color: #388E3C; }
+    )");
+
+    auto* layout = new QVBoxLayout(&dlg);
+    layout->setContentsMargins(24, 24, 24, 24);
+    layout->setSpacing(12);
+
+    auto* title = new QLabel("游戏结束");
+    QFont tf = title->font();
+    tf.setPointSize(22);
+    tf.setBold(true);
+    title->setFont(tf);
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet("QLabel { color: #FFD700; }");
+    layout->addWidget(title);
+
+    auto* finisher = new QLabel(message.split("\n").first());
+    finisher->setAlignment(Qt::AlignCenter);
+    finisher->setStyleSheet("QLabel { color: #FFFFFF; font-size: 16px; }");
+    layout->addWidget(finisher);
+
+    int scoreA = m_playerA.totalScore;
+    int scoreB = m_playerB.totalScore;
+    int diff = qAbs(scoreA - scoreB);
+    bool aWin = scoreA > scoreB;
+    bool tie = scoreA == scoreB;
+
+    auto* labelA = new QLabel(QString("玩家A: %1 分").arg(scoreA));
+    auto* labelB = new QLabel(QString("玩家B: %1 分").arg(scoreB));
+    labelA->setAlignment(Qt::AlignCenter);
+    labelB->setAlignment(Qt::AlignCenter);
+
+    if (!tie) {
+        QString winStyle = "QLabel { color: #FFD700; font-size: 20px; font-weight: bold; }";
+        QString loseStyle = "QLabel { color: #B0BEC5; font-size: 18px; }";
+        labelA->setStyleSheet(aWin ? winStyle : loseStyle);
+        labelB->setStyleSheet(aWin ? loseStyle : winStyle);
+    } else {
+        labelA->setStyleSheet("QLabel { color: #FFD700; font-size: 20px; font-weight: bold; }");
+        labelB->setStyleSheet("QLabel { color: #FFD700; font-size: 20px; font-weight: bold; }");
+    }
+    layout->addWidget(labelA);
+    layout->addWidget(labelB);
+
+    QString resultText;
+    if (tie) resultText = "平局";
+    else resultText = QString("胜者: %1（领先 %2 分）")
+        .arg(aWin ? "玩家A" : "玩家B").arg(diff);
+    auto* result = new QLabel(resultText);
+    result->setAlignment(Qt::AlignCenter);
+    result->setStyleSheet("QLabel { color: #FFF59D; font-size: 16px; font-weight: bold; }");
+    layout->addWidget(result);
+
+    auto countScoreCards = [](const std::vector<Card>& collected) -> QString {
+        int fives = 0, tens = 0, kings = 0;
+        for (const auto& c : collected) {
+            if (c.point == "5") fives++;
+            else if (c.point == "10") tens++;
+            else if (c.point == "K") kings++;
+        }
+        return QString("5×%1  10×%2  K×%3").arg(fives).arg(tens).arg(kings);
+    };
+
+    auto* cardsA = new QLabel(QString("玩家A 分值牌: %1").arg(countScoreCards(m_playerA.collected)));
+    auto* cardsB = new QLabel(QString("玩家B 分值牌: %1").arg(countScoreCards(m_playerB.collected)));
+    cardsA->setAlignment(Qt::AlignCenter);
+    cardsB->setAlignment(Qt::AlignCenter);
+    cardsA->setStyleSheet("QLabel { color: #A5D6A7; font-size: 14px; }");
+    cardsB->setStyleSheet("QLabel { color: #A5D6A7; font-size: 14px; }");
+    layout->addWidget(cardsA);
+    layout->addWidget(cardsB);
+
+    layout->addStretch();
+
+    auto* btnLayout = new QHBoxLayout;
+    auto* againBtn = new QPushButton("再来一局");
+    auto* exitBtn = new QPushButton("退出");
+    btnLayout->addWidget(againBtn);
+    btnLayout->addWidget(exitBtn);
+    layout->addLayout(btnLayout);
+
+    connect(againBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    connect(exitBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    int ret = dlg.exec();
+
+    if (ret == QDialog::Accepted) {
+        m_gameOver = false;
+        onNewGameButtonClicked();
+    }
 }
 
 void MainWindow::disableActionButtons()
@@ -1113,7 +1280,7 @@ void MainWindow::appendLog(const QString& text)
 
 QWidget* MainWindow::createCardBack()
 {
-    const int w = 65;   // 比玩家A 的 100 小
+    const int w = 65;
     const int h = 95;
 
     QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
@@ -1208,6 +1375,60 @@ void MainWindow::flyCardsToTable(const std::vector<CardWidget*>& cards) {
                 QPoint relPos = endPos - m_tableCardsWidget->mapTo(this, QPoint(0, 0));
                 cw->move(relPos);
                 cw->show();
+                cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+                m_tableCardWidgets.push_back(cw);
+            });
+
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
+    }
+}
+
+// ── AI 出牌飞行动画 ──────────────────────────────────────────
+
+void MainWindow::flyAICardsToTable(const std::vector<Card>& cards) {
+    if (cards.empty()) return;
+    if (!m_playerBHandWidget || !m_tableCardsWidget) return;
+
+    QWidget* playArea = m_tableCardsWidget->parentWidget();
+    QPoint playPos = playArea->mapTo(this, QPoint(0, 0));
+    QPoint aiPos = m_playerBHandWidget->mapTo(this, QPoint(0, 0));
+    QPoint startPos(playPos.x() + playArea->width() / 2,
+                    aiPos.y() + m_playerBHandWidget->height() / 2);
+
+    QPoint tablePos = m_tableCardsWidget->mapTo(this, QPoint(0, 0));
+    int tableW = m_tableCardsWidget->width();
+    int tableH = m_tableCardsWidget->height();
+
+    int n = (int)cards.size();
+    int cardW = 100;
+    int spacing = 20;
+    int totalWidth = n * cardW + (n - 1) * spacing;
+    int startX = tablePos.x() + (tableW - totalWidth) / 2;
+    int targetY = tablePos.y() + (tableH - 150) / 2;
+
+    for (int i = 0; i < n; ++i) {
+        CardWidget* cw = new CardWidget(cards[i], this);
+        cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        cw->move(startPos);
+        cw->show();
+        cw->raise();
+        cw->setFlying(true);
+
+        QPoint endPos(startX + i * (cardW + spacing), targetY);
+
+        QPropertyAnimation* anim = new QPropertyAnimation(cw, "pos");
+        anim->setDuration(400);
+        anim->setEasingCurve(QEasingCurve::OutCubic);
+        anim->setStartValue(startPos);
+        anim->setEndValue(endPos);
+
+        connect(anim, &QPropertyAnimation::finished, this,
+            [this, cw, endPos]() {
+                cw->setParent(m_tableCardsWidget);
+                QPoint relPos = endPos - m_tableCardsWidget->mapTo(this, QPoint(0, 0));
+                cw->move(relPos);
+                cw->show();
+                cw->setFlying(false);
                 cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
                 m_tableCardWidgets.push_back(cw);
             });
@@ -1318,6 +1539,50 @@ void MainWindow::showSpecialVictoryEffect(const QString& winnerName, const QStri
         shadow->deleteLater();
         showGameOverDialog(endMessage);
     });
+}
+
+// ── 压分飘字 ──
+
+void MainWindow::showBonusFloat(int bonus) {
+    if (bonus <= 0) return;
+    if (!m_tableScoreLabel) return;
+
+    QLabel* floatLabel = new QLabel(QString("+%1").arg(bonus), this);
+    floatLabel->setStyleSheet(
+        "QLabel {"
+        "  color: #FFD700;"
+        "  font-size: 32px;"
+        "  font-weight: bold;"
+        "  background: transparent;"
+        "}"
+    );
+    floatLabel->setAlignment(Qt::AlignCenter);
+    floatLabel->adjustSize();
+
+    QPoint labelPos = m_tableScoreLabel->mapTo(this, QPoint(0, 0));
+    int x = labelPos.x() + m_tableScoreLabel->width() / 2 - floatLabel->width() / 2;
+    int y = labelPos.y() - floatLabel->height() - 5;
+    floatLabel->move(x, y);
+    floatLabel->show();
+    floatLabel->raise();
+
+    // 向上飘 + 淡出
+    QPropertyAnimation* moveAnim = new QPropertyAnimation(floatLabel, "pos");
+    moveAnim->setDuration(1000);
+    moveAnim->setStartValue(QPoint(x, y));
+    moveAnim->setEndValue(QPoint(x, y - 80));
+    moveAnim->setEasingCurve(QEasingCurve::OutCubic);
+
+    QGraphicsOpacityEffect* effect = new QGraphicsOpacityEffect(floatLabel);
+    floatLabel->setGraphicsEffect(effect);
+    QPropertyAnimation* fadeAnim = new QPropertyAnimation(effect, "opacity");
+    fadeAnim->setDuration(1000);
+    fadeAnim->setStartValue(1.0);
+    fadeAnim->setEndValue(0.0);
+
+    connect(moveAnim, &QPropertyAnimation::finished, floatLabel, &QLabel::deleteLater);
+    moveAnim->start(QAbstractAnimation::DeleteWhenStopped);
+    fadeAnim->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 // ── 桌面牌布局 ──

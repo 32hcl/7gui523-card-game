@@ -1,19 +1,59 @@
+# ========== 编译产物 ==========
 build/
+build2/
 release/
 *.exe
+*.o
 *.obj
 *.dll
 *.a
+*.so
 *.lib
+
+# ========== CMake 生成 ==========
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+Makefile
 build.ninja
+.ninja_deps
+.ninja_log
 rules.ninja
-*.csv
-battle_log.csv
-battle_detail.txt
-battle_out.txt
-.vscode/
+
+# ========== Qt 生成 ==========
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+*.moc
+*_autogen/
+
+# ========== IDE ==========
 .idea/
+*.swp
+*.swo
+*~
+*.user
+*.suo
+*.VC.db
+
+# ========== 运行时输出 ==========
+*.csv
+*.txt
 *.log
+!CMakeLists.txt
+
+# ========== 临时文件 ==========
+_trash/
+*.bak
+*.tmp
+*.old
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ========== 保留 ==========
+!README.md
+!LICENSE
+!music/*.mp3
+!kenney_playing-cards-pack/**

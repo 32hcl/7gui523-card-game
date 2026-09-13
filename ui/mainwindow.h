@@ -11,6 +11,7 @@
 #include <QStackedWidget>
 #include <QMediaPlayer>
 #include <QAudioOutput>
+#include <random>
 #include "core/deck.h"
 #include "core/player.h"
 #include "core/cardtype.h"
@@ -36,6 +37,9 @@ private slots:
     void onNewGameButtonClicked();
     void onDifficultyButtonClicked();
     void onPickButtonClicked();
+    void onFirstBtnClicked();
+    void onRandomBtnClicked();
+    void onSecondBtnClicked();
 
 private:
     void startNewGame();
@@ -52,9 +56,12 @@ private:
     void initSounds();
     void playSound(QMediaPlayer* player);
     void flyCardsToTable(const std::vector<CardWidget*>& cards);
+    void flyAICardsToTable(const std::vector<Card>& cards);
     void layoutTableCards();
     void shakeWidget(QWidget* widget);
     void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
+    void showBonusFloat(int bonus);
+    void startGameWithFirst(bool playerAFirst);
 
     Deck   m_deck;
     Player m_playerA;
@@ -67,6 +74,8 @@ private:
     bool m_waitingForAI = false;
     bool m_isPicking = false;
     bool m_shaking = false;
+    bool m_playerAIsFirst = true;
+    bool m_waitingForFirstChoice = true;
 
     AILevel m_aiLevel = AILevel::AI1_Simple;
     CardTracker m_tracker;
@@ -89,6 +98,9 @@ private:
     QPushButton* m_pickButton;
     QPushButton* m_newGameButton;
     QPushButton* m_difficultyButton;
+    QPushButton* m_firstBtn = nullptr;
+    QPushButton* m_randomBtn = nullptr;
+    QPushButton* m_secondBtn = nullptr;
     QFrame* m_tableFrame = nullptr;
     QWidget*     m_deckDisplayWidget = nullptr;
     QVBoxLayout* m_deckDisplayLayout = nullptr;

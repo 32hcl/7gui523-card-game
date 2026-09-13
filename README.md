@@ -2,9 +2,7 @@
 
 Copyright © 2026 32%Hcl 陈龙大王
 
-一个两人对战的扑克牌游戏。
-
-
+一个两人对战的扑克牌游戏，支持 AI 对战。
 
 ## 如何运行
 
@@ -18,7 +16,7 @@ Copyright © 2026 32%Hcl 陈龙大王
 ### 方式二：从源码编译
 
 需要：
-- Qt 6.11.2
+- Qt 6.7.2
 - CMake 3.16+
 - MinGW 13.1
 - Ninja
@@ -26,23 +24,42 @@ Copyright © 2026 32%Hcl 陈龙大王
 编译步骤：
 
 ```bash
-mkdir build
-cd build
-cmake .. -G Ninja -DCMAKE_PREFIX_PATH=你的Qt路径
-cmake --build .
-windeployqt game.exe
-./game.exe
+mkdir build cd build cmake .. -G Ninja -DCMAKE_PREFIX_PATH=你的Qt路径 cmake --build . windeployqt game.exe ./game.exe
 
-操作
-选卡：游戏开始时点击"选卡"自定义起始手牌
+text
 
-出牌：点击手牌选中，点"出牌"
 
-不要：点"不要"跳过本回合
 
-难度：循环切换 AI1 / AI2 / AI3
 
-重新开始：重开一局
+## 操作
+
+### 开局先手选择
+游戏开始时弹出三个按钮：
+- **先手** — 玩家先出牌
+- **随机** — 随机决定谁先出
+- **后手** — AI 先出牌
+
+### 选卡
+点击"选卡"打开卡牌选择界面，点选卡牌加入起始手牌。
+- 可选 **0~5 张**，未选满的位置由牌堆随机补全
+- 点击已选卡牌可移除
+
+### 出牌
+点击手牌选中，点"出牌"。支持的牌型：
+- 单张、对子、三张
+- 三带一、三带二
+- 炸弹（四张相同点数）
+- 王炸（大鬼 + 小鬼，最大）
+
+### 不要
+点"不要"跳过本回合。
+
+### 难度
+循环切换四档 AI 难度：
+- AI1 简单 → AI2 规则 → AI3 记牌 → AI4 专家 → AI1 简单 → ...
+
+### 重新开始
+重开一局。
 
 ## 牌序
 
@@ -55,37 +72,69 @@ windeployqt game.exe
 - 三张
 - 三带一
 - 三带二
-- 炸弹
-- 王炸（最大）
+- 炸弹（四张相同点数）
+- 王炸（大鬼 + 小鬼，最大）
 
 顺子、连对、飞机等不合法。
 
 ## 玩法
 
-- 每人 5 张手牌，牌堆补牌
+- 每人起始 5 张手牌，从牌堆补牌
+- 一方出牌后，另一方出更大的同牌型，或出炸弹/王炸，或选择"不要"
 - 一方要不起，本回合结束
 - 胜方优先补牌至 5 张，败方后补
-- 一方出完牌且牌堆已空，立即终局
+- **牌堆为 0 时**，一方出完手中最后一张牌，**立即终局**
 - 终局结算：出完牌者获得桌面和对方手牌中的分值卡
-- 分值卡：5=5 分，10=10 分，K=20 分
+- 分值卡：5 = 5 分，10 = 10 分，K = 20 分
 - 最终比较总分，同分双赢
 
 ## 特殊胜利
 
-手牌凑齐 `7、鬼、5、2、3`，直接获胜。
+**一次性打出** 7 + 鬼（大鬼/小鬼均可） + 5 + 2 + 3 这 **5 张牌**，直接获胜，不结算分数。
+
+（注意：不是手牌里凑齐这 5 张就算，必须一次性打出。）
 
 ## 压分奖励
 
-出 5/10/K 的单张或对子时，如果和上一手同类型同点数，额外获得本次出牌的分值。
+出 5 / 10 / K 的单张或对子（含三带一、三带二中的 5/10/K）时，如果和上一手**同牌型、同点数**，额外获得本次出牌的分值。
 
-## 功能
+例如：上一手出了单张 5，这一手也出单张 5，则额外获得 5 分。
 
-- 三档 AI 难度：AI1 简单 / AI2 规则 / AI3 记牌
-- 选卡开局：自定义 5 张起始手牌
-- 出牌动画、音效
-- 游戏日志面板
+## 项目结构
+7gui523/ ├── CMakeLists.txt # 构建配置 ├── package.ps1 # 一键打包脚本（见"如何打包"） ├── core/ # 核心游戏逻辑 │ ├── card.h/cpp # 卡牌数据结构 │ ├── deck.h/cpp # 牌堆创建和洗牌 │ ├── player.h/cpp # 玩家状态管理 │ ├── ai.h/cpp # AI 出牌策略（四档难度） │ ├── game.h/cpp # 游戏流程控制 │ ├── cardtype.h/cpp # 牌型判断 │ ├── score.h/cpp # 终局分数结算 │ └── special.h/cpp # 特殊胜利判定 ├── ui/ # Qt 界面 │ ├── mainwindow.h/cpp # 主窗口（布局、事件、动画） │ ├── cardpickerdialog.h/cpp # 选卡弹窗 │ ├── selectablecardwidget.h/cpp # 可选卡牌控件 │ └── gameoverdialog.h/cpp # 终局结算弹窗 ├── tests/ # 单元测试（Catch2） │ ├── main.cpp │ ├── test_ai.cpp │ ├── test_cardtype.cpp │ ├── test_score.cpp │ └── test_special.cpp ├── music/ # 音效文件（.mp3） │ ├── click.mp3 │ ├── success.mp3 │ ├── failure.mp3 │ ├── card_play.mp3 │ ├── pass_play.mp3 │ ├── bomb_play.mp3 │ └── button_hover.mp3 ├── cards/ # 卡牌图片（构建时从 kenney 素材包复制） └── kenney_playing-cards-pack/ # Kenney 扑克牌素材（仅 large 尺寸）
 
-许可
+text
+
+
+
+
+## 如何打包
+
+项目根目录的 `package.ps1` 是一键打包脚本，自动完成以下步骤：
+
+1. 设置 Qt + MinGW + CMake + Ninja 环境变量
+2. 若 build 目录未配置，自动执行 `cmake .. -G Ninja`
+3. `cmake --build .` 编译 Release
+4. 创建 `release/` 目录
+5. 拷贝 `game.exe` 到 release 目录
+6. 运行 `windeployqt` 复制 Qt 依赖 DLL
+7. 补充 MinGW 运行库（`libgcc_s_seh-1.dll` 等）
+
+打包完成后，`release/` 目录即为绿色免安装版，可直接复制到其他电脑运行。
+
+> 注意：`package.ps1` 中的 Qt 路径（`D:\app\qt-c++\6.7.2\mingw_64\bin`）需根据本地环境修改。
+
+## AI 难度说明
+
+| 难度 | 策略 |
+|------|------|
+| AI1 简单 | 随机出牌，仅遵循牌型规则 |
+| AI2 规则 | 按固定优先级出最小的可出牌型 |
+| AI3 记牌 | 记录已出牌，推测剩余牌分布 |
+| AI4 专家 | 综合记牌、拆牌、骗牌策略 |
+
+## 许可
+
 本项目使用 PolyForm Noncommercial License 1.0.0 授权。
 
 允许个人学习、研究、修改，禁止任何商业用途。
