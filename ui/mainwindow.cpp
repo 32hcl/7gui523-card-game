@@ -16,6 +16,7 @@
 #include <QTimer>
 #include <QPropertyAnimation>
 #include <QStackedWidget>
+#include <QGraphicsDropShadowEffect>
 #include <QFile>
 #include <QCoreApplication>
 #include <QPixmap>
@@ -484,11 +485,11 @@ void MainWindow::onPlayButtonClicked()
 
     m_tracker.recordPlayed(selected);
 
-    if (checkSpecialVictory(m_playerA)) {
+    // 检查刚打出的牌型是否为 Special523（非手牌检查）
+    if (result.type == CardType::Special523) {
         appendLog("玩家A 达成七鬼523，直接获胜！");
         playSound(m_soundSuccess);
-        showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
-        disableActionButtons();
+        showSpecialVictoryEffect("玩家A", "玩家A 达成七鬼523，直接获胜！");
         return;
     }
 
@@ -578,15 +579,13 @@ void MainWindow::onPassButtonClicked()
         if (checkSpecialVictory(m_playerA)) {
             appendLog("玩家A 达成七鬼523，直接获胜！");
             playSound(m_soundSuccess);
-            showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
-            disableActionButtons();
+            showSpecialVictoryEffect("玩家A", "玩家A 达成七鬼523，直接获胜！");
             return;
         }
         if (checkSpecialVictory(m_playerB)) {
             appendLog("玩家B 达成七鬼523，直接获胜！");
             playSound(m_soundFailure);
-            showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
-            disableActionButtons();
+            showSpecialVictoryEffect("玩家B", "玩家B 达成七鬼523，直接获胜！");
             return;
         }
 
@@ -606,15 +605,13 @@ void MainWindow::onPassButtonClicked()
     if (checkSpecialVictory(m_playerA)) {
         appendLog("玩家A 达成七鬼523，直接获胜！");
         playSound(m_soundSuccess);
-        showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
-        disableActionButtons();
+        showSpecialVictoryEffect("玩家A", "玩家A 达成七鬼523，直接获胜！");
         return;
     }
     if (checkSpecialVictory(m_playerB)) {
         appendLog("玩家B 达成七鬼523，直接获胜！");
         playSound(m_soundFailure);
-        showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
-        disableActionButtons();
+        showSpecialVictoryEffect("玩家B", "玩家B 达成七鬼523，直接获胜！");
         return;
     }
 
@@ -663,7 +660,6 @@ void MainWindow::onPickButtonClicked()
     CardPickerDialog dlg(this);
     if (dlg.exec() == QDialog::Accepted) {
         std::vector<Card> selected = dlg.selectedCards();
-        if (selected.size() != 5) return;
 
         Deck fullDeck = createStandardDeck();
         for (const Card& c : selected) {
@@ -677,6 +673,10 @@ void MainWindow::onPickButtonClicked()
         shuffleDeck(fullDeck);
 
         m_playerA.hand = selected;
+        int need = 5 - (int)selected.size();
+        if (need > 0) {
+            dealCards(m_playerA, fullDeck, need);
+        }
         sortHandSmart(m_playerA.hand);
         m_deck = fullDeck;
 
@@ -732,15 +732,13 @@ void MainWindow::doAITurn()
         if (checkSpecialVictory(m_playerA)) {
             appendLog("玩家A 达成七鬼523，直接获胜！");
             playSound(m_soundSuccess);
-            showGameOverDialog("玩家A 达成七鬼523，直接获胜！");
-            disableActionButtons();
+            showSpecialVictoryEffect("玩家A", "玩家A 达成七鬼523，直接获胜！");
             return;
         }
         if (checkSpecialVictory(m_playerB)) {
             appendLog("玩家B 达成七鬼523，直接获胜！");
             playSound(m_soundFailure);
-            showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
-            disableActionButtons();
+            showSpecialVictoryEffect("玩家B", "玩家B 达成七鬼523，直接获胜！");
             return;
         }
 
@@ -786,11 +784,11 @@ void MainWindow::doAITurn()
     }
     layoutTableCards();
 
-    if (checkSpecialVictory(m_playerB)) {
+    // 检查刚打出的牌型是否为 Special523
+    if (m_lastPlay.type == CardType::Special523) {
         appendLog("玩家B 达成七鬼523，直接获胜！");
         playSound(m_soundFailure);
-        showGameOverDialog("玩家B 达成七鬼523，直接获胜！");
-        disableActionButtons();
+        showSpecialVictoryEffect("玩家B", "玩家B 达成七鬼523，直接获胜！");
         return;
     }
 
@@ -1243,6 +1241,83 @@ void MainWindow::shakeWidget(QWidget* widget)
         (*counter)++;
     });
     timer->start(30);
+}
+
+// ── 特殊胜利特效 ──────────────────────────────────────────────────
+
+void MainWindow::showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage)
+{
+    m_gameOver = true;
+    disableActionButtons();
+    QWidget* central = centralWidget();
+
+    // 1. 金色光晕覆盖层
+    QWidget* glow = new QWidget(central);
+    glow->setAttribute(Qt::WA_TransparentForMouseEvents);
+    glow->setGeometry(central->rect());
+    glow->setStyleSheet("background-color: rgba(255, 215, 0, 50);");
+    glow->show();
+    glow->raise();
+
+    // 光晕脉冲
+    QTimer* pulseTimer = new QTimer(this);
+    int* pulseCnt = new int(0);
+    connect(pulseTimer, &QTimer::timeout, this, [glow, pulseCnt]() {
+        (*pulseCnt)++;
+        int a = (*pulseCnt) % 2 == 0 ? 30 : 70;
+        glow->setStyleSheet(
+            QString("background-color: rgba(255, 215, 0, %1);").arg(a));
+    });
+    pulseTimer->start(300);
+
+    // 2. 桌面牌放大到 1.5 倍
+    for (CardWidget* cw : m_tableCardWidgets) {
+        QRect g = cw->geometry();
+        QRect big(g.x() - g.width() / 4, g.y() - g.height() / 4,
+                  g.width() * 3 / 2, g.height() * 3 / 2);
+        QPropertyAnimation* a = new QPropertyAnimation(cw, "geometry");
+        a->setDuration(400);
+        a->setEasingCurve(QEasingCurve::OutBack);
+        a->setEndValue(big);
+        a->start(QAbstractAnimation::DeleteWhenStopped);
+    }
+
+    // 3. 大字 "七鬼523！"
+    QLabel* bigText = new QLabel("七鬼523！", central);
+    bigText->setAlignment(Qt::AlignCenter);
+    bigText->setStyleSheet(
+        "QLabel { color: #FFD700; font-size: 64px; font-weight: bold; background: transparent; }");
+    bigText->setAttribute(Qt::WA_TransparentForMouseEvents);
+    bigText->setGeometry(0, central->height() / 3, central->width(), 100);
+
+    QGraphicsDropShadowEffect* shadow = new QGraphicsDropShadowEffect;
+    shadow->setBlurRadius(20);
+    shadow->setColor(QColor(0, 0, 0, 200));
+    shadow->setOffset(4, 4);
+    bigText->setGraphicsEffect(shadow);
+    bigText->show();
+    bigText->raise();
+
+    // 大字弹出动画
+    bigText->resize(0, 0);
+    QRect origRect = bigText->geometry();
+    QPropertyAnimation* textPop = new QPropertyAnimation(bigText, "geometry");
+    textPop->setDuration(500);
+    textPop->setEasingCurve(QEasingCurve::OutElastic);
+    textPop->setStartValue(QRect(central->width() / 2, central->height() / 3, 0, 0));
+    textPop->setEndValue(QRect(0, central->height() / 3, central->width(), 100));
+    textPop->start(QAbstractAnimation::DeleteWhenStopped);
+
+    // 4. 1.5 秒后清理并弹对话框
+    QTimer::singleShot(1500, this, [this, endMessage, glow, bigText, pulseTimer, pulseCnt, shadow]() {
+        pulseTimer->stop();
+        delete pulseTimer;
+        delete pulseCnt;
+        glow->deleteLater();
+        bigText->deleteLater();
+        shadow->deleteLater();
+        showGameOverDialog(endMessage);
+    });
 }
 
 // ── 桌面牌布局 ──

@@ -9,7 +9,8 @@ struct Deck;
 enum class AILevel {
     AI1_Simple,
     AI2_Rule,
-    AI3_Tracker
+    AI3_Tracker,
+    AI4_Expert
 };
 
 struct Player {

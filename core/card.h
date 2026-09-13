@@ -18,6 +18,7 @@ enum class CardType {
     TripleWithTwo,  // 三带二
     Bomb,           // 炸弹
     Rocket,         // 王炸
+    Special523,     // 特殊牌型 7+大鬼/小鬼+5+2+3
     Invalid         // 非法
 };
 

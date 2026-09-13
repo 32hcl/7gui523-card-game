@@ -5,10 +5,13 @@
 #include <random>
 #include <sstream>
 
-RoundResult playRound(Player& first, Player& second, Deck& deck) {
+RoundResult playRound(Player& first, Player& second, Deck& deck,
+                      CardTracker* tracker) {
     RoundResult result;
     result.winnerName = "";
     result.finishedPlayerName = "";
+    result.specialVictory = false;
+    result.handEmptied = false;
     result.tableCards.clear();
 
     Player* current = &first;
@@ -19,37 +22,76 @@ RoundResult playRound(Player& first, Player& second, Deck& deck) {
     int tableBonus = 0;
 
     while (true) {
-        std::vector<Card> play = choosePlay(*current, lastPlay);
+        int tableScore = calculateScore(tableCards);
+
+        std::vector<Card> play;
+        if (current->isHuman) {
+            play = humanChoosePlay(*current, lastPlay);
+        } else {
+            CardTracker fallback;
+            const CardTracker& tk = (tracker != nullptr) ? *tracker : fallback;
+            play = aiChoosePlay(*current, *opponent, lastPlay, deck, tableScore, tk);
+        }
 
         if (play.empty()) {
-            if (!lastPlay.cards.empty()) {
-                std::cout << current->name << " 不要" << std::endl;
-            } else {
+            if (lastPlay.cards.empty()) {
+                // 先手无牌可出——防御兜底
                 std::cout << current->name << " 无牌可出！" << std::endl;
                 if (current->hand.empty()) {
                     result.winnerName = current->name;
-                    result.finishedPlayerName = current->name;
+                    result.handEmptied = true;
                     return result;
                 }
+                play = {current->hand[0]};
+                std::cout << current->name << " 自动出牌: ";
+                printCard(play[0]);
+                std::cout << std::endl;
+            } else {
+                // 正常"不要"结束本回合
+                std::cout << current->name << " 不要" << std::endl;
+                settleScoreCards(*lastPlayer, tableCards);
+                lastPlayer->totalScore += tableBonus;
+                int ts = calculateTableScore(tableCards, tableBonus);
+                if (ts > 0) std::cout << "桌面分值: " << ts << " 分" << std::endl;
+                result.winnerName = lastPlayer->name;
+                tableCards.clear();
+                return result;
             }
-
-            settleScoreCards(*lastPlayer, tableCards);
-            lastPlayer->totalScore += tableBonus;
-            int tableScore = calculateTableScore(tableCards, tableBonus);
-            if (tableScore > 0) std::cout << "桌面分值: " << tableScore << " 分" << std::endl;
-            result.winnerName = lastPlayer->name;
-            tableCards.clear();
-            return result;
         }
 
         CardTypeResult parsed = parseCardType(play);
+        if (parsed.type == CardType::Invalid) {
+            std::cout << current->name << " 非法牌型！" << std::endl;
+            std::swap(current, opponent);
+            continue;
+        }
+        if (!lastPlay.cards.empty() && !canBeat(parsed, lastPlay)) {
+            std::cout << current->name << " 无法压过！" << std::endl;
+            std::swap(current, opponent);
+            continue;
+        }
 
+        // 特殊胜利检测（移牌前）
+        if (parsed.type == CardType::Special523) {
+            std::cout << current->name << " 打出 Special523，直接获胜！" << std::endl;
+            settleScoreCards(*current, tableCards);
+            tableCards.clear();
+            result.winnerName = current->name;
+            result.finishedPlayerName = current->name;
+            result.specialVictory = true;
+            result.handEmptied = true;
+            return result;
+        }
+
+        // 压分奖励
         int bonus = calculatePressureBonus(parsed, lastPlay);
         parsed.bonusScore = bonus;
         tableBonus += bonus;
 
+        // 移牌
         removeCardsFromHand(*current, play);
         tableCards.insert(tableCards.end(), play.begin(), play.end());
+        if (tracker) tracker->recordPlayed(play);
         lastPlay = parsed;
         lastPlayer = current;
 
@@ -63,10 +105,11 @@ RoundResult playRound(Player& first, Player& second, Deck& deck) {
         if (parsed.bonusScore > 0) std::cout << " 压分+" << parsed.bonusScore;
         std::cout << ")" << std::endl;
 
+        // 出完检查
         if (current->hand.empty()) {
-            std::cout << current->name << " 出完所有牌！" << std::endl;
+            std::cout << current->name << " 出完手牌！" << std::endl;
             result.winnerName = current->name;
-            result.finishedPlayerName = current->name;
+            result.handEmptied = true;
             result.tableCards = tableCards;
             return result;
         }
@@ -311,24 +354,7 @@ void runAIVsAI() {
     }
     std::cout << std::endl;
 
-    auto checkBoth = [&]() -> int {
-        if (checkSpecialVictory(playerA) && checkSpecialVictory(playerB)) {
-            std::cout << "========== 特殊胜利 ==========" << std::endl;
-            std::cout << "双方同时达成\"七鬼523\"，双赢！" << std::endl; return 3;
-        }
-        if (checkSpecialVictory(playerA)) {
-            std::cout << "========== 特殊胜利 ==========" << std::endl;
-            std::cout << "玩家A 达成\"七鬼523\"，直接获胜！" << std::endl; return 1;
-        }
-        if (checkSpecialVictory(playerB)) {
-            std::cout << "========== 特殊胜利 ==========" << std::endl;
-            std::cout << "玩家B 达成\"七鬼523\"，直接获胜！" << std::endl; return 2;
-        }
-        return 0;
-    };
-
-    int sp = checkBoth();
-    if (sp) return;
+    bool finalPhase = false;
 
     std::random_device rd; std::mt19937 g(rd());
     std::uniform_int_distribution<> dist(0, 1);
@@ -345,30 +371,87 @@ void runAIVsAI() {
         std::cout << "---------- 第 " << roundNum << " 回合 ----------" << std::endl;
         RoundResult rr = playRound(*first, *second, deck);
 
-        if (!rr.finishedPlayerName.empty()) {
-            Player* finisher = (rr.finishedPlayerName == playerA.name) ? &playerA : &playerB;
-            Player* opponent = (finisher == &playerA) ? &playerB : &playerA;
-            std::cout << std::endl << "出完牌者: " << finisher->name << std::endl;
-            finalSettlement(*finisher, *opponent, rr.tableCards);
+        // 情况 C：特殊胜利 → 立即终局
+        if (rr.specialVictory) {
+            Player* winner = (rr.winnerName == playerA.name) ? &playerA : &playerB;
+            Player* loser = (winner == &playerA) ? &playerB : &playerA;
+            std::cout << std::endl << "特殊胜利: " << winner->name << std::endl;
+            finalSettlement(*winner, *loser, rr.tableCards);
             compareAndAnnounce(playerA, playerB);
-            break;
+            return;
         }
 
-        Player* w = (rr.winnerName == playerA.name) ? &playerA : &playerB;
-        Player* l = (w == &playerA) ? &playerB : &playerA;
-        std::cout << "本回合胜方: " << w->name << std::endl;
+        Player* winner = (rr.winnerName == playerA.name) ? &playerA : &playerB;
+        Player* loser = (winner == &playerA) ? &playerB : &playerA;
+
+        // 情况 B：出完手牌
+        if (rr.handEmptied) {
+            std::cout << std::endl << "出完牌者: " << winner->name << std::endl;
+            if (deck.cards.empty() || finalPhase) {
+                // 牌堆已空 → 游戏终局
+                finalSettlement(*winner, *loser, rr.tableCards);
+                compareAndAnnounce(playerA, playerB);
+                return;
+            } else {
+                // 牌堆未空 → 补牌继续
+                refillToFive(*winner, deck);
+                refillToFive(*loser, deck);
+                if (deck.cards.empty()) {
+                    finalPhase = true;
+                    std::cout << "牌堆已空，进入终局阶段。" << std::endl;
+                }
+                printPlayerStatus(playerA);
+                printPlayerStatus(playerB);
+                std::cout << "牌堆剩余: " << deck.cards.size() << " 张" << std::endl;
+                first = winner;
+                second = loser;
+                std::cout << std::endl;
+                continue;
+            }
+        }
+
+        // 情况 A：正常"不要"结束回合
+        std::cout << "本回合胜方: " << winner->name << std::endl;
         printPlayerStatus(playerA);
         printPlayerStatus(playerB);
 
-        int bA = (int)playerA.hand.size(), bB = (int)playerB.hand.size();
-        refillToFive(*w, deck); refillToFive(*l, deck);
-        int aA = (int)playerA.hand.size(), aB = (int)playerB.hand.size();
-        if (aA > bA) std::cout << "玩家A 补牌 " << (aA-bA) << " 张 → 现在 " << aA << " 张" << std::endl;
-        if (aB > bB) std::cout << "玩家B 补牌 " << (aB-bB) << " 张 → 现在 " << aB << " 张" << std::endl;
-        std::cout << "牌堆剩余: " << deck.cards.size() << " 张" << std::endl;
+        // 检查是否进入终局阶段
+        if (deck.cards.empty()) {
+            finalPhase = true;
+        }
 
-        sp = checkBoth(); if (sp) return;
-        first = w; second = l;
+        if (finalPhase) {
+            std::cout << "终局阶段，不补牌。" << std::endl;
+            // 终局阶段：检查是否有玩家手牌已空
+            if (winner->hand.empty()) {
+                finalSettlement(*winner, *loser);
+                compareAndAnnounce(playerA, playerB);
+                return;
+            }
+            if (loser->hand.empty()) {
+                finalSettlement(*loser, *winner);
+                compareAndAnnounce(playerA, playerB);
+                return;
+            }
+            printPlayerStatus(playerA);
+            printPlayerStatus(playerB);
+        } else {
+            // 正常补牌
+            int bA = (int)playerA.hand.size(), bB = (int)playerB.hand.size();
+            refillToFive(*winner, deck);
+            refillToFive(*loser, deck);
+            int aA = (int)playerA.hand.size(), aB = (int)playerB.hand.size();
+            if (aA > bA) std::cout << "玩家A 补牌 " << (aA-bA) << " 张 → 现在 " << aA << " 张" << std::endl;
+            if (aB > bB) std::cout << "玩家B 补牌 " << (aB-bB) << " 张 → 现在 " << aB << " 张" << std::endl;
+            std::cout << "牌堆剩余: " << deck.cards.size() << " 张" << std::endl;
+            if (deck.cards.empty()) {
+                finalPhase = true;
+                std::cout << "牌堆已空，进入终局阶段。" << std::endl;
+            }
+        }
+
+        first = winner;
+        second = loser;
         std::cout << std::endl;
     }
 }
@@ -396,24 +479,7 @@ void runHumanVsAI() {
     }
     std::cout << std::endl;
 
-    auto checkBoth = [&]() -> int {
-        if (checkSpecialVictory(playerA) && checkSpecialVictory(playerB)) {
-            std::cout << "========== 特殊胜利 ==========" << std::endl;
-            std::cout << "双方同时达成\"七鬼523\"，双赢！" << std::endl; return 3;
-        }
-        if (checkSpecialVictory(playerA)) {
-            std::cout << "========== 特殊胜利 ==========" << std::endl;
-            std::cout << "玩家A 达成\"七鬼523\"，直接获胜！" << std::endl; return 1;
-        }
-        if (checkSpecialVictory(playerB)) {
-            std::cout << "========== 特殊胜利 ==========" << std::endl;
-            std::cout << "玩家B 达成\"七鬼523\"，直接获胜！" << std::endl; return 2;
-        }
-        return 0;
-    };
-
-    int sp = checkBoth();
-    if (sp) return;
+    bool finalPhase = false;
 
     std::random_device rd; std::mt19937 g(rd());
     std::uniform_int_distribution<> dist(0, 1);
@@ -430,30 +496,85 @@ void runHumanVsAI() {
         std::cout << "---------- 第 " << roundNum << " 回合 ----------" << std::endl;
         RoundResult rr = playRound(*first, *second, deck);
 
-        if (!rr.finishedPlayerName.empty()) {
-            Player* finisher = (rr.finishedPlayerName == playerA.name) ? &playerA : &playerB;
-            Player* opponent = (finisher == &playerA) ? &playerB : &playerA;
-            std::cout << std::endl << "出完牌者: " << finisher->name << std::endl;
-            finalSettlement(*finisher, *opponent, rr.tableCards);
+        // 情况 C：特殊胜利 → 立即终局
+        if (rr.specialVictory) {
+            Player* winner = (rr.winnerName == playerA.name) ? &playerA : &playerB;
+            Player* loser = (winner == &playerA) ? &playerB : &playerA;
+            std::cout << std::endl << "特殊胜利: " << winner->name << std::endl;
+            finalSettlement(*winner, *loser, rr.tableCards);
             compareAndAnnounce(playerA, playerB);
-            break;
+            return;
         }
 
-        Player* w = (rr.winnerName == playerA.name) ? &playerA : &playerB;
-        Player* l = (w == &playerA) ? &playerB : &playerA;
-        std::cout << "本回合胜方: " << w->name << std::endl;
+        Player* winner = (rr.winnerName == playerA.name) ? &playerA : &playerB;
+        Player* loser = (winner == &playerA) ? &playerB : &playerA;
+
+        // 情况 B：出完手牌
+        if (rr.handEmptied) {
+            std::cout << std::endl << "出完牌者: " << winner->name << std::endl;
+            if (deck.cards.empty() || finalPhase) {
+                // 牌堆已空 → 游戏终局
+                finalSettlement(*winner, *loser, rr.tableCards);
+                compareAndAnnounce(playerA, playerB);
+                return;
+            } else {
+                // 牌堆未空 → 补牌继续
+                refillToFive(*winner, deck);
+                refillToFive(*loser, deck);
+                if (deck.cards.empty()) {
+                    finalPhase = true;
+                    std::cout << "牌堆已空，进入终局阶段。" << std::endl;
+                }
+                printPlayerStatus(playerA);
+                printPlayerStatus(playerB);
+                std::cout << "牌堆剩余: " << deck.cards.size() << " 张" << std::endl;
+                first = winner;
+                second = loser;
+                std::cout << std::endl;
+                continue;
+            }
+        }
+
+        // 情况 A：正常"不要"结束回合
+        std::cout << "本回合胜方: " << winner->name << std::endl;
         printPlayerStatus(playerA);
         printPlayerStatus(playerB);
 
-        int bA = (int)playerA.hand.size(), bB = (int)playerB.hand.size();
-        refillToFive(*w, deck); refillToFive(*l, deck);
-        int aA = (int)playerA.hand.size(), aB = (int)playerB.hand.size();
-        if (aA > bA) std::cout << "玩家A 补牌 " << (aA-bA) << " 张 → 现在 " << aA << " 张" << std::endl;
-        if (aB > bB) std::cout << "玩家B 补牌 " << (aB-bB) << " 张 → 现在 " << aB << " 张" << std::endl;
-        std::cout << "牌堆剩余: " << deck.cards.size() << " 张" << std::endl;
+        // 检查是否进入终局阶段
+        if (deck.cards.empty()) {
+            finalPhase = true;
+        }
 
-        sp = checkBoth(); if (sp) return;
-        first = w; second = l;
+        if (finalPhase) {
+            std::cout << "终局阶段，不补牌。" << std::endl;
+            if (winner->hand.empty()) {
+                finalSettlement(*winner, *loser);
+                compareAndAnnounce(playerA, playerB);
+                return;
+            }
+            if (loser->hand.empty()) {
+                finalSettlement(*loser, *winner);
+                compareAndAnnounce(playerA, playerB);
+                return;
+            }
+            printPlayerStatus(playerA);
+            printPlayerStatus(playerB);
+        } else {
+            int bA = (int)playerA.hand.size(), bB = (int)playerB.hand.size();
+            refillToFive(*winner, deck);
+            refillToFive(*loser, deck);
+            int aA = (int)playerA.hand.size(), aB = (int)playerB.hand.size();
+            if (aA > bA) std::cout << "玩家A 补牌 " << (aA-bA) << " 张 → 现在 " << aA << " 张" << std::endl;
+            if (aB > bB) std::cout << "玩家B 补牌 " << (aB-bB) << " 张 → 现在 " << aB << " 张" << std::endl;
+            std::cout << "牌堆剩余: " << deck.cards.size() << " 张" << std::endl;
+            if (deck.cards.empty()) {
+                finalPhase = true;
+                std::cout << "牌堆已空，进入终局阶段。" << std::endl;
+            }
+        }
+
+        first = winner;
+        second = loser;
         std::cout << std::endl;
     }
 }

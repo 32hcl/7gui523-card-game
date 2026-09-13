@@ -54,6 +54,7 @@ private:
     void flyCardsToTable(const std::vector<CardWidget*>& cards);
     void layoutTableCards();
     void shakeWidget(QWidget* widget);
+    void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
 
     Deck   m_deck;
     Player m_playerA;

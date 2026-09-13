@@ -6,6 +6,12 @@
 #include "cardtype.h"
 #include "deck.h"
 #include "cardtracker.h"
+#include "ai_params.h"
+
+struct AIParams;
+extern AIParams g_ai4Params;
+void setAI4Params(const AIParams& p);
+AIParams getAI4Params();
 
 struct DecisionBreakdown {
     int base = 0;
@@ -46,9 +52,6 @@ std::vector<Card> aiChoosePlay(const Player& player,
 
 std::vector<Card> humanChoosePlay(const Player& player,
                                   const CardTypeResult& previous);
-
-std::vector<Card> choosePlay(const Player& player,
-                             const CardTypeResult& previous);
 
 bool breaksCombo(const std::vector<Card>& play, const Player& player);
 

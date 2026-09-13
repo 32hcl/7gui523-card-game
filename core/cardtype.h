@@ -15,6 +15,7 @@ struct CardTypeResult {
 bool isJoker(const Card& card);
 bool isSamePoint(const std::vector<Card>& cards);
 bool isRocket(const std::vector<Card>& cards);
+bool isSpecial523(const std::vector<Card>& cards);
 bool hasTriple(const std::vector<Card>& cards, std::string& outTriplePoint);
 bool hasPair(const std::vector<Card>& cards, std::string& outPairPoint,
              const std::string& excludePoint = "");

@@ -1,10 +1,16 @@
 ﻿#include "ai.h"
 #include "cardtype.h"
 #include "player.h"
+#include "ai_params.h"
 #include <sstream>
 #include <random>
 #include <map>
+#include <set>
 #include <climits>
+
+AIParams g_ai4Params;
+void setAI4Params(const AIParams& p) { g_ai4Params = p; }
+AIParams getAI4Params() { return g_ai4Params; }
 
 std::vector<std::vector<Card>> enumerateLegalPlays(const Player& player) {
     std::vector<std::vector<Card>> result;
@@ -142,6 +148,121 @@ static int playGain(const std::vector<Card>& play,
     return gain;
 }
 
+// AI4 评分：所有权重由 g_ai4Params 控制
+static int playGainAI4(const std::vector<Card>& play,
+                       const Player& player,
+                       const Player& opponent,
+                       const Deck& deck,
+                       const CardTypeResult& previous,
+                       int tableScore,
+                       const CardTracker* tracker) {
+    const AIParams& P = g_ai4Params;
+    int gain = 0;
+    static bool printed = false;
+    if (!printed) { std::cout << "TSW=" << P.tableScoreWeight << std::endl; printed = true; }
+
+    // 桌面分基础收益（所有人都有，鼓励抢回合）
+    gain += tableScore * P.tableScoreWeight;
+
+    // 出牌张数权重
+    gain += (int)play.size() * P.cardCountWeight;
+
+    // 出完奖励
+    if (play.size() == player.hand.size()) gain += P.finishBonus;
+
+    // 前期 — 大牌惩罚
+    for (const Card& c : play) {
+        int rank = RANK_MAP.at(c.point);
+        if (rank >= 13)
+            gain -= P.earlyBigPenalty;
+        else if (rank >= 10)
+            gain -= P.earlyMidPenalty;
+        else
+            gain -= rank;
+    }
+
+    // 中期 — 仅当桌面无分时惩罚出分牌（桌面有分时出分牌是抢分，不应惩罚）
+    for (const Card& c : play) {
+        if (c.score > 0 && tableScore == 0)
+            gain -= P.midScorePenalty;
+    }
+
+    // 抢分
+    if (tableScore >= P.stealThreshold) {
+        for (const Card& c : play) {
+            if (c.score > 0)
+                gain += c.score * P.stealMultiplier;
+        }
+    } else {
+        // 没把握时减分
+        for (const Card& c : play) {
+            if (c.score > 0)
+                gain -= tableScore * P.noConfidencePenalty;
+        }
+    }
+
+    // 牌堆顶预测
+    if (tracker) {
+        for (const Card& c : play) {
+            if (tracker->isExhausted(c.point))
+                gain += P.deckTopBonus;
+        }
+    }
+
+    // 特殊胜利保留 — 检查 7/鬼/5/2/3
+    {
+        const std::set<std::string> specialPoints = {"7", "大鬼", "小鬼", "5", "2", "3"};
+        int handSpecialCount = 0;
+        for (const Card& c : player.hand)
+            if (specialPoints.count(c.point)) handSpecialCount++;
+        if (handSpecialCount >= 3) {
+            // 手牌已有足够特殊牌，惩罚出掉任何一张特殊牌
+            for (const Card& c : play) {
+                if (specialPoints.count(c.point))
+                    gain -= P.specialKeepBonus;
+            }
+        }
+    }
+
+    // 拆对惩罚
+    {
+        // 按点数去重，只对"该点数出恰好 1 张且手牌中该点数 >= 2"扣一次
+        std::set<std::string> deduped;
+        for (const Card& c : play) {
+            if (deduped.count(c.point)) continue;
+            deduped.insert(c.point);
+            int inHand = 0;
+            for (const Card& h : player.hand)
+                if (h.point == c.point) inHand++;
+            int inPlay = 0;
+            for (const Card& pc : play)
+                if (pc.point == c.point) inPlay++;
+            if (inHand >= 2 && inPlay == 1)
+                gain -= P.splitPairPenalty;
+        }
+    }
+
+    // 炸弹保留
+    {
+        auto parsed = parseCardType(play);
+        if (parsed.type == CardType::Bomb)
+            gain -= P.bombKeepPenalty;
+        else if (parsed.type == CardType::Rocket)
+            gain -= P.rocketKeepPenalty;
+    }
+
+    // 终局 — 对方手牌少时炸弹加成分
+    if ((int)opponent.hand.size() <= 2) {
+        auto parsed = parseCardType(play);
+        if (parsed.type == CardType::Bomb)
+            gain += P.endgameBombBonus;
+        else if (parsed.type == CardType::Rocket)
+            gain += P.endgameRocketBonus;
+    }
+
+    return gain;
+}
+
 int evaluatePlayWithBreakdown(const std::vector<Card>& play,
                               const Player& player,
                               const Player& opponent,
@@ -198,8 +319,10 @@ std::vector<Card> aiChoosePlayAI2(const Player& player,
     auto allPlays = enumerateLegalPlays(player);
     if (allPlays.empty()) return {};
 
-    for (const auto& play : allPlays) {
-        if (play.size() == player.hand.size()) return play;
+    if (previous.cards.empty()) {
+        for (const auto& play : allPlays) {
+            if (play.size() == player.hand.size()) return play;
+        }
     }
 
     if (!previous.cards.empty()) {
@@ -256,8 +379,10 @@ std::vector<Card> aiChoosePlayAI3(const Player& player,
     auto allPlays = enumerateLegalPlays(player);
     if (allPlays.empty()) return {};
 
-    for (const auto& play : allPlays) {
-        if (play.size() == player.hand.size()) return play;
+    if (previous.cards.empty()) {
+        for (const auto& play : allPlays) {
+            if (play.size() == player.hand.size()) return play;
+        }
     }
 
     if (!previous.cards.empty()) {
@@ -305,6 +430,66 @@ std::vector<Card> aiChoosePlayAI3(const Player& player,
     return {};
 }
 
+std::vector<Card> aiChoosePlayAI4(const Player& player,
+                                  const Player& opponent,
+                                  const CardTypeResult& previous,
+                                  const Deck& deck,
+                                  int tableScore,
+                                  const CardTracker& tracker) {
+    auto allPlays = enumerateLegalPlays(player);
+    if (allPlays.empty()) return {};
+
+    if (previous.cards.empty()) {
+        for (const auto& play : allPlays) {
+            if (play.size() == player.hand.size()) return play;
+        }
+    }
+
+    if (!previous.cards.empty()) {
+        for (const auto& play : allPlays) {
+            auto parsed = parseCardType(play);
+            if (canBeat(parsed, previous) && play.size() == player.hand.size()) {
+                return play;
+            }
+        }
+    }
+
+    if (!previous.cards.empty() && (int)opponent.hand.size() <= 2) {
+        std::vector<Card> rocket, smallestBomb;
+        int smallestBombRank = INT_MAX;
+        for (const auto& play : allPlays) {
+            auto parsed = parseCardType(play);
+            if (!canBeat(parsed, previous)) continue;
+            if (parsed.type == CardType::Rocket) {
+                rocket = play;
+            } else if (parsed.type == CardType::Bomb) {
+                int rank = RANK_MAP.at(parsed.keyPoint);
+                if (rank < smallestBombRank) {
+                    smallestBombRank = rank;
+                    smallestBomb = play;
+                }
+            }
+        }
+        if (!rocket.empty()) return rocket;
+        if (!smallestBomb.empty()) return smallestBomb;
+    }
+
+    std::vector<Card> best;
+    int bestGain = INT_MIN;
+    for (const auto& play : allPlays) {
+        auto parsed = parseCardType(play);
+        if (!previous.cards.empty() && !canBeat(parsed, previous)) continue;
+        int gain = playGainAI4(play, player, opponent, deck, previous, tableScore, &tracker);
+        if (gain > bestGain) {
+            bestGain = gain;
+            best = play;
+        }
+    }
+    if (!best.empty()) return best;
+
+    return {};
+}
+
 std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,
                                             const Player& opponent,
                                             const CardTypeResult& previous,
@@ -320,10 +505,12 @@ std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,
     auto allPlays = enumerateLegalPlays(player);
     if (allPlays.empty()) return {};
 
-    for (const auto& play : allPlays) {
-        if (play.size() == player.hand.size()) {
-            if (outBd) *outBd = DecisionBreakdown{};
-            return play;
+    if (previous.cards.empty()) {
+        for (const auto& play : allPlays) {
+            if (play.size() == player.hand.size()) {
+                if (outBd) *outBd = DecisionBreakdown{};
+                return play;
+            }
         }
     }
     if (!previous.cards.empty()) {
@@ -384,15 +571,32 @@ std::vector<Card> aiChoosePlay(const Player& player,
                                const Deck& deck,
                                int tableScore,
                                const CardTracker& tracker) {
+    std::vector<Card> play;
     switch (player.aiLevel) {
         case AILevel::AI1_Simple:
-            return aiChoosePlayAI1(player, previous);
+            play = aiChoosePlayAI1(player, previous);
+            break;
         case AILevel::AI2_Rule:
-            return aiChoosePlayAI2(player, opponent, previous, deck, tableScore);
+            play = aiChoosePlayAI2(player, opponent, previous, deck, tableScore);
+            break;
         case AILevel::AI3_Tracker:
-            return aiChoosePlayAI3(player, opponent, previous, deck, tableScore, tracker);
+            play = aiChoosePlayAI3(player, opponent, previous, deck, tableScore, tracker);
+            break;
+        case AILevel::AI4_Expert:
+            play = aiChoosePlayAI4(player, opponent, previous, deck, tableScore, tracker);
+            break;
+        default:
+            play = aiChoosePlayAI1(player, previous);
+            break;
     }
-    return aiChoosePlayAI1(player, previous);
+    // 防御：非先手不得返回压不过的牌（仅先手允许出完即走）
+    if (!play.empty() && !previous.cards.empty()) {
+        auto parsed = parseCardType(play);
+        if (!canBeat(parsed, previous)) {
+            return {};
+        }
+    }
+    return play;
 }
 
 std::vector<Card> humanChoosePlay(const Player& player, const CardTypeResult& previous) {
@@ -438,12 +642,4 @@ std::vector<Card> humanChoosePlay(const Player& player, const CardTypeResult& pr
         return {};
     }
     return chosen;
-}
-
-std::vector<Card> choosePlay(const Player& player, const CardTypeResult& previous) {
-    if (player.isHuman) {
-        return humanChoosePlay(player, previous);
-    } else {
-        return aiChoosePlayAI1(player, previous);
-    }
 }

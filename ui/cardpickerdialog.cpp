@@ -3,177 +3,205 @@
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QGridLayout>
-#include <QLabel>
 #include <QMessageBox>
 #include <QCoreApplication>
 #include <QFile>
-#include <QIcon>
-#include <QPixmap>
-#include <QScrollArea>
+#include <QMouseEvent>
 
 CardPickerDialog::CardPickerDialog(QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle("选择起始手牌");
-    setMinimumSize(1000, 750);
+    setWindowTitle("选择起始手牌（可选 0~5 张）");
+    setMinimumSize(950, 700);
+    setStyleSheet("QDialog { background-color: #1a1a1a; }");
 
     Deck full = createStandardDeck();
     m_allCards = full.cards;
 
     auto* mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(8, 8, 8, 8);
+    mainLayout->setSpacing(4);
 
-    m_hintLabel = new QLabel("请选择 5 张牌作为你的起始手牌（已选 0/5）");
-    QFont hintFont = m_hintLabel->font();
-    hintFont.setPointSize(12);
-    m_hintLabel->setFont(hintFont);
-    mainLayout->addWidget(m_hintLabel);
-
-    // 卡牌网格
-    auto* page = new QWidget;
-    auto* grid = new QGridLayout(page);
-    grid->setSpacing(4);
-
-    std::vector<std::string> suits = {"黑桃", "红桃", "梅花", "方块"};
-    std::vector<std::string> points = {"A", "2", "3", "4", "5", "6", "7",
-                                        "8", "9", "10", "J", "Q", "K"};
+    m_cardCanvas = new QWidget;
+    m_cardCanvas->setStyleSheet("background: transparent;");
+    mainLayout->addWidget(m_cardCanvas, 1);
 
     QString cardsDir = QCoreApplication::applicationDirPath() + "/cards/";
+
+    std::vector<std::string> suits = {"黑桃", "红桃", "梅花", "方块"};
+    std::vector<std::string> points = {"A","2","3","4","5","6","7","8","9","10","J","Q","K"};
 
     for (int row = 0; row < 4; ++row) {
         for (int col = 0; col < 13; ++col) {
             for (size_t i = 0; i < m_allCards.size(); ++i) {
-                if (m_allCards[i].suit == suits[row] &&
-                    m_allCards[i].point == points[col]) {
+                if (m_allCards[i].suit != suits[row]) continue;
+                if (m_allCards[i].point != points[col]) continue;
 
-                    auto* btn = new QPushButton;
-                    btn->setFixedSize(64, 90);
-                    btn->setCheckable(true);
-                    btn->setProperty("cardIndex", (int)i);
+                QString suitKey;
+                if (suits[row] == "黑桃") suitKey = "spades";
+                else if (suits[row] == "红桃") suitKey = "hearts";
+                else if (suits[row] == "梅花") suitKey = "clubs";
+                else suitKey = "diamonds";
 
-                    QString suitKey;
-                    if (suits[row] == "黑桃") suitKey = "spades";
-                    else if (suits[row] == "红桃") suitKey = "hearts";
-                    else if (suits[row] == "梅花") suitKey = "clubs";
-                    else suitKey = "diamonds";
-
-                    QString pointKey = QString::fromStdString(points[col]);
-                    if (pointKey != "A" && pointKey != "J" &&
-                        pointKey != "Q" && pointKey != "K") {
-                        int n = pointKey.toInt();
-                        pointKey = QString("%1").arg(n, 2, 10, QChar('0'));
-                    }
-                    QString path = cardsDir + QString("card_%1_%2.png").arg(suitKey).arg(pointKey);
-
-                    if (QFile::exists(path)) {
-                        btn->setIcon(QIcon(path));
-                        btn->setIconSize(QSize(60, 86));
-                        btn->setStyleSheet("QPushButton { border: none; background: transparent; }");
-                    } else {
-                        btn->setText(QString::fromStdString(points[col]));
-                        btn->setStyleSheet("QPushButton { border: none; background: transparent; color: #000; }");
-                    }
-
-                    connect(btn, &QPushButton::clicked, this, &CardPickerDialog::onCardClicked);
-                    grid->addWidget(btn, row, col);
-                    m_cardButtons.push_back(btn);
-                    break;
+                QString pointKey = QString::fromStdString(points[col]);
+                if (pointKey != "A" && pointKey != "J" &&
+                    pointKey != "Q" && pointKey != "K") {
+                    int n = pointKey.toInt();
+                    pointKey = QString("%1").arg(n, 2, 10, QChar('0'));
                 }
+                QString path = cardsDir + QString("card_%1_%2.png").arg(suitKey).arg(pointKey);
+
+                QPixmap pix;
+                if (QFile::exists(path)) pix.load(path);
+
+                auto* lbl = new QLabel(m_cardCanvas);
+                lbl->setAlignment(Qt::AlignCenter);
+                lbl->setScaledContents(true);
+                lbl->setProperty("cardIndex", (int)i);
+                lbl->setProperty("selected", false);
+                lbl->setProperty("srcPixmap", QVariant::fromValue(pix));
+                lbl->setStyleSheet(
+                    "QLabel { border: 2px solid transparent; background: transparent; padding: 0; }"
+                    "QLabel[selected=\"true\"] { border: 2px solid transparent; }"
+                );
+                lbl->installEventFilter(this);
+                auto* overlay = new QWidget(lbl);
+                overlay->setAttribute(Qt::WA_TransparentForMouseEvents);
+                overlay->setStyleSheet(
+                    "QWidget { background: transparent; border: 2px solid #FFD700; border-radius: 4px; }"
+                );
+                overlay->hide();
+                lbl->setProperty("overlay", QVariant::fromValue(overlay));
+
+
+                m_cardCol.push_back(col);
+                m_cardRow.push_back(row);
+                m_cardLabels.push_back(lbl);
+                break;
             }
         }
     }
 
-    // 鬼牌
     {
-        int row = 4, col = 0;
+        int ghostCol = 0;
         for (size_t i = 0; i < m_allCards.size(); ++i) {
-            if (m_allCards[i].point == "大鬼" || m_allCards[i].point == "小鬼") {
-                auto* btn = new QPushButton;
-                btn->setFixedSize(64, 90);
-                btn->setCheckable(true);
-                btn->setProperty("cardIndex", (int)i);
+            if (m_allCards[i].point != "大鬼" && m_allCards[i].point != "小鬼") continue;
+            QString fn = (m_allCards[i].point == "大鬼")
+                ? "card_joker_red.png" : "card_joker_black.png";
+            QString path = cardsDir + fn;
+            QPixmap pix;
+            if (QFile::exists(path)) pix.load(path);
 
-                QString fileName = (m_allCards[i].point == "大鬼")
-                    ? "card_joker_red.png" : "card_joker_black.png";
-                QString path = cardsDir + fileName;
+            auto* lbl = new QLabel(m_cardCanvas);
+            lbl->setAlignment(Qt::AlignCenter);
+            lbl->setScaledContents(true);
+            lbl->setProperty("cardIndex", (int)i);
+            lbl->setProperty("selected", false);
+            lbl->setProperty("srcPixmap", QVariant::fromValue(pix));
+            lbl->setStyleSheet(
+                "QLabel { border: 2px solid transparent; background: transparent; padding: 0; }"
+                "QLabel[selected=\"true\"] { border: 2px solid #FFD700; }"
+            );
+            lbl->installEventFilter(this);
 
-                if (QFile::exists(path)) {
-                    btn->setIcon(QIcon(path));
-                    btn->setIconSize(QSize(60, 86));
-                    btn->setStyleSheet("QPushButton { border: none; background: transparent; }");
-                } else {
-                    btn->setText(QString::fromStdString(m_allCards[i].point));
-                    btn->setStyleSheet("QPushButton { border: none; background: transparent; color: #000; }");
-                }
-
-                connect(btn, &QPushButton::clicked, this, &CardPickerDialog::onCardClicked);
-                grid->addWidget(btn, row, col);
-                m_cardButtons.push_back(btn);
-                col++;
-            }
+            m_cardCol.push_back(ghostCol);
+            m_cardRow.push_back(4);
+            m_cardLabels.push_back(lbl);
+            ghostCol++;
         }
     }
 
-    auto* scroll = new QScrollArea;
-    scroll->setWidget(page);
-    scroll->setWidgetResizable(true);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    mainLayout->addWidget(scroll, 1);
-
-    // 底部按钮
     auto* bottomLayout = new QHBoxLayout;
     bottomLayout->addStretch();
-
     m_cancelButton = new QPushButton("取消（随机发牌）");
     m_okButton = new QPushButton("确认");
-    m_okButton->setEnabled(false);
-
     connect(m_cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     connect(m_okButton, &QPushButton::clicked, this, &QDialog::accept);
-
     bottomLayout->addWidget(m_cancelButton);
     bottomLayout->addWidget(m_okButton);
     mainLayout->addLayout(bottomLayout);
+
+    layoutCards();
 }
 
-void CardPickerDialog::onCardClicked() {
-    auto* btn = qobject_cast<QPushButton*>(sender());
-    if (!btn) return;
+void CardPickerDialog::resizeEvent(QResizeEvent* event) {
+    QDialog::resizeEvent(event);
+    layoutCards();
+}
 
-    int cardIndex = btn->property("cardIndex").toInt();
+bool CardPickerDialog::eventFilter(QObject* obj, QEvent* ev) {
+    if (ev->type() == QEvent::MouseButtonPress) {
+        QLabel* lbl = qobject_cast<QLabel*>(obj);
+        if (lbl) { onCardClicked(lbl); return true; }
+    }
+    return QDialog::eventFilter(obj, ev);
+}
+
+void CardPickerDialog::onCardClicked(QLabel* lbl) {
+    int cardIndex = lbl->property("cardIndex").toInt();
+    bool selected = lbl->property("selected").toBool();
 
     auto it = std::find(m_selectedIndices.begin(), m_selectedIndices.end(), cardIndex);
     if (it != m_selectedIndices.end()) {
         m_selectedIndices.erase(it);
-        btn->setStyleSheet("QPushButton { border: none; background: transparent; }");
+        lbl->setProperty("selected", false);
     } else {
         if (m_selectedIndices.size() >= 5) {
             QMessageBox::information(this, "提示", "最多只能选择 5 张牌");
             return;
         }
         m_selectedIndices.push_back(cardIndex);
-        btn->setStyleSheet("QPushButton { background-color: rgba(255,215,0,0.4); border: 2px solid #FFD700; }");
+        lbl->setProperty("selected", true);
     }
-
-    updateButtonStates();
-    updateHint();
+    lbl->style()->unpolish(lbl);
+    lbl->style()->polish(lbl);
+    lbl->update();
+    QWidget* overlay = lbl->property("overlay").value<QWidget*>();
+    if (overlay) {
+        overlay->setVisible(lbl->property("selected").toBool());
+        overlay->raise();
+    }
 }
 
-void CardPickerDialog::updateButtonStates() {
-    m_okButton->setEnabled(m_selectedIndices.size() == 5);
-}
+void CardPickerDialog::layoutCards() {
+    if (!m_cardCanvas) return;
+    int W = m_cardCanvas->width();
+    int H = m_cardCanvas->height();
+    if (W <= 0 || H <= 0) return;
 
-void CardPickerDialog::updateHint() {
-    m_hintLabel->setText(
-        QString("请选择 5 张牌作为你的起始手牌（已选 %1/5）")
-            .arg(m_selectedIndices.size()));
+    double cellW = W / 13.0;
+    double cellH = H / 5.0;
+    double ratio = 2.0 / 3.0;
+
+    int cardW = (int)qMin(cellW, cellH * ratio);
+    int cardH = (int)(cardW / ratio);
+    if (cardW < 30) cardW = 30;
+    if (cardH < 45) cardH = 45;
+
+    int totalW = 13 * cardW;
+    int totalH = 5 * cardH;
+    int startX = (W - totalW) / 2;
+    int startY = (H - totalH) / 2;
+
+    for (size_t i = 0; i < m_cardLabels.size(); ++i) {
+        QLabel* lbl = m_cardLabels[i];
+        QPixmap pix = lbl->property("srcPixmap").value<QPixmap>();
+        if (!pix.isNull()) {
+            lbl->setPixmap(pix.scaled(cardW, cardH,
+                           Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+        }
+        int x = startX + m_cardCol[i] * cardW;
+        int y = startY + m_cardRow[i] * cardH;
+        lbl->setGeometry(x, y, cardW, cardH);
+        QWidget* overlay = lbl->property("overlay").value<QWidget*>();
+        if (overlay) {
+            overlay->setGeometry(2, 2, cardW - 4, cardH - 4);
+        }
+    }
 }
 
 std::vector<Card> CardPickerDialog::selectedCards() const {
     std::vector<Card> result;
-    for (int idx : m_selectedIndices) {
-        result.push_back(m_allCards[idx]);
-    }
+    for (int idx : m_selectedIndices) result.push_back(m_allCards[idx]);
     return result;
 }

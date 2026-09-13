@@ -29,6 +29,7 @@ std::string cardTypeToString(CardType type) {
         case CardType::TripleWithTwo: return "三带二";
         case CardType::Bomb:          return "炸弹";
         case CardType::Rocket:        return "王炸";
+        case CardType::Special523:    return "Special523";
         case CardType::Invalid:       return "非法";
         default:                      return "未知";
     }

@@ -108,7 +108,8 @@ void test_pressureBonus()
             makeCard("7"), makeCard("7"), makeCard("7"),
             makeCard("5"), makeCard("5")
         });
-        assert(calculatePressureBonus(t2, t1) == 0);
+        // P0-3 压分奖励支持全牌型，两张5各5分 → 10分
+        assert(calculatePressureBonus(t2, t1) == 10);
     }
 
     {

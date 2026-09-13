@@ -64,3 +64,15 @@ add_executable(unit_tests
     tests/test_player.cpp
 )
 target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(genetic_tuner
+    ${CORE_SOURCES}
+    tests/genetic_tuner.cpp
+)
+target_include_directories(genetic_tuner PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(loss_analysis
+    ${CORE_SOURCES}
+    tests/loss_analysis.cpp
+)
+target_include_directories(loss_analysis PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

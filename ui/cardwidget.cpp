@@ -9,7 +9,7 @@
 CardWidget::CardWidget(const Card& card, QWidget* parent)
     : QWidget(parent), m_card(card), m_currentYOffset(21)
 {
-    setFixedSize(110, 165);
+    setFixedSize(110, 168);
     loadPixmap();
 }
 
@@ -26,7 +26,7 @@ void CardWidget::setSelected(bool selected)
         anim->setDuration(150);
         anim->setEasingCurve(QEasingCurve::OutCubic);
         anim->setStartValue(m_currentYOffset);
-        anim->setEndValue(m_selected ? 1 : 21);
+        anim->setEndValue(m_selected ? 3 : 21);
         anim->start(QAbstractAnimation::DeleteWhenStopped);
     }
 }
@@ -50,7 +50,7 @@ void CardWidget::mousePressEvent(QMouseEvent*)
     anim->setDuration(150);
     anim->setEasingCurve(QEasingCurve::OutCubic);
     anim->setStartValue(m_currentYOffset);
-    anim->setEndValue(m_selected ? 1 : 21);
+    anim->setEndValue(m_selected ? 3 : 21);
     anim->start(QAbstractAnimation::DeleteWhenStopped);
 
     emit clicked();
@@ -125,30 +125,33 @@ void CardWidget::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    const int w = width();      // 100
-    const int h = height();     // 165
-    const int yOffset = m_currentYOffset;  // 动画值
+    const int w = width();
+    const int yOffset = m_currentYOffset;
+
+    int imgX = 0, imgY = yOffset, imgW = w, imgH = 143;
 
     if (!m_pixmap.isNull()) {
-        QPixmap scaled = m_pixmap.scaled(w - 4, 143,
+        QPixmap scaled = m_pixmap.scaled(w - 8, 143,
                                          Qt::KeepAspectRatio,
                                          Qt::SmoothTransformation);
-        int x = (w - scaled.width()) / 2;
-        p.drawPixmap(x, yOffset, scaled);
+        imgX = (w - scaled.width()) / 2;
+        imgY = yOffset;
+        imgW = scaled.width();
+        imgH = scaled.height();
 
-        if (m_selected && !m_flying) {
-            p.setPen(QPen(QColor(255, 200, 0), 3));
-            p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(1, yOffset, w - 2, 143, 8, 8);
-        }
+        p.drawPixmap(imgX, imgY, scaled);
     } else {
+        imgX = 1;
+        imgW = w - 2;
+        imgH = 143;
+
         if (m_selected && !m_flying) {
             p.setPen(QPen(QColor(255, 200, 0), 3));
         } else {
             p.setPen(QPen(Qt::black, 2));
         }
         p.setBrush(Qt::white);
-        p.drawRoundedRect(1, yOffset, w - 2, 143, 8, 8);
+        p.drawRoundedRect(imgX, imgY, imgW, imgH, 8, 8);
 
         const QColor color = textColor();
         p.setPen(color);
@@ -159,14 +162,14 @@ void CardWidget::paintEvent(QPaintEvent*)
         p.setFont(ptFont);
 
         const QString ptText = QString::fromStdString(m_card.point);
-        p.drawText(6, yOffset + 4, w - 12, 22, Qt::AlignLeft | Qt::AlignTop, ptText);
+        p.drawText(6, imgY + 4, w - 12, 22, Qt::AlignLeft | Qt::AlignTop, ptText);
 
         if (m_card.point != "大鬼" && m_card.point != "小鬼") {
             QFont centerFont = font();
             centerFont.setPixelSize(34);
             p.setFont(centerFont);
             p.setOpacity(0.20);
-            p.drawText(0, yOffset, w, 143, Qt::AlignCenter, suitSymbol());
+            p.drawText(0, imgY, w, imgH, Qt::AlignCenter, suitSymbol());
             p.setOpacity(1.0);
         }
 
@@ -176,8 +179,16 @@ void CardWidget::paintEvent(QPaintEvent*)
         p.setFont(suitFont);
         p.setPen(color);
 
-        p.drawText(w - 38, yOffset + 143 - 30, 34, 26,
+        p.drawText(w - 38, imgY + imgH - 30, 34, 26,
                    Qt::AlignRight | Qt::AlignBottom, suitSymbol());
+    }
+
+    if (m_selected && !m_flying) {
+        p.setPen(QPen(QColor(255, 200, 0), 2));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(imgX - 2, imgY - 2,
+                          imgW + 4, imgH + 4,
+                          6, 6);
     }
 
     if (m_card.score > 0) {
@@ -188,7 +199,7 @@ void CardWidget::paintEvent(QPaintEvent*)
         p.setPen(QColor(255, 215, 0));
 
         QString scText = QString("%1分").arg(m_card.score);
-        QRect textRect(0, yOffset + 143 - 22, w, 20);
+        QRect textRect(0, imgY + imgH - 22, w, 20);
         p.drawText(textRect, Qt::AlignCenter, scText);
     }
 }
