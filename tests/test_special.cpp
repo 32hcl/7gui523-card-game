@@ -1,5 +1,5 @@
 #include <cassert>
-#include "core/special.h"
+#include "core/rule/special.h"
 
 static Card makeCard(const std::string& point, const std::string& suit = "")
 {

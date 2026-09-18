@@ -1,6 +1,6 @@
 #include <QApplication>
 #include <QLoggingCategory>
-#include "ui/mainwindow.h"
+#include "ui/main/mainwindow.h"
 
 #ifdef _WIN32
 #include <windows.h>

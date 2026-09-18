@@ -7,13 +7,13 @@
 #include <random>
 #include <map>
 
-#include "core/deck.h"
+#include "core/card/deck.h"
 #include "core/player.h"
-#include "core/cardtype.h"
-#include "core/ai.h"
-#include "core/score.h"
-#include "core/special.h"
-#include "core/cardtracker.h"
+#include "core/card/cardtype.h"
+#include "ai/ai.h"
+#include "core/rule/score.h"
+#include "core/rule/special.h"
+#include "core/tracker/cardtracker.h"
 
 struct DecisionRecord {
     int round = 0;

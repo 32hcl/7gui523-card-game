@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-#include "card.h"
+#include "core/card/card.h"
 
 struct Deck;
 

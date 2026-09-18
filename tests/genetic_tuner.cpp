@@ -7,14 +7,14 @@
 #include <numeric>
 #include <iomanip>
 
-#include "core/ai.h"
-#include "core/ai_params.h"
-#include "core/deck.h"
+#include "ai/ai.h"
+#include "ai/ai_types.h"
+#include "core/card/deck.h"
 #include "core/player.h"
-#include "core/cardtype.h"
-#include "core/cardtracker.h"
-#include "core/score.h"
-#include "core/special.h"
+#include "core/card/cardtype.h"
+#include "core/tracker/cardtracker.h"
+#include "core/rule/score.h"
+#include "core/rule/special.h"
 
 struct GameResult {
     int winner;

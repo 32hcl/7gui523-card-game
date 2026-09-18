@@ -1,5 +1,5 @@
 #include "player.h"
-#include "deck.h"
+#include "core/card/deck.h"
 
 Player createPlayer(const std::string& name) {
     Player p;

@@ -1,6 +1,6 @@
 #include <cassert>
 #include "core/player.h"
-#include "core/deck.h"
+#include "core/card/deck.h"
 
 static Card makeCard(const std::string& point, const std::string& suit = "")
 {
