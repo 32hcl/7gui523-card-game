@@ -58,3 +58,6 @@ desktop.ini
 !music/*.mp3
 !kenney_playing-cards-pack/**RoomAI-master/
 *.diff
+RoomAI-master/
+*.diff
+new_ai/*.pkl
