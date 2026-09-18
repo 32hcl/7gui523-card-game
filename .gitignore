@@ -56,8 +56,8 @@ desktop.ini
 !README.md
 !LICENSE
 !music/*.mp3
-!kenney_playing-cards-pack/**RoomAI-master/
-*.diff
+!kenney_playing-cards-pack/**
 RoomAI-master/
 *.diff
 new_ai/*.pkl
+new_ai/debug_*.txt
