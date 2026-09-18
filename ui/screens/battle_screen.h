@@ -31,6 +31,7 @@ public:
 signals:
     void gameStarted();
     void gameEnded();
+    void dealAnimationFinished();
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -67,6 +68,7 @@ private:
     void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
     void showBonusFloat(int bonus);
     void startGameWithFirst(bool playerAFirst);
+    void onDealAnimationFinished();
 
     void createTopBar(QVBoxLayout* leftLay);
     void createOpponentArea(QVBoxLayout* leftLay);

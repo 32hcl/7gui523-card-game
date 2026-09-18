@@ -759,24 +759,25 @@ void BattleScreen::startGameWithFirst(bool playerAFirst)
 
     playDealAnimation();
 
-    int animDuration = 10 * 60 + 300;
-    QTimer::singleShot(animDuration, this, [this, playerAFirst]() {
-        m_dealAnimating = false;
-        m_difficultyButton->setEnabled(true);
-        m_newGameButton->setEnabled(true);
-        m_buttonStack->setEnabled(true);
-        m_buttonStack->setCurrentIndex(0);
+    connect(this, &BattleScreen::dealAnimationFinished, this, &BattleScreen::onDealAnimationFinished, Qt::SingleShotConnection);
+}
 
-        if (playerAFirst) {
-            m_waitingForAI = false;
-            enableActionButtons();
-        } else {
-            m_waitingForAI = true;
-            disableActionButtons();
-            QTimer::singleShot(300, this, &BattleScreen::doAITurn);
-        }
-        updateUI();
-    });
+void BattleScreen::onDealAnimationFinished()
+{
+    m_difficultyButton->setEnabled(true);
+    m_newGameButton->setEnabled(true);
+    m_buttonStack->setEnabled(true);
+    m_buttonStack->setCurrentIndex(0);
+
+    if (m_playerAIsFirst) {
+        m_waitingForAI = false;
+        enableActionButtons();
+    } else {
+        m_waitingForAI = true;
+        disableActionButtons();
+        QTimer::singleShot(300, this, &BattleScreen::doAITurn);
+    }
+    updateUI();
 }
 
 void BattleScreen::onPickButtonClicked()

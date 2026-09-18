@@ -21,19 +21,21 @@ class ValueNet(nn.Module):
     def __init__(self, input_dim=103):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(input_dim, 128),
+            nn.Linear(input_dim, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+
+            nn.Linear(256, 128),
             nn.ReLU(),
             nn.BatchNorm1d(128),
 
             nn.Linear(128, 64),
             nn.ReLU(),
-            nn.BatchNorm1d(64),
 
             nn.Linear(64, 32),
             nn.ReLU(),
 
             nn.Linear(32, 1),
-            nn.Tanh(),
         )
 
     def forward(self, x):
@@ -75,7 +77,7 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE)
 
     model = ValueNet().to(DEVICE)
-    criterion = nn.MSELoss()
+    criterion = nn.HuberLoss(delta=1.0)
     optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
 
     start_epoch = 0

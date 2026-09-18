@@ -5,6 +5,7 @@
 #include <QPropertyAnimation>
 #include <QCoreApplication>
 #include <QFile>
+#include <cmath>
 
 CardWidget::CardWidget(const Card& card, QWidget* parent)
     : QWidget(parent), m_card(card), m_currentYOffset(21)
@@ -39,6 +40,28 @@ bool CardWidget::isSelected() const
 void CardWidget::setCurrentYOffset(int v)
 {
     m_currentYOffset = v;
+    update();
+}
+
+void CardWidget::setDealProgress(qreal v)
+{
+    m_dealProgress = v;
+    bool shouldFaceUp = (v >= 0.5);
+    if (m_faceUp != shouldFaceUp) {
+        m_faceUp = shouldFaceUp;
+    }
+    update();
+}
+
+void CardWidget::setCardTilt(qreal v)
+{
+    m_cardTilt = v;
+    update();
+}
+
+void CardWidget::setFaceUp(bool v)
+{
+    m_faceUp = v;
     update();
 }
 
@@ -103,6 +126,18 @@ QString CardWidget::cardImageFileName(const Card& card) {
     return QString("card_%1_%2.png").arg(suitKey).arg(pointKey);
 }
 
+QPixmap CardWidget::cardBackPixmap()
+{
+    static QPixmap s_back;
+    if (s_back.isNull()) {
+        QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
+        if (QFile::exists(backPath)) {
+            s_back = QPixmap(backPath);
+        }
+    }
+    return s_back;
+}
+
 void CardWidget::loadPixmap() {
     QString cardsDir = QCoreApplication::applicationDirPath() + "/cards/";
     QString fileName = cardImageFileName(m_card);
@@ -117,8 +152,42 @@ void CardWidget::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
+    qreal tilt = m_cardTilt;
+    if (tilt == 0.0 && m_dealProgress > 0.0 && m_dealProgress < 1.0) {
+        static const qreal pi = 3.14159265359;
+        tilt = std::sin(pi * m_dealProgress) * 10.0 * m_tiltSign;
+    }
+
+    if (tilt != 0.0) {
+        p.save();
+        qreal cx = width() / 2.0;
+        qreal cy = height() / 2.0;
+        p.translate(cx, cy);
+        p.rotate(tilt);
+        p.translate(-cx, -cy);
+    }
+
     const int w = width();
-    const int yOffset = m_currentYOffset;
+    const int yOffset = (m_dealProgress > 0.0) ? 0 : m_currentYOffset;
+
+    bool inDeal = (m_dealProgress > 0.0 && m_dealProgress < 1.0);
+
+    if (inDeal && !m_faceUp) {
+        QPixmap back = cardBackPixmap();
+        if (!back.isNull()) {
+            QPixmap scaled = back.scaled(w - 8, 143,
+                                         Qt::KeepAspectRatio,
+                                         Qt::SmoothTransformation);
+            int imgX = (w - scaled.width()) / 2;
+            p.drawPixmap(imgX, yOffset, scaled);
+        } else {
+            p.setPen(QPen(Qt::darkGray, 2));
+            p.setBrush(QColor(40, 40, 80));
+            p.drawRoundedRect(1, yOffset, w - 2, 143, 8, 8);
+        }
+        if (tilt != 0.0) p.restore();
+        return;
+    }
 
     int imgX = 0, imgY = yOffset, imgW = w, imgH = 143;
 
@@ -195,5 +264,9 @@ void CardWidget::paintEvent(QPaintEvent*)
         QString scText = QString("%1分").arg(m_card.score);
         QRect textRect(0, imgY + imgH - 22, w, 20);
         p.drawText(textRect, Qt::AlignCenter, scText);
+    }
+
+    if (tilt != 0.0) {
+        p.restore();
     }
 }

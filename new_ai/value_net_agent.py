@@ -7,16 +7,17 @@ class ValueNet(nn.Module):
     def __init__(self, state_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(state_dim, 128),
+            nn.Linear(state_dim, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Linear(256, 128),
             nn.ReLU(),
             nn.BatchNorm1d(128),
             nn.Linear(128, 64),
             nn.ReLU(),
-            nn.BatchNorm1d(64),
             nn.Linear(64, 32),
             nn.ReLU(),
             nn.Linear(32, 1),
-            nn.Tanh(),
         )
 
     def forward(self, x):
