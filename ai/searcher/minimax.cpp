@@ -3,15 +3,9 @@
 #include "search_state.h"
 #include "core/card/cardtype.h"
 #include "core/rule/score.h"
-#include "core/rule/special.h"
+
 #include <algorithm>
 #include <climits>
-
-// ── 辅助：判断手牌是否包含 Special523 ──
-static bool hasSpecial523(const std::vector<Card>& hand) {
-    Player tmp; tmp.hand = hand;
-    return checkSpecialVictory(tmp);
-}
 
 // ── 辅助：手牌补到 5 张 ──
 static void refillToFiveLocal(std::vector<Card>& hand, std::vector<Card>& deck) {
@@ -80,25 +74,16 @@ SearchState applyMove(const SearchState& state, const std::vector<Card>& move) {
             ns.oppScore += roundScore;
         }
 
-        // 双方补牌到 5 张
-        refillToFiveLocal(ns.myHand, ns.deckCards);
-        refillToFiveLocal(ns.oppHand, ns.deckCards);
-
-        // 检查 Special523（补牌后可能达成）
-        if (hasSpecial523(ns.myHand)) {
-            ns.terminal = true;
-            ns.winner = 1;
-            ns.myScore += ns.oppScore;
-            ns.oppScore = 0;
-            return ns;
+        // 胜者先补牌（Bug 4 修复：原代码始终先补我方）
+        if (roundWinnerIsMe) {
+            refillToFiveLocal(ns.myHand, ns.deckCards);
+            refillToFiveLocal(ns.oppHand, ns.deckCards);
+        } else {
+            refillToFiveLocal(ns.oppHand, ns.deckCards);
+            refillToFiveLocal(ns.myHand, ns.deckCards);
         }
-        if (hasSpecial523(ns.oppHand)) {
-            ns.terminal = true;
-            ns.winner = -1;
-            ns.oppScore += ns.myScore;
-            ns.myScore = 0;
-            return ns;
-        }
+        // Bug 5 修复：不再检查补牌后手牌中的 Special523
+        // Special523 必须打出才生效，仅持有不算胜利
 
         // 重置回合状态
         ns.lastPlay.type = CardType::Invalid;
@@ -134,6 +119,9 @@ SearchState applyMove(const SearchState& state, const std::vector<Card>& move) {
 
     // 更新 lastPlay
     ns.lastPlay = parseCardType(move);
+
+    // 压分奖励（Bug 6 修复：同牌型+同keyPoint时额外得分）
+    ns.tableScore += calculatePressureBonus(ns.lastPlay, state.lastPlay);
 
     // 手牌空 + 牌堆空 → 立即终局
     if (hand.empty() && ns.deckCards.empty()
@@ -254,14 +242,6 @@ std::vector<Card> searchBestPlayCheat(
     state.oppScore = opp.totalScore;
     state.terminal = false;
     state.winner = 0;
-
-    // 检查 Special523
-    if (hasSpecial523(state.myHand)) {
-        return {};
-    }
-    if (hasSpecial523(state.oppHand)) {
-        return {};
-    }
 
     auto moves = genLegalMoves(state);
     if (moves.empty()) return {};
