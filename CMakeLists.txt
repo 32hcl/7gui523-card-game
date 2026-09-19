@@ -6,7 +6,11 @@ project(7gui523 CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_AUTOMOC ON)
+include(CTest)
+
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
 
 option(BUILD_GUI "Build the GUI game application" ON)
 
@@ -41,6 +45,8 @@ if(BUILD_GUI)
         main.cpp
     )
 
+    set_target_properties(game PROPERTIES AUTOMOC ON)
+
     target_include_directories(game PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(game PRIVATE Qt6::Widgets Qt6::Multimedia)
 
@@ -57,6 +63,12 @@ if(BUILD_GUI)
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/kenney_playing-cards-pack/PNG/Cards (large)"
                 "$<TARGET_FILE_DIR:game>/cards"
+        )
+    endif()
+
+    if(WIN32 AND Qt6_FOUND)
+        add_custom_command(TARGET game POST_BUILD
+            COMMAND "${Qt6_DIR}/../../../bin/windeployqt.exe" "$<TARGET_FILE:game>"
         )
     endif()
 endif()
@@ -96,8 +108,18 @@ add_executable(unit_tests
     tests/test_special.cpp
     tests/test_deck.cpp
     tests/test_player.cpp
+    tests/test_search_p0.cpp
 )
 target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# These tests use assert(), including in Release builds.
+if(MSVC)
+    target_compile_options(unit_tests PRIVATE /UNDEBUG)
+else()
+    target_compile_options(unit_tests PRIVATE -UNDEBUG)
+endif()
+if(BUILD_TESTING)
+    add_test(NAME core_rules COMMAND unit_tests)
+endif()
 
 add_executable(genetic_tuner
     ${CORE_SOURCES}

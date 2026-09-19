@@ -136,9 +136,17 @@ SearchState applyMove(const SearchState& state, const std::vector<Card>& move) {
     ns.lastPlay = parseCardType(move);
 
     // 手牌空 + 牌堆空 → 立即终局
-    if (hand.empty() && ns.deckCards.empty()) {
+    if (hand.empty() && ns.deckCards.empty()
+        && ns.lastPlay.type != CardType::Special523) {
+        auto& opponentHand = ns.myTurn ? ns.oppHand : ns.myHand;
+        const int finalScore = ns.tableScore + calculateScore(opponentHand);
+        if (ns.myTurn) ns.myScore += finalScore;
+        else ns.oppScore += finalScore;
+        opponentHand.clear();
+        ns.tableScore = 0;
         ns.terminal = true;
-        ns.winner = state.myTurn ? 1 : -1;
+        ns.winner = (ns.myScore > ns.oppScore) ? 1
+                  : (ns.myScore < ns.oppScore) ? -1 : 0;
         return ns;
     }
     // 打出 Special523 → 立即终局
@@ -189,7 +197,10 @@ static int evaluateLeaf(const SearchState& state, const SearchParams& p) {
 
 // ── 4. Minimax + Alpha-Beta ──
 int minimax(SearchState& state, int depth, int alpha, int beta, bool isMax, const SearchParams& p) {
-    if (depth == 0 || state.terminal) {
+    if (state.terminal) {
+        return state.winner > 0 ? 10000 : state.winner < 0 ? -10000 : 0;
+    }
+    if (depth == 0) {
         return evaluateLeaf(state, p);
     }
 

@@ -11,6 +11,9 @@ void test_createStandardDeck();
 void test_drawCards();
 void test_refillToFive();
 void test_removeCardsFromHand();
+void test_sampledWorldConservation();
+void test_searchFinalSettlement();
+void test_searchTerminalUtility();
 
 static int g_total = 0;
 static int g_passed = 0;
@@ -61,6 +64,11 @@ int main()
 
     GROUP("player: removeCardsFromHand")
     TEST(removeCardsFromHand);
+
+    GROUP("search: P0 regressions")
+    TEST(sampledWorldConservation);
+    TEST(searchFinalSettlement);
+    TEST(searchTerminalUtility);
 
     std::cout << std::endl;
     std::cout << "Result: " << g_passed << " / " << g_total << " passed";

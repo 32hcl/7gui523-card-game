@@ -426,7 +426,7 @@ std::vector<Card> aiChoosePlayAI4(const Player& player,
                                   const Deck& deck,
                                   int tableScore,
                                   const CardTracker& tracker) {
-    return searchBestPlayCheat(player, opponent, previous, deck, tableScore, 3);
+    return searchBestPlayCheat(player, opponent, previous, deck, tableScore, 6);
 }
 
 std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,

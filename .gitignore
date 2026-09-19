@@ -61,3 +61,6 @@ RoomAI-master/
 *.diff
 new_ai/*.pkl
 new_ai/debug_*.txt
+
+build-main/
+新建文件夹 (6)/
