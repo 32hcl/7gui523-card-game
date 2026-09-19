@@ -867,6 +867,7 @@ int main(int argc, char* argv[]) {
     bool verbose = false;
     int gamesPerCombo = 100;
     int verboseGames = 20;
+    int fixedSeed = 0;
     AILevel firstAI = AILevel::AI4_Expert;
     AILevel secondAI = AILevel::AI3_Tracker;
 
@@ -876,6 +877,8 @@ int main(int argc, char* argv[]) {
             verbose = true;
         } else if (arg == "--games" || arg == "-g") {
             if (i + 1 < argc) verboseGames = std::atoi(argv[++i]);
+        } else if (arg == "--seed" || arg == "-s") {
+            if (i + 1 < argc) fixedSeed = std::atoi(argv[++i]);
         } else if (arg == "--first" || arg == "-1") {
             if (i + 1 < argc) firstAI = parseAILevel(argv[++i]);
         } else if (arg == "--second" || arg == "-2") {
@@ -886,11 +889,10 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    std::mt19937 rng(fixedSeed != 0 ? fixedSeed : std::random_device{}());
+
     // ── 风骚日志模式 ──
     if (verbose) {
-        std::random_device rd;
-        std::mt19937 rng(rd());
-
         std::string fn = levelName(firstAI);
         std::string sn = levelName(secondAI);
 
@@ -921,9 +923,6 @@ int main(int argc, char* argv[]) {
         AILevel::AI3_Tracker,
         AILevel::AI4_Expert
     };
-
-    std::random_device rd;
-    std::mt19937 rng(rd());
 
     int totalGames = 16 * gamesPerCombo;
 
