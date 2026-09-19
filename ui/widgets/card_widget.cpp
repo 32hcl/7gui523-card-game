@@ -6,11 +6,14 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <cmath>
+#include <QRadialGradient>
+#include <QPolygonF>
+#include <QTransform>
 
 CardWidget::CardWidget(const Card& card, QWidget* parent)
     : QWidget(parent), m_card(card), m_currentYOffset(21)
 {
-    setFixedSize(110, 168);
+    setFixedSize(110, 178);
     loadPixmap();
 }
 
@@ -59,6 +62,20 @@ void CardWidget::setCardTilt(qreal v)
     update();
 }
 
+void CardWidget::setDealAnimationEnabled(bool enabled, bool revealFace)
+{
+    m_dealAnimationEnabled = enabled;
+    m_dealRevealFace = revealFace;
+    m_dealProgress = 0.0;
+    update();
+}
+
+void CardWidget::setDealTilt(qreal degrees)
+{
+    m_dealTilt = qBound(qreal(-10.0), degrees, qreal(10.0));
+    update();
+}
+
 void CardWidget::setFaceUp(bool v)
 {
     m_faceUp = v;
@@ -69,6 +86,71 @@ void CardWidget::mousePressEvent(QMouseEvent*)
 {
     setSelected(!m_selected);
     emit clicked();
+}
+
+void CardWidget::paintDealCard()
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::SmoothPixmapTransform);
+
+    constexpr qreal pi = 3.14159265358979323846;
+
+    const qreal flipStart = 0.85;
+    const qreal flipP = qBound(qreal(0.0),
+                               (m_dealProgress - flipStart) / (1.0 - flipStart),
+                               qreal(1.0));
+    const qreal lift = std::sin(pi * flipP);
+    const qreal scaleX = (flipP > 0.0)
+        ? qMax(qreal(0.35), std::abs(std::cos(pi * flipP)))
+        : qreal(1.0);
+    const bool showFace = m_dealRevealFace && (flipP >= 0.5);
+
+    if (flipP > 0.0) {
+        p.save();
+        p.translate(width() / 2.0 + 3.0 * lift, height() / 2.0 + 41.0 + 5.0 * lift);
+        p.scale(1.0 - 0.35 * lift, 0.24);
+        QRadialGradient shadow(QPointF(0.0, 0.0), 60.0);
+        shadow.setColorAt(0.0, QColor(0, 0, 0, qRound(115.0 - 80.0 * lift)));
+        shadow.setColorAt(1.0, QColor(0, 0, 0, 0));
+        p.setPen(Qt::NoPen);
+        p.setBrush(shadow);
+        p.drawEllipse(QRectF(-60.0, -60.0, 120.0, 120.0));
+        p.restore();
+    }
+
+    p.translate(width() / 2.0, height() / 2.0);
+    p.rotate(m_dealTilt * lift);
+    p.scale(scaleX, 1.0);
+    const QRectF cardRect(-55.0, -89.0, 110.0, 178.0);
+    const qreal inset = 8.0 * lift;
+    const QPolygonF source{cardRect.topLeft(), cardRect.topRight(),
+                           cardRect.bottomRight(), cardRect.bottomLeft()};
+    const QPolygonF projected{QPointF(-55.0 + inset, -89.0 + inset),
+                              QPointF(55.0 - inset, -89.0 + inset),
+                              QPointF(55.0, 89.0), QPointF(-55.0, 89.0)};
+    QTransform perspective;
+    if (QTransform::quadToQuad(source, projected, perspective)) {
+        p.setWorldTransform(perspective, true);
+    }
+    QPixmap backPixmap = cardBackPixmap();
+    const QPixmap& pixmap = showFace ? m_pixmap : backPixmap;
+    if (!pixmap.isNull()) {
+        p.drawPixmap(cardRect, pixmap, QRectF(pixmap.rect()));
+        return;
+    }
+    p.setPen(QPen(QColor(35, 50, 75), 1.0));
+    p.setBrush(showFace ? QColor(Qt::white) : QColor(45, 70, 120));
+    p.drawRoundedRect(cardRect, 4.0, 4.0);
+    QFont labelFont = font();
+    labelFont.setPixelSize(13);
+    labelFont.setBold(true);
+    p.setFont(labelFont);
+    p.setPen(showFace ? textColor() : QColor(Qt::white));
+    const QString label = showFace
+        ? QString::fromStdString(m_card.point) + "\n" + suitSymbol()
+        : QStringLiteral("\u25c6");
+    p.drawText(cardRect, Qt::AlignCenter, label);
 }
 
 QColor CardWidget::textColor() const
@@ -149,6 +231,10 @@ void CardWidget::loadPixmap() {
 
 void CardWidget::paintEvent(QPaintEvent*)
 {
+    if (m_dealAnimationEnabled) {
+        paintDealCard();
+        return;
+    }
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
@@ -244,13 +330,18 @@ void CardWidget::paintEvent(QPaintEvent*)
                    Qt::AlignRight | Qt::AlignBottom, suitSymbol());
     }
 
-    int cardBottom = imgY + imgH;
-    int shadowBottom = height() - 4;
-    if (shadowBottom > cardBottom) {
-        QLinearGradient grad(0, cardBottom, 0, shadowBottom);
-        grad.setColorAt(0.0, QColor(0, 0, 0, 180));
+    int shadowH = 7;
+    int shadowInset = 12;
+    int shadowX = imgX + shadowInset;
+    int shadowW = imgW - 2 * shadowInset;
+    int shadowGroundY = 21 + imgH - 2;
+    if (shadowW > 0) {
+        float alphaScale = m_selected ? 0.3f : 1.0f;
+        QLinearGradient grad(0, shadowGroundY, 0, shadowGroundY + shadowH);
+        grad.setColorAt(0.0, QColor(0, 0, 0, qRound(140 * alphaScale)));
+        grad.setColorAt(0.5, QColor(0, 0, 0, qRound(70 * alphaScale)));
         grad.setColorAt(1.0, QColor(0, 0, 0, 0));
-        QRect shadowRect(4, cardBottom, w - 8, shadowBottom - cardBottom);
+        QRect shadowRect(shadowX, shadowGroundY, shadowW, shadowH);
         p.fillRect(shadowRect, grad);
     }
 

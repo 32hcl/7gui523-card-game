@@ -764,6 +764,7 @@ void BattleScreen::startGameWithFirst(bool playerAFirst)
 
 void BattleScreen::onDealAnimationFinished()
 {
+    m_dealAnimating = false;
     m_difficultyButton->setEnabled(true);
     m_newGameButton->setEnabled(true);
     m_buttonStack->setEnabled(true);
@@ -777,7 +778,7 @@ void BattleScreen::onDealAnimationFinished()
         disableActionButtons();
         QTimer::singleShot(300, this, &BattleScreen::doAITurn);
     }
-    updateUI();
+    updateUI(false);
 }
 
 void BattleScreen::onPickButtonClicked()
@@ -983,7 +984,7 @@ void BattleScreen::startNewGame()
     emit gameStarted();
 }
 
-void BattleScreen::updateUI()
+void BattleScreen::updateUI(bool rebuildHand)
 {
     m_deckCountLabel->setText(
         QString("牌堆剩余: %1").arg(static_cast<int>(m_deck.cards.size())));
@@ -1047,7 +1048,7 @@ void BattleScreen::updateUI()
 
     if (m_dealAnimating) return;
 
-    {
+    if (rebuildHand) {
         m_playerACardWidgets.clear();
         while (QLayoutItem* item = m_playerALayout->takeAt(0)) {
             if (QWidget* w = item->widget()) w->deleteLater();

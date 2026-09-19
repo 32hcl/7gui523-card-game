@@ -3,7 +3,9 @@
 #include "core/card/cardtype.h"
 #include <QPropertyAnimation>
 #include <QParallelAnimationGroup>
-#include <QSequentialAnimationGroup>
+#include <QPainterPath>
+#include <QRandomGenerator>
+#include <QLineF>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QGraphicsOpacityEffect>
@@ -13,11 +15,13 @@
 #include <QLabel>
 #include <QPixmap>
 #include <random>
-#include <cmath>
 
 void BattleScreen::playDealAnimation()
 {
-    if (!m_deckBackLabel || !m_playerAHandWidget || !m_playerBHandWidget) return;
+    if (!m_deckBackLabel || !m_playerAHandWidget || !m_playerBHandWidget) {
+        emit dealAnimationFinished();
+        return;
+    }
     m_dealAnimating = true;
 
     QPoint deckPos = m_deckBackLabel->mapTo(this, QPoint(0, 0));
@@ -25,36 +29,32 @@ void BattleScreen::playDealAnimation()
                     deckPos.y() + m_deckBackLabel->height() / 2);
 
     QPoint aPos = m_playerAHandWidget->mapTo(this, QPoint(0, 0));
-    QPoint endA(aPos.x() + m_playerAHandWidget->width() / 2,
-                aPos.y() + m_playerAHandWidget->height() / 2);
-
     QPoint bPos = m_playerBHandWidget->mapTo(this, QPoint(0, 0));
-    QPoint endB(bPos.x() + m_playerBHandWidget->width() / 2,
-                bPos.y() + m_playerBHandWidget->height() / 2);
 
-    const int cw = 60, ch = 84;
+    const int cw = 110, ch = 178;
     const int delayPerCard = 70;
     const int flyDuration = 400;
 
-    int totalCards = 10;
-    int animDuration = (totalCards - 1) * delayPerCard + flyDuration + 100;
-
-    QTimer::singleShot(animDuration, this, [this]() {
-        m_dealAnimating = false;
-        emit dealAnimationFinished();
-    });
-
-    for (int i = 0; i < totalCards; ++i) {
+    for (int i = 0; i < 10; ++i) {
         bool toA = (i % 2 == 0);
-        QPoint target = toA ? endA : endB;
+        int slot = i / 2;
+        QPoint target;
+        if (toA) {
+            target = QPoint(aPos.x() + slot * (cw + 6) + cw / 2,
+                            aPos.y() + ch / 2);
+        } else {
+            target = QPoint(bPos.x() + m_playerBHandWidget->width() / 2,
+                            bPos.y() + m_playerBHandWidget->height() / 2);
+        }
 
         QTimer::singleShot(i * delayPerCard, this, [=]() {
-            Card dummy;
-            CardWidget* card = new CardWidget(dummy, this);
+            CardWidget* card = toA
+                ? new CardWidget(m_playerA.hand.at(slot), this)
+                : new CardWidget(Card{}, this);
             card->setFixedSize(cw, ch);
-            card->setFlying(true);
-            card->setFaceUp(false);
-            card->setTiltSign(toA ? 1 : -1);
+            card->setDealAnimationEnabled(true, toA);
+            card->setDealTilt(QRandomGenerator::global()->generateDouble() * 20.0 - 10.0);
+            card->setAttribute(Qt::WA_TransparentForMouseEvents);
 
             QPoint from = startPos - QPoint(cw / 2, ch / 2);
             QPoint to   = target   - QPoint(cw / 2, ch / 2);
@@ -63,38 +63,54 @@ void BattleScreen::playDealAnimation()
             card->show();
             card->raise();
 
-            QPoint mid = QPoint(
-                (from.x() + to.x()) / 2,
-                std::min(from.y(), to.y()) - 40
-            );
-            QPoint overshoot = QPoint(to.x(), to.y() - 5);
+            auto* flight = new QParallelAnimationGroup(card);
+            auto* anim = new QPropertyAnimation(card, "pos", flight);
+            anim->setDuration(flyDuration);
+            anim->setEasingCurve(QEasingCurve::Linear);
+            anim->setStartValue(from);
+            anim->setEndValue(to);
 
-            QPropertyAnimation* posAnim = new QPropertyAnimation(card, "pos");
-            posAnim->setDuration(flyDuration);
-            posAnim->setEasingCurve(QEasingCurve::OutCubic);
-            posAnim->setKeyValueAt(0.0, from);
-            posAnim->setKeyValueAt(0.5, mid);
-            posAnim->setKeyValueAt(0.85, overshoot);
-            posAnim->setKeyValueAt(1.0, to);
+            const QPointF fromF(from);
+            const QPointF toF(to);
+            const qreal distance = QLineF(fromF, toF).length();
+            const QPointF direction = distance > 0.0
+                ? (toF - fromF) / distance : QPointF(0.0, 1.0);
+            const QPointF overshoot = toF + direction * 5.0;
+            const QPointF control = (fromF + toF) / 2.0 + QPointF(toA ? -24.0 : 24.0, -55.0);
+            QPainterPath arc(fromF);
+            arc.quadTo(control, overshoot);
+            for (int frame = 1; frame <= 20; ++frame) {
+                const qreal phase = static_cast<qreal>(frame) / 20.0;
+                const qreal eased = 1.0 - (1.0 - phase) * (1.0 - phase);
+                anim->setKeyValueAt(0.85 * phase, arc.pointAtPercent(eased).toPoint());
+            }
+            anim->setKeyValueAt(0.925, (toF + direction * 2.0).toPoint());
+            auto* flip = new QPropertyAnimation(card, "dealProgress", flight);
+            flip->setDuration(flyDuration);
+            flip->setEasingCurve(QEasingCurve::Linear);
+            flip->setStartValue(0.0);
+            flip->setEndValue(1.0);
 
-            QPropertyAnimation* progAnim = new QPropertyAnimation(card, "dealProgress");
-            progAnim->setDuration(flyDuration);
-            progAnim->setEasingCurve(QEasingCurve::Linear);
-            progAnim->setStartValue(0.0);
-            progAnim->setEndValue(1.0);
+            if (toA) {
+                connect(flight, &QParallelAnimationGroup::finished, this, [this, card]() {
+                    card->setDealAnimationEnabled(false);
+                    card->setFaceUp(true);
+                    card->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+                    int insertIdx = m_playerALayout->count();
+                    if (insertIdx > 0 && m_playerALayout->itemAt(insertIdx - 1)->spacerItem())
+                        insertIdx--;
+                    m_playerALayout->insertWidget(insertIdx, card);
+                    m_playerACardWidgets.push_back(card);
+                });
+            } else {
+                connect(flight, &QParallelAnimationGroup::finished, card, &QObject::deleteLater);
+            }
 
-            QParallelAnimationGroup* group = new QParallelAnimationGroup(this);
-            group->addAnimation(posAnim);
-            group->addAnimation(progAnim);
-
-            connect(group, &QParallelAnimationGroup::finished, card, [card]() {
-                card->setDealProgress(1.0);
-                card->setFaceUp(true);
-                card->setFlying(false);
-                card->deleteLater();
-            });
-
-            group->start(QAbstractAnimation::DeleteWhenStopped);
+            if (i == 9) {
+                connect(flight, &QParallelAnimationGroup::finished,
+                        this, &BattleScreen::dealAnimationFinished);
+            }
+            flight->start(QAbstractAnimation::DeleteWhenStopped);
         });
     }
 }
@@ -138,6 +154,7 @@ void BattleScreen::flyCardsToTable(const std::vector<CardWidget*>& cards) {
                 cw->setParent(m_tableCardsWidget);
                 QPoint relPos = endPos - m_tableCardsWidget->mapTo(this, QPoint(0, 0));
                 cw->move(relPos);
+                cw->resetToIdle();
                 cw->show();
                 cw->setFlying(false);
                 cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
@@ -190,6 +207,7 @@ void BattleScreen::flyAICardsToTable(const std::vector<Card>& cards) {
                 cw->setParent(m_tableCardsWidget);
                 QPoint relPos = endPos - m_tableCardsWidget->mapTo(this, QPoint(0, 0));
                 cw->move(relPos);
+                cw->resetToIdle();
                 cw->show();
                 cw->setFlying(false);
                 cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);

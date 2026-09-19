@@ -22,7 +22,10 @@ public:
 
     int currentYOffset() const { return m_currentYOffset; }
     void setCurrentYOffset(int v);
+    void resetToIdle() { m_selected = false; m_currentYOffset = 21; update(); }
     void setFlying(bool flying) { m_flying = flying; update(); }
+    void setDealAnimationEnabled(bool enabled, bool revealFace = true);
+    void setDealTilt(qreal degrees);
 
     qreal dealProgress() const { return m_dealProgress; }
     void setDealProgress(qreal v);
@@ -47,6 +50,9 @@ private:
     bool m_flying = false;
     int  m_currentYOffset = 21;
     qreal m_dealProgress = 0.0;
+    bool m_dealAnimationEnabled = false;
+    bool m_dealRevealFace = true;
+    qreal m_dealTilt = 0.0;
     qreal m_cardTilt = 0.0;
     bool m_faceUp = true;
     int m_tiltSign = 1;
@@ -56,4 +62,5 @@ private:
     QString suitSymbol() const;
     int pointFontSize() const;
     void loadPixmap();
+    void paintDealCard();
 };

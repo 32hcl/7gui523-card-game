@@ -45,10 +45,11 @@ private slots:
     void onFirstBtnClicked();
     void onRandomBtnClicked();
     void onSecondBtnClicked();
+    void onDealAnimationFinished();
 
 private:
     void startNewGame();
-    void updateUI();
+    void updateUI(bool rebuildHand = true);
     QWidget* createCardBack();
     void doAITurn();
     void endRound(Player& winner);
@@ -68,7 +69,6 @@ private:
     void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
     void showBonusFloat(int bonus);
     void startGameWithFirst(bool playerAFirst);
-    void onDealAnimationFinished();
 
     void createTopBar(QVBoxLayout* leftLay);
     void createOpponentArea(QVBoxLayout* leftLay);
