@@ -17,7 +17,6 @@
 #include "core/card/cardtype.h"
 #include "core/tracker/cardtracker.h"
 #include "core/rule/score.h"
-#include "core/rule/special.h"
 
 // ── 对战统计 ──────────────────────────────────────────────────
 
@@ -243,13 +242,6 @@ static void runOneGame(AILevel levelFirst, AILevel levelSecond,
 
     CardTracker tracker;
 
-    if (checkSpecialVictory(first)) {
-        stats.firstWins++; stats.specialWins++; return;
-    }
-    if (checkSpecialVictory(second)) {
-        stats.secondWins++; stats.specialWins++; return;
-    }
-
     Player* current = &first;
     Player* opponent = &second;
     Player* lastPlayer = nullptr;
@@ -389,7 +381,8 @@ static void runOneGame(AILevel levelFirst, AILevel levelSecond,
             lastPlay = parsed;
             lastPlayer = current;
 
-            if (checkSpecialVictory(*current)) {
+            // Special523 由打出牌型检测（Bug 5 修复）
+            if (parsed.type == CardType::Special523) {
                 if (current == &first) stats.firstWins++;
                 else stats.secondWins++;
                 stats.specialWins++;
@@ -417,13 +410,6 @@ static void runOneGame(AILevel levelFirst, AILevel levelSecond,
         lastPlay.type = CardType::Invalid;
         lastPlay.cards.clear();
         lastPlay.keyPoint.clear();
-
-        if (checkSpecialVictory(first)) {
-            stats.firstWins++; stats.specialWins++; return;
-        }
-        if (checkSpecialVictory(second)) {
-            stats.secondWins++; stats.specialWins++; return;
-        }
 
         if (!deck.cards.empty()) {
             Player* loser = (lastPlayer == &first) ? &second : &first;
@@ -723,15 +709,6 @@ static void runOneGameVerbose(AILevel levelFirst, AILevel levelSecond,
     log << "牌堆: " << deck.cards.size() << "\n";
     log << "========================================\n\n";
 
-    if (checkSpecialVictory(first)) {
-        log << "[" << fn << "] 天胡 Special523 获胜！\n\n";
-        return;
-    }
-    if (checkSpecialVictory(second)) {
-        log << "[" << sn << "] 天胡 Special523 获胜！\n\n";
-        return;
-    }
-
     // ── 游戏循环 ──
     Player* current = &first;
     Player* opponent = &second;
@@ -832,8 +809,8 @@ static void runOneGameVerbose(AILevel levelFirst, AILevel levelSecond,
             lastPlay = parsed;
             lastPlayer = current;
 
-            // Special523 检查
-            if (checkSpecialVictory(*current)) {
+            // Special523 由打出牌型检测（Bug 5 修复）
+            if (parsed.type == CardType::Special523) {
                 log << "[" << pn << "] Special523 获胜！\n\n";
                 return;
             }
@@ -862,15 +839,6 @@ static void runOneGameVerbose(AILevel levelFirst, AILevel levelSecond,
         lastPlay.type = CardType::Invalid;
         lastPlay.cards.clear();
         lastPlay.keyPoint.clear();
-
-        if (checkSpecialVictory(first)) {
-            log << "[" << fn << "] Special523 获胜！\n\n";
-            return;
-        }
-        if (checkSpecialVictory(second)) {
-            log << "[" << sn << "] Special523 获胜！\n\n";
-            return;
-        }
 
         if (!deck.cards.empty()) {
             Player* loser = (lastPlayer == &first) ? &second : &first;
