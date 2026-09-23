@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 if(POLICY CMP0167)
-    cmake_policy(SET CMP0167 OLD)
+    cmake_policy(SET CMP0167 NEW)
 endif()
 project(7gui523 CXX)
 
@@ -33,11 +33,21 @@ file(GLOB_RECURSE DIALOGUE_SOURCES "dialogue/*.cpp")
 file(GLOB_RECURSE SHOP_SOURCES "shop/*.cpp")
 file(GLOB_RECURSE UI_SOURCES "ui/*.cpp")
 
+# ── Object Libraries for faster incremental builds ──
+add_library(core_obj OBJECT ${CORE_SOURCES})
+target_include_directories(core_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_library(game_obj OBJECT ${GAME_SOURCES})
+target_include_directories(game_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_library(ai_obj OBJECT ${AI_SOURCES})
+target_include_directories(ai_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
 if(BUILD_GUI)
     add_executable(game
-        ${CORE_SOURCES}
-        ${GAME_SOURCES}
-        ${AI_SOURCES}
+        $<TARGET_OBJECTS:core_obj>
+        $<TARGET_OBJECTS:game_obj>
+        $<TARGET_OBJECTS:ai_obj>
         ${DATA_SOURCES}
         ${DIALOGUE_SOURCES}
         ${SHOP_SOURCES}
@@ -65,43 +75,37 @@ if(BUILD_GUI)
                 "$<TARGET_FILE_DIR:game>/cards"
         )
     endif()
-
-    if(WIN32 AND Qt6_FOUND)
-        add_custom_command(TARGET game POST_BUILD
-            COMMAND "${Qt6_DIR}/../../../bin/windeployqt.exe" "$<TARGET_FILE:game>"
-        )
-    endif()
 endif()
 
 
 add_executable(ai_battle
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/ai_battle.cpp
 )
 target_include_directories(ai_battle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(data_collector
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/data_collector.cpp
 )
 target_include_directories(data_collector PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(debug_one
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/debug_one_game.cpp
 )
 target_include_directories(debug_one PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(unit_tests
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/test_main.cpp
     tests/test_cardtype.cpp
     tests/test_score.cpp
@@ -109,6 +113,8 @@ add_executable(unit_tests
     tests/test_deck.cpp
     tests/test_player.cpp
     tests/test_search_p0.cpp
+    tests/test_rules_v2.cpp
+    tests/test_fair_ai.cpp
 )
 target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # These tests use assert(), including in Release builds.
@@ -122,73 +128,100 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(genetic_tuner
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/genetic_tuner.cpp
 )
 target_include_directories(genetic_tuner PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(test_sampler
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/test_sampler.cpp
 )
 target_include_directories(test_sampler PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(test_sampler_battle
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/test_sampler_battle.cpp
 )
 target_include_directories(test_sampler_battle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(test_sampler_sweep
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/test_sampler_sweep.cpp
 )
 target_include_directories(test_sampler_sweep PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(test_sampler_topk
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/test_sampler_topk.cpp
 )
 target_include_directories(test_sampler_topk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(test_bayesian
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/test_bayesian.cpp
 )
 target_include_directories(test_bayesian PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(test_bayesian_battle
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/test_bayesian_battle.cpp
 )
 target_include_directories(test_bayesian_battle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(loss_analysis
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/loss_analysis.cpp
 )
 target_include_directories(loss_analysis PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(env_server
-    ${CORE_SOURCES}
-    ${GAME_SOURCES}
-    ${AI_SOURCES}
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
     tests/env_server.cpp
 )
 target_include_directories(env_server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(test_battle_fix $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/test_battle_fix.cpp)
+target_include_directories(test_battle_fix PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(test_diag $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/test_diag.cpp)
+target_include_directories(test_diag PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(test_fidelity $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/test_fidelity.cpp)
+target_include_directories(test_fidelity PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(acceptance $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/acceptance.cpp)
+target_include_directories(acceptance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(fair_benchmark $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/fair_benchmark.cpp)
+target_include_directories(fair_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(all_vs_all $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/all_vs_all.cpp)
+target_include_directories(all_vs_all PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(debug_l6 $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/debug_l6.cpp)
+target_include_directories(debug_l6 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(debug_l6b $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/debug_l6b.cpp)
+target_include_directories(debug_l6b PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(debug_l6d $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/debug_l6d.cpp)
+target_include_directories(debug_l6d PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

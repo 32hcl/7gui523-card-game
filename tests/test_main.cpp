@@ -1,3 +1,4 @@
+void test_fairAI();
 #include <iostream>
 #include <cassert>
 
@@ -14,6 +15,7 @@ void test_removeCardsFromHand();
 void test_sampledWorldConservation();
 void test_searchFinalSettlement();
 void test_searchTerminalUtility();
+void test_rulesV2();
 
 static int g_total = 0;
 static int g_passed = 0;
@@ -69,6 +71,8 @@ int main()
     TEST(sampledWorldConservation);
     TEST(searchFinalSettlement);
     TEST(searchTerminalUtility);
+    TEST(rulesV2);
+    TEST(fairAI);
 
     std::cout << std::endl;
     std::cout << "Result: " << g_passed << " / " << g_total << " passed";

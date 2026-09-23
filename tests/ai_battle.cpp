@@ -10,6 +10,8 @@
 #include <map>
 #include <set>
 
+#include "ai/engine/ai_levels.h"
+#include "ai/engine/ai_engine.h"
 #include "ai/ai.h"
 #include "ai/ai_types.h"
 #include "core/card/deck.h"
@@ -17,6 +19,7 @@
 #include "core/card/cardtype.h"
 #include "core/tracker/cardtracker.h"
 #include "core/rule/score.h"
+#include "core/rule/special.h"
 
 // ── 对战统计 ──────────────────────────────────────────────────
 
@@ -31,14 +34,8 @@ struct BattleStats {
 
 // ── 辅助函数 ──────────────────────────────────────────────────
 
-static std::string levelName(AILevel lv) {
-    switch (lv) {
-        case AILevel::AI1_Simple:  return "AI1";
-        case AILevel::AI2_Rule:    return "AI2";
-        case AILevel::AI3_Tracker: return "AI3";
-        case AILevel::AI4_Expert:  return "AI4";
-    }
-    return "?";
+static std::string levelName(int lv) {
+    return getAILevelName(lv);
 }
 
 static std::string pointName(const std::string& p) {
@@ -127,8 +124,8 @@ static const int NUM_POINTS = 15;
 
 struct FirstMoveRecord {
     int gameIndex;
-    AILevel firstLevel;
-    AILevel secondLevel;
+    int firstLevel;
+    int secondLevel;
     std::vector<Card> hand;
     std::vector<Card> firstCards;
     CardType firstType;
@@ -221,18 +218,29 @@ static int typeIndex(CardType t) {
     }
 }
 
+static std::vector<Card> aiEngineChoosePlay(int level,
+                                             const Player& player,
+                                             const Player& opponent,
+                                             const CardTypeResult& previous,
+                                             const Deck& deck,
+                                             int tableScore,
+                                             CardTracker& tracker) {
+    AIEngineConfig cfg = buildAIEngineConfig(level);
+    AIEngine engine(cfg);
+    engine.setOpponentHand(opponent.hand);
+    return engine.choosePlay(player, opponent, previous, deck, tableScore);
+}
+
 // ── runOneGame 增强版 ──
 
-static void runOneGame(AILevel levelFirst, AILevel levelSecond,
+static void runOneGame(int levelFirst, int levelSecond,
                        std::mt19937& rng, BattleStats& stats,
                        FirstMoveStats& fmStats, int gameIndex) {
     Deck deck = createStandardDeck();
     std::shuffle(deck.cards.begin(), deck.cards.end(), rng);
 
     Player first = createPlayer("P1");
-    first.aiLevel = levelFirst;
     Player second = createPlayer("P2");
-    second.aiLevel = levelSecond;
 
     dealCards(first, deck, 5);
     dealCards(second, deck, 5);
@@ -241,6 +249,18 @@ static void runOneGame(AILevel levelFirst, AILevel levelSecond,
     std::vector<Card> firstHand = first.hand; // snapshot
 
     CardTracker tracker;
+
+    AIEngine engineFirst(buildAIEngineConfig(levelFirst));
+    AIEngine engineSecond(buildAIEngineConfig(levelSecond));
+    engineFirst.setOpponentHand(second.hand);
+    engineSecond.setOpponentHand(first.hand);
+
+    if (checkSpecialVictory(first)) {
+        stats.firstWins++; stats.specialWins++; return;
+    }
+    if (checkSpecialVictory(second)) {
+        stats.secondWins++; stats.specialWins++; return;
+    }
 
     Player* current = &first;
     Player* opponent = &second;
@@ -260,8 +280,12 @@ static void runOneGame(AILevel levelFirst, AILevel levelSecond,
 
         while (true) {
             int tableScore = calculateScore(tableCards);
-            std::vector<Card> play = aiChoosePlay(
-                *current, *opponent, lastPlay, deck, tableScore, tracker);
+            std::vector<Card> play;
+            if (current == &first) {
+                play = engineFirst.choosePlay(*current, *opponent, lastPlay, deck, tableScore);
+            } else {
+                play = engineSecond.choosePlay(*current, *opponent, lastPlay, deck, tableScore);
+            }
 
             if (play.empty()) {
                 if (lastPlay.type == CardType::Invalid) break;
@@ -381,8 +405,7 @@ static void runOneGame(AILevel levelFirst, AILevel levelSecond,
             lastPlay = parsed;
             lastPlayer = current;
 
-            // Special523 由打出牌型检测（Bug 5 修复）
-            if (parsed.type == CardType::Special523) {
+            if (checkSpecialVictory(*current)) {
                 if (current == &first) stats.firstWins++;
                 else stats.secondWins++;
                 stats.specialWins++;
@@ -410,6 +433,13 @@ static void runOneGame(AILevel levelFirst, AILevel levelSecond,
         lastPlay.type = CardType::Invalid;
         lastPlay.cards.clear();
         lastPlay.keyPoint.clear();
+
+        if (checkSpecialVictory(first)) {
+            stats.firstWins++; stats.specialWins++; return;
+        }
+        if (checkSpecialVictory(second)) {
+            stats.secondWins++; stats.specialWins++; return;
+        }
 
         if (!deck.cards.empty()) {
             Player* loser = (lastPlayer == &first) ? &second : &first;
@@ -670,30 +700,42 @@ static std::string handToString(const std::vector<Card>& hand) {
     return r;
 }
 
-static AILevel parseAILevel(const std::string& s) {
-    std::string u = s;
-    std::transform(u.begin(), u.end(), u.begin(), ::toupper);
-    if (u == "AI1") return AILevel::AI1_Simple;
-    if (u == "AI2") return AILevel::AI2_Rule;
-    if (u == "AI3") return AILevel::AI3_Tracker;
-    if (u == "AI4") return AILevel::AI4_Expert;
-    return AILevel::AI1_Simple;
+static int parseAILevel(const std::string& s) {
+    if (s == "AI1" || s == "ai1" || s == "1") return 1;
+    if (s == "AI2" || s == "ai2" || s == "2") return 2;
+    if (s == "AI3" || s == "ai3" || s == "3") return 3;
+    if (s == "AI4" || s == "ai4" || s == "4") return 4;
+    if (s == "AI5" || s == "ai5" || s == "5") return 5;
+    if (s == "AI6" || s == "ai6" || s == "6") return 6;
+    if (s == "AI7" || s == "ai7" || s == "7") return 7;
+    if (s == "AI8" || s == "ai8" || s == "8") return 8;
+    if (s == "AI9" || s == "ai9" || s == "9") return 9;
+    if (s == "AI10" || s == "ai10" || s == "10") return 10;
+    if (s == "AI11" || s == "ai11" || s == "11") return 11;
+    if (s == "AI12" || s == "ai12" || s == "12") return 12;
+    if (s == "AI13" || s == "ai13" || s == "13") return 13;
+    if (s == "AI14" || s == "ai14" || s == "14") return 14;
+    if (s == "AI15" || s == "ai15" || s == "15") return 15;
+    return 1;
 }
 
-static void runOneGameVerbose(AILevel levelFirst, AILevel levelSecond,
+static void runOneGameVerbose(int levelFirst, int levelSecond,
                               std::mt19937& rng, std::ostream& log, int gameIndex) {
     Deck deck = createStandardDeck();
     std::shuffle(deck.cards.begin(), deck.cards.end(), rng);
 
     Player first = createPlayer("P1");
-    first.aiLevel = levelFirst;
     Player second = createPlayer("P2");
-    second.aiLevel = levelSecond;
 
     dealCards(first, deck, 5);
     dealCards(second, deck, 5);
 
     CardTracker tracker;
+
+    AIEngine engineFirst(buildAIEngineConfig(levelFirst));
+    AIEngine engineSecond(buildAIEngineConfig(levelSecond));
+    engineFirst.setOpponentHand(second.hand);
+    engineSecond.setOpponentHand(first.hand);
 
     std::string fn = levelName(levelFirst);
     std::string sn = levelName(levelSecond);
@@ -708,6 +750,15 @@ static void runOneGameVerbose(AILevel levelFirst, AILevel levelSecond,
     log << "  " << sn << ": " << handToString(second.hand) << "\n";
     log << "牌堆: " << deck.cards.size() << "\n";
     log << "========================================\n\n";
+
+    if (checkSpecialVictory(first)) {
+        log << "[" << fn << "] 天胡 Special523 获胜！\n\n";
+        return;
+    }
+    if (checkSpecialVictory(second)) {
+        log << "[" << sn << "] 天胡 Special523 获胜！\n\n";
+        return;
+    }
 
     // ── 游戏循环 ──
     Player* current = &first;
@@ -734,8 +785,12 @@ static void runOneGameVerbose(AILevel levelFirst, AILevel levelSecond,
 
         while (true) {
             int tableScore = calculateScore(tableCards);
-            std::vector<Card> play = aiChoosePlay(
-                *current, *opponent, lastPlay, deck, tableScore, tracker);
+            std::vector<Card> play;
+            if (current == &first) {
+                play = engineFirst.choosePlay(*current, *opponent, lastPlay, deck, tableScore);
+            } else {
+                play = engineSecond.choosePlay(*current, *opponent, lastPlay, deck, tableScore);
+            }
 
             if (play.empty()) {
                 if (lastPlay.type == CardType::Invalid) break;
@@ -809,8 +864,8 @@ static void runOneGameVerbose(AILevel levelFirst, AILevel levelSecond,
             lastPlay = parsed;
             lastPlayer = current;
 
-            // Special523 由打出牌型检测（Bug 5 修复）
-            if (parsed.type == CardType::Special523) {
+            // Special523 检查
+            if (checkSpecialVictory(*current)) {
                 log << "[" << pn << "] Special523 获胜！\n\n";
                 return;
             }
@@ -840,6 +895,15 @@ static void runOneGameVerbose(AILevel levelFirst, AILevel levelSecond,
         lastPlay.cards.clear();
         lastPlay.keyPoint.clear();
 
+        if (checkSpecialVictory(first)) {
+            log << "[" << fn << "] Special523 获胜！\n\n";
+            return;
+        }
+        if (checkSpecialVictory(second)) {
+            log << "[" << sn << "] Special523 获胜！\n\n";
+            return;
+        }
+
         if (!deck.cards.empty()) {
             Player* loser = (lastPlayer == &first) ? &second : &first;
             refillToFive(*lastPlayer, deck);
@@ -867,9 +931,9 @@ int main(int argc, char* argv[]) {
     bool verbose = false;
     int gamesPerCombo = 100;
     int verboseGames = 20;
-    int fixedSeed = 0;
-    AILevel firstAI = AILevel::AI4_Expert;
-    AILevel secondAI = AILevel::AI3_Tracker;
+    int firstAI = 7;
+    int secondAI = 6;
+    int maxLevel = 4;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -877,22 +941,25 @@ int main(int argc, char* argv[]) {
             verbose = true;
         } else if (arg == "--games" || arg == "-g") {
             if (i + 1 < argc) verboseGames = std::atoi(argv[++i]);
-        } else if (arg == "--seed" || arg == "-s") {
-            if (i + 1 < argc) fixedSeed = std::atoi(argv[++i]);
         } else if (arg == "--first" || arg == "-1") {
             if (i + 1 < argc) firstAI = parseAILevel(argv[++i]);
         } else if (arg == "--second" || arg == "-2") {
             if (i + 1 < argc) secondAI = parseAILevel(argv[++i]);
+        } else if (arg == "--max-level" || arg == "-m") {
+            if (i + 1 < argc) maxLevel = std::atoi(argv[++i]);
         } else if (arg[0] != '-') {
             // 老模式：第一个数字参数 = gamesPerCombo
             gamesPerCombo = std::atoi(argv[i]);
         }
     }
 
-    std::mt19937 rng(fixedSeed != 0 ? fixedSeed : std::random_device{}());
+    maxLevel = std::max(1, std::min(15, maxLevel));
 
     // ── 风骚日志模式 ──
     if (verbose) {
+        std::random_device rd;
+        std::mt19937 rng(rd());
+
         std::string fn = levelName(firstAI);
         std::string sn = levelName(secondAI);
 
@@ -917,14 +984,14 @@ int main(int argc, char* argv[]) {
     }
 
     // ── 批量对战模式 ──
-    std::vector<AILevel> levels = {
-        AILevel::AI1_Simple,
-        AILevel::AI2_Rule,
-        AILevel::AI3_Tracker,
-        AILevel::AI4_Expert
-    };
+    std::vector<int> levels;
+    for (int i = 1; i <= maxLevel; ++i) levels.push_back(i);
 
-    int totalGames = 16 * gamesPerCombo;
+    std::random_device rd;
+    std::mt19937 rng(rd());
+
+    int numLevels = (int)levels.size();
+    int totalGames = numLevels * numLevels * gamesPerCombo;
 
     // 同时输出到屏幕和文件
     std::ofstream ofs("battle_result.txt");
@@ -936,28 +1003,30 @@ int main(int argc, char* argv[]) {
     {
         std::ostringstream oss;
         oss << "========================================\n"
-            << "四档 AI 全组合对战测试 + 先手首张观测\n"
-            << "16 种组合，每种 " << gamesPerCombo << " 局\n"
+            << numLevels << " 档 AI 全组合对战测试 + 先手首张观测\n"
+            << numLevels * numLevels << " 种组合，每种 " << gamesPerCombo << " 局\n"
             << "总计 " << totalGames << " 局\n"
             << "========================================\n\n";
         output(oss.str());
     }
 
     // battle stats
-    BattleStats allStats[4][4];
+    std::vector<std::vector<BattleStats>> allStats(numLevels, std::vector<BattleStats>(numLevels));
     // first move stats, indexed by first player AI level
-    FirstMoveStats fmStats[4];
+    std::vector<FirstMoveStats> fmStats(numLevels);
 
     int combo = 0;
-    for (AILevel lf : levels) {
-        for (AILevel ls : levels) {
-            int fi = (int)lf;
+    int totalCombos = numLevels * numLevels;
+    for (int li = 0; li < numLevels; ++li) {
+        for (int lj = 0; lj < numLevels; ++lj) {
+            int lf = levels[li];
+            int ls = levels[lj];
             BattleStats s;
             for (int i = 0; i < gamesPerCombo; ++i) {
                 int gameIndex = combo * gamesPerCombo + i;
-                runOneGame(lf, ls, rng, s, fmStats[fi], gameIndex);
+                runOneGame(lf, ls, rng, s, fmStats[li], gameIndex);
             }
-            allStats[fi][(int)ls] = s;
+            allStats[li][lj] = s;
 
             double wr   = (double)s.firstWins / gamesPerCombo;
             double avg1 = (double)s.firstScoreSum / gamesPerCombo;
@@ -975,9 +1044,9 @@ int main(int argc, char* argv[]) {
                 << std::setw(12) << std::fixed << std::setprecision(1) << avg2
                 << "\n";
             output(oss.str());
-            std::cerr << "[" << combo+1 << "/16] " << levelName(lf)
+            std::cerr << "[" << combo+1 << "/" << totalCombos << "] " << levelName(lf)
                       << " vs " << levelName(ls) << " 完成 ("
-                      << fmStats[fi].totalGames << " 局记录)\n";
+                      << fmStats[li].totalGames << " 局记录)\n";
             combo++;
         }
     }
@@ -987,7 +1056,10 @@ int main(int argc, char* argv[]) {
     // 打印详细观测
     std::ostringstream detail;
     try {
-        printAllStats(fmStats, detail);
+        // 转换为数组格式以兼容 printAllStats
+        std::vector<FirstMoveStats> fmArray(numLevels);
+        for (int i = 0; i < numLevels; ++i) fmArray[i] = fmStats[i];
+        printAllStats(fmArray.data(), detail);
     } catch (const std::exception& e) {
         std::cerr << "\n!!! printAllStats 崩溃: " << e.what() << "\n";
         detail << "\n[printAllStats 崩溃: " << e.what() << "]\n";

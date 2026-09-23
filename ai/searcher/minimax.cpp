@@ -3,19 +3,9 @@
 #include "search_state.h"
 #include "core/card/cardtype.h"
 #include "core/rule/score.h"
-
+#include "core/rule/special.h"
 #include <algorithm>
 #include <climits>
-
-// ── 辅助：手牌补到 5 张 ──
-static void refillToFiveLocal(std::vector<Card>& hand, std::vector<Card>& deck) {
-    int need = 5 - (int)hand.size();
-    while (need > 0 && !deck.empty()) {
-        hand.push_back(deck.back());
-        deck.pop_back();
-        need--;
-    }
-}
 
 // ── 1. 枚举所有合法走法 ──
 std::vector<std::vector<Card>> genLegalMoves(const SearchState& state) {
@@ -60,96 +50,7 @@ std::vector<std::vector<Card>> genLegalMoves(const SearchState& state) {
 
 // ── 2. 执行走法，返回新状态 ──
 SearchState applyMove(const SearchState& state, const std::vector<Card>& move) {
-    SearchState ns = state;
-    auto& hand = ns.myTurn ? ns.myHand : ns.oppHand;
-
-    if (move.empty()) {
-        // ── pass：对方赢得本回合 ──
-        bool roundWinnerIsMe = !ns.myTurn;
-        int roundScore = ns.tableScore;
-
-        if (roundWinnerIsMe) {
-            ns.myScore += roundScore;
-        } else {
-            ns.oppScore += roundScore;
-        }
-
-        // 胜者先补牌（Bug 4 修复：原代码始终先补我方）
-        if (roundWinnerIsMe) {
-            refillToFiveLocal(ns.myHand, ns.deckCards);
-            refillToFiveLocal(ns.oppHand, ns.deckCards);
-        } else {
-            refillToFiveLocal(ns.oppHand, ns.deckCards);
-            refillToFiveLocal(ns.myHand, ns.deckCards);
-        }
-        // Bug 5 修复：不再检查补牌后手牌中的 Special523
-        // Special523 必须打出才生效，仅持有不算胜利
-
-        // 重置回合状态
-        ns.lastPlay.type = CardType::Invalid;
-        ns.lastPlay.cards.clear();
-        ns.lastPlay.keyPoint.clear();
-        ns.tableScore = 0;
-
-        // 赢家先手
-        ns.myTurn = roundWinnerIsMe;
-
-        // 检查是否已无牌可打（双方空手、牌堆空）
-        if (ns.myHand.empty() && ns.oppHand.empty() && ns.deckCards.empty()) {
-            ns.terminal = true;
-            if (ns.myScore > ns.oppScore) ns.winner = 1;
-            else if (ns.oppScore > ns.myScore) ns.winner = -1;
-            else ns.winner = 0;
-        }
-
-        return ns;
-    }
-
-    // ── 出牌 ──
-    for (const Card& c : move) {
-        auto it = std::find_if(hand.begin(), hand.end(),
-            [&](const Card& h) { return h.point == c.point && h.suit == c.suit; });
-        if (it != hand.end()) {
-            hand.erase(it);
-        }
-    }
-
-    // 更新桌面分
-    ns.tableScore += calculateScore(move);
-
-    // 更新 lastPlay
-    ns.lastPlay = parseCardType(move);
-
-    // 压分奖励（Bug 6 修复：同牌型+同keyPoint时额外得分）
-    ns.tableScore += calculatePressureBonus(ns.lastPlay, state.lastPlay);
-
-    // 手牌空 + 牌堆空 → 立即终局
-    if (hand.empty() && ns.deckCards.empty()
-        && ns.lastPlay.type != CardType::Special523) {
-        auto& opponentHand = ns.myTurn ? ns.oppHand : ns.myHand;
-        const int finalScore = ns.tableScore + calculateScore(opponentHand);
-        if (ns.myTurn) ns.myScore += finalScore;
-        else ns.oppScore += finalScore;
-        opponentHand.clear();
-        ns.tableScore = 0;
-        ns.terminal = true;
-        ns.winner = (ns.myScore > ns.oppScore) ? 1
-                  : (ns.myScore < ns.oppScore) ? -1 : 0;
-        return ns;
-    }
-    // 打出 Special523 → 立即终局
-    if (ns.lastPlay.type == CardType::Special523) {
-        ns.terminal = true;
-        ns.winner = state.myTurn ? 1 : -1;
-        return ns;
-    }
-
-    // 手牌空但牌堆还有牌：换对方出
-    // hand empty + !deck.empty = 继续
-
-    // 换对方出
-    ns.myTurn = !ns.myTurn;
-    return ns;
+    return advancePosition(state, move);
 }
 
 // ── 3. 叶节点估值 ──
@@ -161,7 +62,7 @@ static int evaluateLeaf(const SearchState& state, const SearchParams& p) {
 
     if (state.lastPlay.type != CardType::Invalid) {
         int dir = state.myTurn ? -1 : 1;
-        score += state.tableScore * dir * p.tableScoreWeight;
+        score += (state.tableScore + state.tableBonus) * dir * p.tableScoreWeight;
     }
 
     int myHandValue = 0, oppHandValue = 0;
@@ -235,6 +136,7 @@ std::vector<Card> searchBestPlayCheat(
     state.myHand = me.hand;
     state.oppHand = opp.hand;
     state.deckCards = deck.cards;
+    state.finalPhase = deck.cards.empty();
     state.lastPlay = previous;
     state.myTurn = true;
     state.tableScore = tableScore;

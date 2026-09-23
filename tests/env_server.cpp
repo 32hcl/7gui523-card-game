@@ -6,6 +6,10 @@
 #include "core/rule/special.h"
 #include "game/game.h"
 #include "ai/ai.h"
+#include "ai/fair_engine.h"
+#include "ai/fair_common.h"
+#include "ai/searcher/minimax.h"
+#include <climits>
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -30,7 +34,8 @@ static void printJson(const std::string& json) {
     fflush(stdout);
 }
 
-static std::mt19937 g_rng(std::random_device{}());
+static std::mt19937 g_rng(714025);
+static unsigned g_seed=714025,g_game=0;
 
 static const char* g_opponentLevelStr = "AI1";
 
@@ -100,6 +105,8 @@ static std::string jsonArray(const std::vector<std::string>& items) {
 
 struct EnvState {
     Player me, opp;
+    Observation fairObs[2];
+    FairEngine engines[2];
     Deck deck;
     std::vector<Card> tableCards;
     int tableBonus = 0;
@@ -107,6 +114,8 @@ struct EnvState {
     Player* lastPlayer = nullptr;
     int roundCount = 0;
     bool gameOver = false;
+    bool myTurn=true,finalPhase=false;
+    int firstEmpty=0;
     std::string winner;  // "me", "opp", "draw"
     int myFinalScore = 0, oppFinalScore = 0;
     CardTracker tracker;
@@ -287,7 +296,9 @@ static EnvState cloneEnv(const EnvState& src) {
     dst.lastPlay = src.lastPlay;
     dst.lastPlayer = (src.lastPlayer == &src.me) ? &dst.me :
                      (src.lastPlayer == &src.opp) ? &dst.opp : nullptr;
+    for(int i=0;i<2;++i){dst.fairObs[i]=src.fairObs[i];dst.engines[i]=src.engines[i];}
     dst.roundCount = src.roundCount;
+    dst.myTurn=src.myTurn;dst.finalPhase=src.finalPhase;dst.firstEmpty=src.firstEmpty;
     dst.gameOver = src.gameOver;
     dst.winner = src.winner;
     dst.myFinalScore = src.myFinalScore;
@@ -321,6 +332,8 @@ static std::string buildObservation(const EnvState& env) {
     oss << "\"my_score\": " << env.me.totalScore << ", ";
     oss << "\"opp_score\": " << env.opp.totalScore << ", ";
     oss << "\"deck_remaining\": " << env.deck.cards.size() << ", ";
+    oss << "\"final_phase\":" << (env.finalPhase?"true":"false") << ",\"played_counts\":[";
+    for(int i=0;i<15;++i){if(i)oss<<",";oss<<env.playedPointCount[i];}oss<<"],";
 
     if (env.lastPlay.type != CardType::Invalid) {
         oss << "\"last_play\": {";
@@ -404,157 +417,46 @@ static std::vector<Card> envParseAction(const std::string& actionStr, const Play
     return cards;
 }
 
+static SearchState positionOf(const EnvState& env) {
+ SearchState s;s.myHand=env.me.hand;s.oppHand=env.opp.hand;s.deckCards=env.deck.cards;
+ s.myScore=env.me.totalScore;s.oppScore=env.opp.totalScore;s.tableScore=calculateScore(env.tableCards);s.tableBonus=env.tableBonus;
+ s.lastPlay=env.lastPlay;s.myTurn=env.myTurn;s.finalPhase=env.finalPhase;s.firstEmpty=env.firstEmpty;s.terminal=env.gameOver;return s;
+}
+static void applyEnvAction(EnvState& env,const std::vector<Card>& action) {
+ auto previous=positionOf(env);auto n=applyMove(previous,action);
+ for(int side=0;side<2;++side){auto& obs=env.fairObs[side];bool mine=side==0;auto before=mine?previous.myHand:previous.oppHand;const auto& after=mine?n.myHand:n.oppHand;
+  PublicEvent event;event.actorMe=previous.myTurn==mine;event.cards=fair::canonical(action);event.myCount=static_cast<int>(after.size());event.opponentCount=static_cast<int>((mine?n.oppHand:n.myHand).size());event.deckCount=static_cast<int>(n.deckCards.size());
+  if(event.actorMe)for(const auto& c:action){auto it=std::find_if(before.begin(),before.end(),[&](const Card& h){return h.point==c.point&&h.suit==c.suit;});if(it!=before.end())before.erase(it);}
+  for(const auto& c:after){auto it=std::find_if(before.begin(),before.end(),[&](const Card& h){return h.point==c.point&&h.suit==c.suit;});if(it==before.end())event.myDraws.push_back(fair::card(fair::index(c.point)));else before.erase(it);}
+  obs.history.push_back(event);for(const auto& c:action)++obs.played[fair::index(c.point)];obs.hand=after;obs.opponentCount=event.opponentCount;obs.deckCount=event.deckCount;obs.myScore=mine?n.myScore:n.oppScore;obs.opponentScore=mine?n.oppScore:n.myScore;obs.tableScore=n.tableScore;obs.tableBonus=n.tableBonus;obs.previous=n.lastPlay;obs.finalPhase=n.finalPhase;obs.firstEmpty=mine?n.firstEmpty:-n.firstEmpty;
+ }
+ env.me.hand=n.myHand;env.opp.hand=n.oppHand;env.deck.cards=n.deckCards;
+ env.me.totalScore=n.myScore;env.opp.totalScore=n.oppScore;env.tableBonus=n.tableBonus;
+ if(action.empty()||n.terminal)env.tableCards.clear();else env.tableCards.insert(env.tableCards.end(),action.begin(),action.end());
+ env.lastPlayer=nullptr;env.lastPlay=n.lastPlay;env.myTurn=n.myTurn;env.finalPhase=n.finalPhase;env.firstEmpty=n.firstEmpty;
+ env.tracker.recordPlayed(action);incPlayedCounts(env,action);if(action.empty())++env.roundCount;
+ env.gameOver=n.terminal;if(n.terminal)env.winner=n.winner==1?"me":n.winner==-1?"opp":"draw";
+ env.myFinalScore=n.myScore;env.oppFinalScore=n.oppScore;
+}
+static std::vector<Card> envMove(EnvState& env,const std::string& level) {
+ if(level=="Fair1"||level=="Fair2"){int side=env.myTurn?0:1;return env.engines[side].choosePlay(env.fairObs[side],level=="Fair1"?1:2);}
+ auto s=positionOf(env);
+ if(!s.myTurn){std::swap(s.myHand,s.oppHand);std::swap(s.myScore,s.oppScore);s.myTurn=true;s.firstEmpty=-s.firstEmpty;}
+ auto legal=genLegalMoves(s);
+ if(level=="Random")return legal[std::uniform_int_distribution<size_t>(0,legal.size()-1)(g_rng)];
+ if(level=="AI4") {int best=INT_MIN+1;std::vector<Card> result;for(const auto& a:legal){auto child=applyMove(s,a);int v=minimax(child,5,INT_MIN+1,INT_MAX-1,false,SearchParams{});if(v>best){best=v;result=a;}}return result;}
+ Player me=createPlayer("actor"),opp=createPlayer("opponent");me.hand=s.myHand;opp.hand=s.oppHand;me.totalScore=s.myScore;opp.totalScore=s.oppScore;me.aiLevel=parseAILevel(level.c_str());Deck d;d.cards=s.deckCards;
+ return aiChoosePlay(me,opp,s.lastPlay,d,s.tableScore+s.tableBonus,env.tracker);
+}
 static void envReset(EnvState& env) {
-    env.deck = createStandardDeck();
-    std::shuffle(env.deck.cards.begin(), env.deck.cards.end(), g_rng);
-
-    env.me = createPlayer("me");
-    env.opp = createPlayer("opp");
-    env.opp.aiLevel = parseAILevel(g_opponentLevelStr);
-
-    dealCards(env.me, env.deck, 5);
-    dealCards(env.opp, env.deck, 5);
-
-    env.tableCards.clear();
-    env.tableBonus = 0;
-    env.lastPlay = CardTypeResult{};
-    env.lastPlayer = nullptr;
-    env.roundCount = 0;
-    env.gameOver = false;
-    env.winner.clear();
-    env.myFinalScore = 0;
-    env.oppFinalScore = 0;
-    env.tracker.reset();
-    for (int i = 0; i < 15; ++i) env.playedPointCount[i] = 0;
+ env=EnvState{};env.me=createPlayer("me");env.opp=createPlayer("opp");env.opp.aiLevel=parseAILevel(g_opponentLevelStr);
+ env.deck=createStandardDeck();g_rng.seed(g_seed+g_game/2);std::shuffle(env.deck.cards.begin(),env.deck.cards.end(),g_rng);
+ bool first=(g_game++%2)==0;dealCards(first?env.me:env.opp,env.deck,5);dealCards(first?env.opp:env.me,env.deck,5);env.myTurn=first;
+ for(int side=0;side<2;++side){auto& obs=env.fairObs[side];obs.hand=side==0?env.me.hand:env.opp.hand;obs.initialHand=obs.hand;obs.initialMyTurn=(side==0)==first;}
 }
 
 static void runOpponentUntilMyTurn(EnvState& env) {
-    while (!env.gameOver) {
-        int tableScore = calculateTableScore(env.tableCards, env.tableBonus);
-
-        // ---- opponent chooses a play ----
-        std::vector<Card> oppPlay;
-        fprintf(stderr, "[DEBUG] opp.aiLevel = %d\n", (int)env.opp.aiLevel);
-        if (env.opp.isHuman) {
-            oppPlay = humanChoosePlay(env.opp, env.lastPlay);
-        } else if (std::strcmp(g_opponentLevelStr, "Random") == 0) {
-            // random play: pick uniformly from legal plays
-            auto allPlays = enumerateLegalPlays(env.opp);
-            std::vector<std::vector<Card>> valid;
-            for (auto& play : allPlays) {
-                auto parsed = safeParseCardType(play);
-                if (parsed.type == CardType::Invalid) continue;
-                if (!env.lastPlay.cards.empty() && !canBeat(parsed, env.lastPlay)) continue;
-                valid.push_back(play);
-            }
-            if (valid.empty()) {
-                if (env.lastPlay.cards.empty()) {
-                    // first to play, force-play first card
-                    oppPlay = {env.opp.hand[0]};
-                } else {
-                    oppPlay = {}; // pass
-                }
-            } else {
-                std::uniform_int_distribution<size_t> dist(0, valid.size() - 1);
-                oppPlay = valid[dist(g_rng)];
-            }
-        } else {
-            oppPlay = aiChoosePlay(env.opp, env.me, env.lastPlay,
-                                   env.deck, tableScore, env.tracker);
-        }
-
-        if (oppPlay.empty()) {
-            if (env.lastPlay.cards.empty()) {
-                // first move, AI returned empty → force play first card
-                if (env.opp.hand.empty()) {
-                    env.gameOver = true;
-                    env.winner = "me";
-                    finalSettlement(env.me, env.opp, env.tableCards);
-                    return;
-                }
-                oppPlay = {env.opp.hand[0]};
-            } else {
-                // opp passes, I (me) win this round
-                settleScoreCards(env.me, env.tableCards);
-                env.me.totalScore += env.tableBonus;
-                env.tableCards.clear();
-                env.tableBonus = 0;
-                env.lastPlay = CardTypeResult{};
-                env.lastPlayer = nullptr;
-                env.roundCount++;
-
-                refillToFive(env.me, env.deck);
-                refillToFive(env.opp, env.deck);
-
-                if (checkSpecialVictory(env.me)) {
-                    env.gameOver = true; env.winner = "me"; return;
-                }
-                if (checkSpecialVictory(env.opp)) {
-                    env.gameOver = true; env.winner = "opp"; return;
-                }
-                if (env.me.hand.empty() && env.opp.hand.empty() && env.deck.cards.empty()) {
-                    env.gameOver = true;
-                    if (env.me.totalScore > env.opp.totalScore) env.winner = "me";
-                    else if (env.opp.totalScore > env.me.totalScore) env.winner = "opp";
-                    else env.winner = "draw";
-                    return;
-                }
-                // I start new round → return to agent
-                return;
-            }
-        }
-
-        CardTypeResult oppParsed = safeParseCardType(oppPlay);
-        if (oppParsed.type == CardType::Invalid) continue;
-        if (!env.lastPlay.cards.empty() && !canBeat(oppParsed, env.lastPlay)) continue;
-
-        if (oppParsed.type == CardType::Special523) {
-            settleScoreCards(env.opp, env.tableCards);
-            env.opp.totalScore += env.tableBonus;
-            env.tableCards.clear();
-            env.tableBonus = 0;
-            env.gameOver = true;
-            env.winner = "opp";
-            finalSettlement(env.opp, env.me, env.tableCards);
-            return;
-        }
-
-        int bonus = calculatePressureBonus(oppParsed, env.lastPlay);
-        env.tableBonus += bonus;
-        removeCardsFromHand(env.opp, oppPlay);
-        env.tableCards.insert(env.tableCards.end(), oppPlay.begin(), oppPlay.end());
-        env.tracker.recordPlayed(oppPlay);
-        incPlayedCounts(env, oppPlay);
-        env.lastPlay = oppParsed;
-        env.lastPlayer = &env.opp;
-
-        if (env.opp.hand.empty()) {
-            if (env.deck.cards.empty()) {
-                env.gameOver = true;
-                finalSettlement(env.opp, env.me, env.tableCards);
-                if (env.me.totalScore > env.opp.totalScore) env.winner = "me";
-                else if (env.opp.totalScore > env.me.totalScore) env.winner = "opp";
-                else env.winner = "draw";
-                return;
-            }
-            // opp emptied hand → opp wins round, starts next
-            settleScoreCards(env.opp, env.tableCards);
-            env.opp.totalScore += env.tableBonus;
-            env.tableCards.clear();
-            env.tableBonus = 0;
-            env.lastPlay = CardTypeResult{};
-            env.lastPlayer = nullptr;
-            env.roundCount++;
-            refillToFive(env.me, env.deck);
-            refillToFive(env.opp, env.deck);
-            if (checkSpecialVictory(env.me))      { env.gameOver = true; env.winner = "me"; return; }
-            if (checkSpecialVictory(env.opp))     { env.gameOver = true; env.winner = "opp"; return; }
-            continue;  // opp starts new round
-        }
-
-        // opp played, still has cards → my turn
-        return;
-    }
+ while(!env.gameOver&&!env.myTurn)applyEnvAction(env,envMove(env,g_opponentLevelStr));
 }
 
 static bool isPassAction(const std::string& actionStr) {
@@ -566,137 +468,16 @@ static bool isPassAction(const std::string& actionStr) {
     return false;
 }
 
-static void handleStep(EnvState& env, const std::string& actionStr) {
-    ScopedCoutSuppress suppress;
-    if (env.gameOver) {
-        printJson("{\"status\": \"error\", \"message\": \"game already over\"}");
-        return;
-    }
-
-    bool isPass = isPassAction(actionStr);
-    std::string error;
-    std::vector<Card> cards;
-    CardTypeResult parsed;
-
-    if (!isPass) {
-        cards = envParseAction(actionStr, env.me, error);
-        if (cards.empty() || !error.empty()) {
-            std::ostringstream oss;
-            oss << "{\"status\": \"error\", \"message\": \""
-                << jsonEscape(error.empty() ? "invalid action" : error) << "\"}";
-            printJson(oss.str());
-            return;
-        }
-        parsed = safeParseCardType(cards);
-        if (parsed.type == CardType::Invalid) {
-            printJson("{\"status\": \"error\", \"message\": \"invalid card combination\"}");
-            return;
-        }
-        if (!env.lastPlay.cards.empty() && !canBeat(parsed, env.lastPlay)) {
-            printJson("{\"status\": \"error\", \"message\": \"cannot beat last play\"}");
-            return;
-        }
-    }
-
-    // ── execute the action ──
-    if (isPass) {
-        if (env.lastPlay.cards.empty()) {
-            printJson("{\"status\": \"error\", \"message\": \"cannot pass as first player\"}");
-            return;
-        }
-        if (env.lastPlayer) {
-            settleScoreCards(*env.lastPlayer, env.tableCards);
-            env.lastPlayer->totalScore += env.tableBonus;
-        }
-        env.tableCards.clear();
-        env.tableBonus = 0;
-        env.lastPlay = CardTypeResult{};
-        env.lastPlayer = nullptr;
-        env.roundCount++;
-
-        refillToFive(env.me, env.deck);
-        refillToFive(env.opp, env.deck);
-
-        if (checkSpecialVictory(env.me))      { env.gameOver = true; env.winner = "me"; }
-        else if (checkSpecialVictory(env.opp)) { env.gameOver = true; env.winner = "opp"; }
-        else if (env.me.hand.empty() && env.opp.hand.empty() && env.deck.cards.empty()) {
-            env.gameOver = true;
-            if (env.me.totalScore > env.opp.totalScore) env.winner = "me";
-            else if (env.opp.totalScore > env.me.totalScore) env.winner = "opp";
-            else env.winner = "draw";
-        }
-
-    } else if (parsed.type == CardType::Special523) {
-        settleScoreCards(env.me, env.tableCards);
-        env.me.totalScore += env.tableBonus;
-        env.tableCards.clear();
-        env.tableBonus = 0;
-        env.gameOver = true;
-        env.winner = "me";
-        finalSettlement(env.me, env.opp, env.tableCards);
-
-    } else {
-        int bonus = calculatePressureBonus(parsed, env.lastPlay);
-        env.tableBonus += bonus;
-
-        removeCardsFromHand(env.me, cards);
-        env.tableCards.insert(env.tableCards.end(), cards.begin(), cards.end());
-        env.tracker.recordPlayed(cards);
-        incPlayedCounts(env, cards);
-        env.lastPlay = parsed;
-        env.lastPlayer = &env.me;
-
-        if (env.me.hand.empty()) {
-            if (env.deck.cards.empty()) {
-                env.gameOver = true;
-                finalSettlement(env.me, env.opp, env.tableCards);
-                if (env.me.totalScore > env.opp.totalScore) env.winner = "me";
-                else if (env.opp.totalScore > env.me.totalScore) env.winner = "opp";
-                else env.winner = "draw";
-            } else {
-                settleScoreCards(env.me, env.tableCards);
-                env.me.totalScore += env.tableBonus;
-                env.tableCards.clear();
-                env.tableBonus = 0;
-                env.lastPlay = CardTypeResult{};
-                env.lastPlayer = nullptr;
-                env.roundCount++;
-
-                refillToFive(env.me, env.deck);
-                refillToFive(env.opp, env.deck);
-
-                if (checkSpecialVictory(env.me))      { env.gameOver = true; env.winner = "me"; }
-                else if (checkSpecialVictory(env.opp)) { env.gameOver = true; env.winner = "opp"; }
-            }
-        }
-    }
-
-    // ── after my action: run opponent if game continues ──
-    if (!env.gameOver) {
-        runOpponentUntilMyTurn(env);
-    }
-
-    env.myFinalScore = env.me.totalScore;
-    env.oppFinalScore = env.opp.totalScore;
-
-    // ── build response ──
-    std::ostringstream oss;
-    oss << "{\"status\": \"ok\", "
-        << "\"observation\": " << buildObservation(env) << ", ";
-    if (env.gameOver) {
-        int reward = 0;
-        if (env.winner == "me")       reward = 1;
-        else if (env.winner == "opp") reward = -1;
-        oss << "\"reward\": " << reward << ", "
-            << "\"done\": true, "
-            << "\"winner\": \"" << jsonEscape(env.winner) << "\", "
-            << "\"my_final_score\": " << env.myFinalScore << ", "
-            << "\"opp_final_score\": " << env.oppFinalScore;
-    } else {
-        oss << "\"reward\": 0, \"done\": false";
-    }
-    oss << "}";
-    printJson(oss.str());
+static void handleStep(EnvState& env,const std::string& actionStr) {
+ ScopedCoutSuppress suppress;
+ if(env.gameOver){printJson("{\"status\":\"error\",\"message\":\"game already over\"}");return;}
+ try {
+  std::string error;auto cards=isPassAction(actionStr)?std::vector<Card>{}:envParseAction(actionStr,env.me,error);
+  if(!error.empty())throw std::invalid_argument(error);
+  applyEnvAction(env,cards);runOpponentUntilMyTurn(env);
+  int reward=env.winner=="me"?1:env.winner=="opp"?-1:0;
+  std::ostringstream out;out<<"{\"status\":\"ok\",\"observation\":"<<buildObservation(env)<<",\"reward\":"<<reward<<",\"done\":"<<(env.gameOver?"true":"false")<<",\"winner\":\""<<env.winner<<"\",\"my_final_score\":"<<env.myFinalScore<<",\"opp_final_score\":"<<env.oppFinalScore<<"}";printJson(out.str());
+ }catch(const std::exception& e){printJson("{\"status\":\"error\",\"message\":\""+jsonEscape(e.what())+"\"}");}
 }
 
 static void handleReset(EnvState& env) {
@@ -772,234 +553,20 @@ static void handleStateVec(const EnvState& env) {
 }
 
 static void handlePeek(const EnvState& env) {
-    if (env.gameOver) {
-        printJson("{\"status\": \"error\", \"message\": \"game already over\"}");
-        return;
-    }
-
-    auto allPlays = enumerateLegalPlays(env.me);
-    std::vector<std::string> actionJsons;
-    std::vector<std::vector<float>> nextStates;
-
-    for (const auto& play : allPlays) {
-        auto parsed = safeParseCardType(play);
-        if (parsed.type == CardType::Invalid) continue;
-        if (!env.lastPlay.cards.empty() && !canBeat(parsed, env.lastPlay)) continue;
-
-        std::vector<std::string> cardStrs;
-        for (const auto& c : play) cardStrs.push_back(cardToString(c));
-        actionJsons.push_back(jsonArray(cardStrs));
-
-        // clone env and apply this action (without running opponent)
-        EnvState clone = cloneEnv(env);
-        if (parsed.type == CardType::Special523) {
-            // game ending move, no meaningful next state
-            nextStates.push_back(buildStateVec(clone));
-        } else {
-            // apply action to clone
-            int bonus = calculatePressureBonus(parsed, clone.lastPlay);
-            clone.tableBonus += bonus;
-            removeCardsFromHand(clone.me, play);
-            clone.tableCards.insert(clone.tableCards.end(), play.begin(), play.end());
-            clone.tracker.recordPlayed(play);
-            incPlayedCounts(clone, play);
-            clone.lastPlay = parsed;
-            clone.lastPlayer = &clone.me;
-            nextStates.push_back(buildStateVec(clone));
-        }
-    }
-
-    // add pass action if not first player
-    if (!env.lastPlay.cards.empty()) {
-        actionJsons.push_back("[]");
-        EnvState clone = cloneEnv(env);
-        // pass: opponent wins the round
-        settleScoreCards(clone.opp, clone.tableCards);
-        clone.opp.totalScore += clone.tableBonus;
-        clone.tableCards.clear();
-        clone.tableBonus = 0;
-        clone.lastPlay = CardTypeResult{};
-        clone.lastPlayer = nullptr;
-        clone.roundCount++;
-        refillToFive(clone.me, clone.deck);
-        refillToFive(clone.opp, clone.deck);
-        nextStates.push_back(buildStateVec(clone));
-    }
-
-    std::ostringstream oss;
-    oss << "{\"status\": \"ok\", \"actions\": [";
-    for (size_t i = 0; i < actionJsons.size(); ++i) {
-        if (i > 0) oss << ", ";
-        oss << actionJsons[i];
-    }
-    oss << "], \"next_states\": [";
-    for (size_t i = 0; i < nextStates.size(); ++i) {
-        if (i > 0) oss << ", ";
-        oss << vecToJson(nextStates[i]);
-    }
-    oss << "]}";
-    printJson(oss.str());
+ if(env.gameOver){printJson("{\"status\":\"error\",\"message\":\"game already over\"}");return;}
+ const auto legal=genLegalMoves(positionOf(env));std::string actions,states,rewards,dones;
+ auto saved=g_rng;
+ for(const auto& a:legal){auto clone=cloneEnv(env);g_rng=saved;applyEnvAction(clone,a);runOpponentUntilMyTurn(clone);std::vector<std::string> cs;for(const auto& c:a)cs.push_back(cardToString(c));
+ if(!actions.empty()){actions+=",";states+=",";rewards+=",";dones+=",";}
+ actions+=jsonArray(cs);states+=vecToJson(buildStateVec(clone));rewards+=clone.winner=="me"?"1":clone.winner=="opp"?"-1":"0";dones+=clone.gameOver?"true":"false";
+ }g_rng=saved;printJson("{\"status\":\"ok\",\"privileged\":true,\"actions\":["+actions+"],\"next_states\":["+states+"],\"rewards\":["+rewards+"],\"dones\":["+dones+"]}");
 }
 
-static void handleAutoPlay(EnvState& env,
-                           const std::string& oppAIStr,
-                           const std::string& agentAIStr) {
-    ScopedCoutSuppress suppress;
-
-    AILevel oppLevel = parseAILevel(oppAIStr.c_str());
-    AILevel agentLevel = parseAILevel(agentAIStr.c_str());
-
-    envReset(env);
-    env.opp.aiLevel = oppLevel;
-    env.me.aiLevel = agentLevel;
-
-    std::vector<std::vector<float>> states;
-    std::vector<int> stepRoundIndex;          // which round each state belongs to
-    std::vector<double> roundRewards;         // per-round reward
-    bool myTurn = false;
-    int currentRound = 0;
-    double meScoreBaseline = (double)env.me.totalScore;
-    double oppScoreBaseline = (double)env.opp.totalScore;
-
-    auto settleRoundReward = [&]() {
-        double meDelta = (double)env.me.totalScore - meScoreBaseline;
-        double oppDelta = (double)env.opp.totalScore - oppScoreBaseline;
-        roundRewards.push_back((meDelta - oppDelta) * 0.01);
-        meScoreBaseline = (double)env.me.totalScore;
-        oppScoreBaseline = (double)env.opp.totalScore;
-    };
-
-    while (!env.gameOver) {
-        Player& cur  = myTurn ? env.me : env.opp;
-        Player& other = myTurn ? env.opp : env.me;
-        bool isMe = myTurn;
-
-        if (myTurn) {
-            states.push_back(buildStateVec(env));
-            stepRoundIndex.push_back(currentRound);
-        }
-
-        int tableScore = calculateTableScore(env.tableCards, env.tableBonus);
-        auto play = aiChoosePlay(cur, other, env.lastPlay,
-                                 env.deck, tableScore, env.tracker);
-
-        if (play.empty()) {
-            if (env.lastPlay.cards.empty()) {
-                if (cur.hand.empty()) {
-                    env.gameOver = true;
-                    env.winner = isMe ? "opp" : "me";
-                    finalSettlement(env.me, env.opp, env.tableCards);
-                    break;
-                }
-                play = {cur.hand[0]};
-            } else {
-                settleScoreCards(other, env.tableCards);
-                other.totalScore += env.tableBonus;
-                env.tableCards.clear();
-                env.tableBonus = 0;
-                env.lastPlay = CardTypeResult{};
-                env.lastPlayer = nullptr;
-                settleRoundReward();
-                env.roundCount++;
-                currentRound++;
-
-                refillToFive(env.me, env.deck);
-                refillToFive(env.opp, env.deck);
-
-                if (checkSpecialVictory(env.me))  { env.gameOver = true; env.winner = "me"; break; }
-                if (checkSpecialVictory(env.opp)) { env.gameOver = true; env.winner = "opp"; break; }
-                if (env.me.hand.empty() && env.opp.hand.empty() && env.deck.cards.empty()) {
-                    env.gameOver = true;
-                    if (env.me.totalScore > env.opp.totalScore) env.winner = "me";
-                    else if (env.opp.totalScore > env.me.totalScore) env.winner = "opp";
-                    else env.winner = "draw";
-                    break;
-                }
-                myTurn = !myTurn;
-                continue;
-            }
-        }
-
-        CardTypeResult parsed = safeParseCardType(play);
-
-        if (parsed.type == CardType::Special523) {
-            settleScoreCards(cur, env.tableCards);
-            cur.totalScore += env.tableBonus;
-            env.tableCards.clear();
-            env.tableBonus = 0;
-            env.gameOver = true;
-            env.winner = isMe ? "me" : "opp";
-            finalSettlement(cur, other, env.tableCards);
-            break;
-        }
-
-        int bonus = calculatePressureBonus(parsed, env.lastPlay);
-        env.tableBonus += bonus;
-        removeCardsFromHand(cur, play);
-        env.tableCards.insert(env.tableCards.end(), play.begin(), play.end());
-        env.tracker.recordPlayed(play);
-        incPlayedCounts(env, play);
-        env.lastPlay = parsed;
-        env.lastPlayer = &cur;
-
-        if (cur.hand.empty()) {
-            if (env.deck.cards.empty()) {
-                env.gameOver = true;
-                finalSettlement(env.me, env.opp, env.tableCards);
-                if (env.me.totalScore > env.opp.totalScore) env.winner = "me";
-                else if (env.opp.totalScore > env.me.totalScore) env.winner = "opp";
-                else env.winner = "draw";
-                break;
-            }
-            settleScoreCards(cur, env.tableCards);
-            cur.totalScore += env.tableBonus;
-            env.tableCards.clear();
-            env.tableBonus = 0;
-            env.lastPlay = CardTypeResult{};
-            env.lastPlayer = nullptr;
-            settleRoundReward();
-            env.roundCount++;
-            currentRound++;
-            refillToFive(env.me, env.deck);
-            refillToFive(env.opp, env.deck);
-            if (checkSpecialVictory(env.me))  { env.gameOver = true; env.winner = "me"; break; }
-            if (checkSpecialVictory(env.opp)) { env.gameOver = true; env.winner = "opp"; break; }
-            continue;
-        }
-
-        myTurn = !myTurn;
-    }
-
-    // ── result from agent perspective ──
-    int result = 0;
-    if (env.winner == "me")       result = 1;
-    else if (env.winner == "opp") result = -1;
-
-    // ── compute cumulative rewards (backward) ──
-    int nRounds = (int)roundRewards.size();
-    std::vector<double> cumulative(nRounds, 0.0);
-    if (nRounds > 0) {
-        cumulative[nRounds - 1] = roundRewards[nRounds - 1] + (double)result;
-        for (int r = nRounds - 2; r >= 0; --r) {
-            cumulative[r] = roundRewards[r] + cumulative[r + 1];
-        }
-    } else {
-        cumulative.push_back((double)result);
-    }
-
-    // ── build JSON response ──
-    std::ostringstream oss;
-    oss << "{\"status\": \"ok\", \"trajectory\": [";
-    for (size_t i = 0; i < states.size(); ++i) {
-        if (i > 0) oss << ", ";
-        int r = (i < stepRoundIndex.size()) ? stepRoundIndex[i] : 0;
-        double cr = (r < (int)cumulative.size()) ? cumulative[r] : 0.0;
-        oss << "{\"state\": " << vecToJson(states[i])
-            << ", \"round\": " << r
-            << ", \"cumulative_reward\": " << cr << "}";
-    }
-    oss << "]}";
-    printJson(oss.str());
+static void handleAutoPlay(EnvState& env,const std::string& oppAI,const std::string& agentAI) {
+ ScopedCoutSuppress suppress;envReset(env);std::vector<std::vector<float>> states;std::vector<int> rounds;
+ while(!env.gameOver){if(env.myTurn){states.push_back(buildStateVec(env));rounds.push_back(env.roundCount);}applyEnvAction(env,envMove(env,env.myTurn?agentAI:oppAI));}
+ int reward=env.winner=="me"?1:env.winner=="opp"?-1:0;std::ostringstream out;out<<"{\"status\":\"ok\",\"target_version\":\"terminal_wdl_v2\",\"trajectory\":[";
+ for(size_t i=0;i<states.size();++i){if(i)out<<",";out<<"{\"state\":"<<vecToJson(states[i])<<",\"round\":"<<rounds[i]<<",\"cumulative_reward\":"<<reward<<"}";}out<<"]}";printJson(out.str());
 }
 
 static std::string extractField(const std::string& json, const std::string& key) {
@@ -1036,11 +603,11 @@ int main(int argc, char* argv[]) {
         g_opponentLevelStr = argv[1];
     }
 
+    if(argc>2)g_seed=static_cast<unsigned>(std::stoul(argv[2]));
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
 
     EnvState env;
-    envReset(env);
     bool initialized = false;
 
     std::string line;
@@ -1051,6 +618,7 @@ int main(int argc, char* argv[]) {
         std::string cmd = extractField(line, "command");
 
         if (cmd == "reset") {
+            auto seed=extractField(line,"seed");if(!seed.empty()){g_seed=static_cast<unsigned>(std::stoul(seed));g_game=0;}
             handleReset(env);
             initialized = true;
         } else if (cmd == "legal_actions") {

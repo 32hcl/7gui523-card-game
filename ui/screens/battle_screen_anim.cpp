@@ -29,32 +29,30 @@ void BattleScreen::playDealAnimation()
                     deckPos.y() + m_deckBackLabel->height() / 2);
 
     QPoint aPos = m_playerAHandWidget->mapTo(this, QPoint(0, 0));
-    QPoint bPos = m_playerBHandWidget->mapTo(this, QPoint(0, 0));
+    QPoint endA(aPos.x() + m_playerAHandWidget->width() / 2,
+                aPos.y() + m_playerAHandWidget->height() / 2);
 
-    const int cw = 110, ch = 178;
+    QPoint bPos = m_playerBHandWidget->mapTo(this, QPoint(0, 0));
+    QPoint endB(bPos.x() + m_playerBHandWidget->width() / 2,
+                bPos.y() + m_playerBHandWidget->height() / 2);
+
+    // 60 x 84 face plus padding for rotation and the soft landing shadow.
+    const int cw = 96, ch = 120;
     const int delayPerCard = 70;
     const int flyDuration = 400;
 
     for (int i = 0; i < 10; ++i) {
         bool toA = (i % 2 == 0);
-        int slot = i / 2;
-        QPoint target;
-        if (toA) {
-            target = QPoint(aPos.x() + slot * (cw + 6) + cw / 2,
-                            aPos.y() + ch / 2);
-        } else {
-            target = QPoint(bPos.x() + m_playerBHandWidget->width() / 2,
-                            bPos.y() + m_playerBHandWidget->height() / 2);
-        }
+        QPoint target = toA ? endA : endB;
+        // Opponent animation intentionally carries no hidden card data.
+        const Card dealtCard = toA ? m_playerA.hand.at(static_cast<size_t>(i / 2)) : Card{};
 
         QTimer::singleShot(i * delayPerCard, this, [=]() {
-            CardWidget* card = toA
-                ? new CardWidget(m_playerA.hand.at(slot), this)
-                : new CardWidget(Card{}, this);
+            CardWidget* card = new CardWidget(dealtCard, this);
             card->setFixedSize(cw, ch);
+            card->setAttribute(Qt::WA_TransparentForMouseEvents);
             card->setDealAnimationEnabled(true, toA);
             card->setDealTilt(QRandomGenerator::global()->generateDouble() * 20.0 - 10.0);
-            card->setAttribute(Qt::WA_TransparentForMouseEvents);
 
             QPoint from = startPos - QPoint(cw / 2, ch / 2);
             QPoint to   = target   - QPoint(cw / 2, ch / 2);
@@ -70,6 +68,8 @@ void BattleScreen::playDealAnimation()
             anim->setStartValue(from);
             anim->setEndValue(to);
 
+            // Sample a quadratic Bezier arc; finish with a small overshoot
+            // along the incoming direction followed by a smooth return.
             const QPointF fromF(from);
             const QPointF toF(to);
             const qreal distance = QLineF(fromF, toF).length();
@@ -90,22 +90,7 @@ void BattleScreen::playDealAnimation()
             flip->setEasingCurve(QEasingCurve::Linear);
             flip->setStartValue(0.0);
             flip->setEndValue(1.0);
-
-            if (toA) {
-                connect(flight, &QParallelAnimationGroup::finished, this, [this, card]() {
-                    card->setDealAnimationEnabled(false);
-                    card->setFaceUp(true);
-                    card->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-                    int insertIdx = m_playerALayout->count();
-                    if (insertIdx > 0 && m_playerALayout->itemAt(insertIdx - 1)->spacerItem())
-                        insertIdx--;
-                    m_playerALayout->insertWidget(insertIdx, card);
-                    m_playerACardWidgets.push_back(card);
-                });
-            } else {
-                connect(flight, &QParallelAnimationGroup::finished, card, &QObject::deleteLater);
-            }
-
+            connect(flight, &QParallelAnimationGroup::finished, card, &QObject::deleteLater);
             if (i == 9) {
                 connect(flight, &QParallelAnimationGroup::finished,
                         this, &BattleScreen::dealAnimationFinished);
@@ -154,7 +139,6 @@ void BattleScreen::flyCardsToTable(const std::vector<CardWidget*>& cards) {
                 cw->setParent(m_tableCardsWidget);
                 QPoint relPos = endPos - m_tableCardsWidget->mapTo(this, QPoint(0, 0));
                 cw->move(relPos);
-                cw->resetToIdle();
                 cw->show();
                 cw->setFlying(false);
                 cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
@@ -207,7 +191,6 @@ void BattleScreen::flyAICardsToTable(const std::vector<Card>& cards) {
                 cw->setParent(m_tableCardsWidget);
                 QPoint relPos = endPos - m_tableCardsWidget->mapTo(this, QPoint(0, 0));
                 cw->move(relPos);
-                cw->resetToIdle();
                 cw->show();
                 cw->setFlying(false);
                 cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);

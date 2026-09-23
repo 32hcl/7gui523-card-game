@@ -1,5 +1,7 @@
 #include "deck.h"
 #include "core/player.h"
+#include <random>
+#include <algorithm>
 
 Deck createStandardDeck() {
     Deck deck;

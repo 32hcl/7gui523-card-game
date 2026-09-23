@@ -13,6 +13,8 @@ public:
     bool isExhausted(const std::string& point) const;
     int totalCount(const std::string& point) const;
     int playedCount(const std::string& point) const;
+    double expectedOpponentCount(const std::string& point, int oppHandSize, int deckSize) const;
+    double expectedDeckCount(const std::string& point, int oppHandSize, int deckSize) const;
 
 private:
     std::map<std::string, int> m_totalCount;

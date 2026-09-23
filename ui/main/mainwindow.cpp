@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui/screens/battle_screen.h"
+#include "ui/screens/main_menu_screen.h"
 
 #include <QResizeEvent>
 
@@ -24,12 +25,38 @@ MainWindow::MainWindow(QWidget* parent)
     // 路由器
     m_router = new ScreenRouter(m_screenStack, this);
 
+    // 注册 MainMenuScreen
+    m_menuScreen = new MainMenuScreen(m_screenStack);
+    m_router->registerScreen(ScreenId::MainMenu, m_menuScreen);
+    connect(m_menuScreen, &MainMenuScreen::practiceModeSelected, this, &MainWindow::onPracticeMode);
+    connect(m_menuScreen, &MainMenuScreen::levelModeSelected, this, &MainWindow::onLevelMode);
+
     // 注册 BattleScreen
     m_battleScreen = new BattleScreen(m_screenStack);
     m_router->registerScreen(ScreenId::Battle, m_battleScreen);
+    connect(m_battleScreen, &BattleScreen::gameEnded, this, &MainWindow::onBattleGameEnded);
 
-    // 默认显示 BattleScreen
+    // 默认显示主菜单
+    m_router->switchTo(ScreenId::MainMenu);
+}
+
+void MainWindow::onPracticeMode()
+{
+    m_battleScreen->setLevelMode(false, 1);
+    m_battleScreen->startNewGame();
     m_router->switchTo(ScreenId::Battle);
+}
+
+void MainWindow::onLevelMode()
+{
+    m_battleScreen->setLevelMode(true, 1);
+    m_battleScreen->startNewGame();
+    m_router->switchTo(ScreenId::Battle);
+}
+
+void MainWindow::onBattleGameEnded()
+{
+    m_router->switchTo(ScreenId::MainMenu);
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event) {

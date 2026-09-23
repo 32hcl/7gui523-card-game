@@ -2,6 +2,7 @@
 #include "rank.h"
 #include "cardtype.h"
 #include "core/rule/score.h"
+#include <iostream>
 
 bool isJoker(const Card& card) {
     return card.point == "大鬼" || card.point == "小鬼";

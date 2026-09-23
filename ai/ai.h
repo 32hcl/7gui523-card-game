@@ -55,6 +55,9 @@ std::vector<Card> humanChoosePlay(const Player& player,
 
 bool breaksCombo(const std::vector<Card>& play, const Player& player);
 
+// 可覆盖的搜索深度（旧AI4用searchBestPlayCheat硬编码6，现改为变量便于测试）
+extern int g_searchBestPlayCheatDepth;
+
 int evaluatePlayWithBreakdown(const std::vector<Card>& play,
                               const Player& player,
                               const Player& opponent,
@@ -71,3 +74,7 @@ std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,
                                             int tableScore,
                                             const CardTracker& tracker,
                                             DecisionBreakdown* outBd);
+// Fair levels require an explicit public observation and persistent engine.
+class FairEngine;
+struct Observation;
+std::vector<Card> aiChooseFairPlay(FairEngine&, const Observation&, AILevel);

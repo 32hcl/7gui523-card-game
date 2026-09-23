@@ -4,6 +4,7 @@
 #include <QWidget>
 
 enum class ScreenId {
+    MainMenu,
     Battle,
 };
 

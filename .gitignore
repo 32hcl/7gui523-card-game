@@ -57,10 +57,5 @@ desktop.ini
 !LICENSE
 !music/*.mp3
 !kenney_playing-cards-pack/**
-RoomAI-master/
-*.diff
-new_ai/*.pkl
-new_ai/debug_*.txt
-
-build-main/
-新建文件夹 (6)/
+build-*/
+w64devkit/

@@ -10,7 +10,9 @@ enum class AILevel {
     AI1_Simple,
     AI2_Rule,
     AI3_Tracker,
-    AI4_Expert
+    AI4_Expert,
+    AI_Fair_Lv1,
+    AI_Fair_Lv2
 };
 
 struct Player {

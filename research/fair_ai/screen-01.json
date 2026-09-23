@@ -1,0 +1,1661 @@
+{
+  "belief_resets": 353,
+  "config": {
+    "particles": 96,
+    "simulations": 24,
+    "horizon": 24,
+    "budget_ms": 60,
+    "exploration": 2,
+    "tolerance": 0.35,
+    "rollout_model": 2,
+    "prior": [
+      0.15,
+      0.6,
+      0.1,
+      0.1,
+      0.05
+    ]
+  },
+  "candidate": "Fair2",
+  "opponent": "AI2",
+  "seed": 61000,
+  "games": 200,
+  "wins": 34,
+  "losses": 161,
+  "draws": 5,
+  "win_rate": 0.17,
+  "score_rate": 0.1825,
+  "ci95_wilson_marginal": [
+    0.1242790791,
+    0.2281588363
+  ],
+  "average_score_diff": -77.725,
+  "p50_ms": 8.3702,
+  "p95_ms": 14.2394,
+  "p99_ms": 15.8649,
+  "max_ms": 19.0364,
+  "elapsed_seconds": 44.9409929,
+  "details": [
+    {
+      "game": 0,
+      "deal_seed": 61000,
+      "first": true,
+      "winner": 1,
+      "score_diff": 100,
+      "steps": 70
+    },
+    {
+      "game": 1,
+      "deal_seed": 61000,
+      "first": false,
+      "winner": 1,
+      "score_diff": 35,
+      "steps": 63
+    },
+    {
+      "game": 2,
+      "deal_seed": 61001,
+      "first": true,
+      "winner": 1,
+      "score_diff": 100,
+      "steps": 66
+    },
+    {
+      "game": 3,
+      "deal_seed": 61001,
+      "first": false,
+      "winner": -1,
+      "score_diff": -70,
+      "steps": 67
+    },
+    {
+      "game": 4,
+      "deal_seed": 61002,
+      "first": true,
+      "winner": 1,
+      "score_diff": 130,
+      "steps": 60
+    },
+    {
+      "game": 5,
+      "deal_seed": 61002,
+      "first": false,
+      "winner": -1,
+      "score_diff": -75,
+      "steps": 67
+    },
+    {
+      "game": 6,
+      "deal_seed": 61003,
+      "first": true,
+      "winner": -1,
+      "score_diff": -25,
+      "steps": 62
+    },
+    {
+      "game": 7,
+      "deal_seed": 61003,
+      "first": false,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 67
+    },
+    {
+      "game": 8,
+      "deal_seed": 61004,
+      "first": true,
+      "winner": 1,
+      "score_diff": 45,
+      "steps": 58
+    },
+    {
+      "game": 9,
+      "deal_seed": 61004,
+      "first": false,
+      "winner": -1,
+      "score_diff": -30,
+      "steps": 13
+    },
+    {
+      "game": 10,
+      "deal_seed": 61005,
+      "first": true,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 71
+    },
+    {
+      "game": 11,
+      "deal_seed": 61005,
+      "first": false,
+      "winner": 1,
+      "score_diff": 70,
+      "steps": 65
+    },
+    {
+      "game": 12,
+      "deal_seed": 61006,
+      "first": true,
+      "winner": -1,
+      "score_diff": -35,
+      "steps": 62
+    },
+    {
+      "game": 13,
+      "deal_seed": 61006,
+      "first": false,
+      "winner": 1,
+      "score_diff": 20,
+      "steps": 59
+    },
+    {
+      "game": 14,
+      "deal_seed": 61007,
+      "first": true,
+      "winner": -1,
+      "score_diff": -105,
+      "steps": 72
+    },
+    {
+      "game": 15,
+      "deal_seed": 61007,
+      "first": false,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 67
+    },
+    {
+      "game": 16,
+      "deal_seed": 61008,
+      "first": true,
+      "winner": -1,
+      "score_diff": -70,
+      "steps": 64
+    },
+    {
+      "game": 17,
+      "deal_seed": 61008,
+      "first": false,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 63
+    },
+    {
+      "game": 18,
+      "deal_seed": 61009,
+      "first": true,
+      "winner": -1,
+      "score_diff": -65,
+      "steps": 74
+    },
+    {
+      "game": 19,
+      "deal_seed": 61009,
+      "first": false,
+      "winner": 1,
+      "score_diff": 15,
+      "steps": 59
+    },
+    {
+      "game": 20,
+      "deal_seed": 61010,
+      "first": true,
+      "winner": -1,
+      "score_diff": -20,
+      "steps": 66
+    },
+    {
+      "game": 21,
+      "deal_seed": 61010,
+      "first": false,
+      "winner": -1,
+      "score_diff": -165,
+      "steps": 63
+    },
+    {
+      "game": 22,
+      "deal_seed": 61011,
+      "first": true,
+      "winner": 1,
+      "score_diff": 105,
+      "steps": 68
+    },
+    {
+      "game": 23,
+      "deal_seed": 61011,
+      "first": false,
+      "winner": 1,
+      "score_diff": 15,
+      "steps": 56
+    },
+    {
+      "game": 24,
+      "deal_seed": 61012,
+      "first": true,
+      "winner": 1,
+      "score_diff": 100,
+      "steps": 70
+    },
+    {
+      "game": 25,
+      "deal_seed": 61012,
+      "first": false,
+      "winner": -1,
+      "score_diff": -80,
+      "steps": 63
+    },
+    {
+      "game": 26,
+      "deal_seed": 61013,
+      "first": true,
+      "winner": -1,
+      "score_diff": -45,
+      "steps": 44
+    },
+    {
+      "game": 27,
+      "deal_seed": 61013,
+      "first": false,
+      "winner": -1,
+      "score_diff": -95,
+      "steps": 63
+    },
+    {
+      "game": 28,
+      "deal_seed": 61014,
+      "first": true,
+      "winner": -1,
+      "score_diff": -125,
+      "steps": 68
+    },
+    {
+      "game": 29,
+      "deal_seed": 61014,
+      "first": false,
+      "winner": -1,
+      "score_diff": -95,
+      "steps": 63
+    },
+    {
+      "game": 30,
+      "deal_seed": 61015,
+      "first": true,
+      "winner": -1,
+      "score_diff": -125,
+      "steps": 67
+    },
+    {
+      "game": 31,
+      "deal_seed": 61015,
+      "first": false,
+      "winner": 1,
+      "score_diff": 20,
+      "steps": 65
+    },
+    {
+      "game": 32,
+      "deal_seed": 61016,
+      "first": true,
+      "winner": 1,
+      "score_diff": 135,
+      "steps": 65
+    },
+    {
+      "game": 33,
+      "deal_seed": 61016,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 65
+    },
+    {
+      "game": 34,
+      "deal_seed": 61017,
+      "first": true,
+      "winner": -1,
+      "score_diff": -170,
+      "steps": 72
+    },
+    {
+      "game": 35,
+      "deal_seed": 61017,
+      "first": false,
+      "winner": -1,
+      "score_diff": -155,
+      "steps": 71
+    },
+    {
+      "game": 36,
+      "deal_seed": 61018,
+      "first": true,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 75
+    },
+    {
+      "game": 37,
+      "deal_seed": 61018,
+      "first": false,
+      "winner": -1,
+      "score_diff": -10,
+      "steps": 65
+    },
+    {
+      "game": 38,
+      "deal_seed": 61019,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 70
+    },
+    {
+      "game": 39,
+      "deal_seed": 61019,
+      "first": false,
+      "winner": -1,
+      "score_diff": -25,
+      "steps": 65
+    },
+    {
+      "game": 40,
+      "deal_seed": 61020,
+      "first": true,
+      "winner": 1,
+      "score_diff": 105,
+      "steps": 67
+    },
+    {
+      "game": 41,
+      "deal_seed": 61020,
+      "first": false,
+      "winner": -1,
+      "score_diff": -170,
+      "steps": 63
+    },
+    {
+      "game": 42,
+      "deal_seed": 61021,
+      "first": true,
+      "winner": -1,
+      "score_diff": -105,
+      "steps": 66
+    },
+    {
+      "game": 43,
+      "deal_seed": 61021,
+      "first": false,
+      "winner": -1,
+      "score_diff": -205,
+      "steps": 73
+    },
+    {
+      "game": 44,
+      "deal_seed": 61022,
+      "first": true,
+      "winner": -1,
+      "score_diff": -175,
+      "steps": 72
+    },
+    {
+      "game": 45,
+      "deal_seed": 61022,
+      "first": false,
+      "winner": -1,
+      "score_diff": -100,
+      "steps": 67
+    },
+    {
+      "game": 46,
+      "deal_seed": 61023,
+      "first": true,
+      "winner": -1,
+      "score_diff": -50,
+      "steps": 70
+    },
+    {
+      "game": 47,
+      "deal_seed": 61023,
+      "first": false,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 65
+    },
+    {
+      "game": 48,
+      "deal_seed": 61024,
+      "first": true,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 68
+    },
+    {
+      "game": 49,
+      "deal_seed": 61024,
+      "first": false,
+      "winner": -1,
+      "score_diff": -110,
+      "steps": 63
+    },
+    {
+      "game": 50,
+      "deal_seed": 61025,
+      "first": true,
+      "winner": -1,
+      "score_diff": -70,
+      "steps": 62
+    },
+    {
+      "game": 51,
+      "deal_seed": 61025,
+      "first": false,
+      "winner": -1,
+      "score_diff": -125,
+      "steps": 65
+    },
+    {
+      "game": 52,
+      "deal_seed": 61026,
+      "first": true,
+      "winner": 1,
+      "score_diff": 90,
+      "steps": 60
+    },
+    {
+      "game": 53,
+      "deal_seed": 61026,
+      "first": false,
+      "winner": -1,
+      "score_diff": -100,
+      "steps": 65
+    },
+    {
+      "game": 54,
+      "deal_seed": 61027,
+      "first": true,
+      "winner": 0,
+      "score_diff": 0,
+      "steps": 64
+    },
+    {
+      "game": 55,
+      "deal_seed": 61027,
+      "first": false,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 63
+    },
+    {
+      "game": 56,
+      "deal_seed": 61028,
+      "first": true,
+      "winner": -1,
+      "score_diff": -30,
+      "steps": 64
+    },
+    {
+      "game": 57,
+      "deal_seed": 61028,
+      "first": false,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 61
+    },
+    {
+      "game": 58,
+      "deal_seed": 61029,
+      "first": true,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 66
+    },
+    {
+      "game": 59,
+      "deal_seed": 61029,
+      "first": false,
+      "winner": -1,
+      "score_diff": -80,
+      "steps": 41
+    },
+    {
+      "game": 60,
+      "deal_seed": 61030,
+      "first": true,
+      "winner": -1,
+      "score_diff": -55,
+      "steps": 64
+    },
+    {
+      "game": 61,
+      "deal_seed": 61030,
+      "first": false,
+      "winner": -1,
+      "score_diff": -100,
+      "steps": 65
+    },
+    {
+      "game": 62,
+      "deal_seed": 61031,
+      "first": true,
+      "winner": 1,
+      "score_diff": 50,
+      "steps": 66
+    },
+    {
+      "game": 63,
+      "deal_seed": 61031,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 59
+    },
+    {
+      "game": 64,
+      "deal_seed": 61032,
+      "first": true,
+      "winner": -1,
+      "score_diff": -125,
+      "steps": 64
+    },
+    {
+      "game": 65,
+      "deal_seed": 61032,
+      "first": false,
+      "winner": -1,
+      "score_diff": -110,
+      "steps": 67
+    },
+    {
+      "game": 66,
+      "deal_seed": 61033,
+      "first": true,
+      "winner": -1,
+      "score_diff": -60,
+      "steps": 66
+    },
+    {
+      "game": 67,
+      "deal_seed": 61033,
+      "first": false,
+      "winner": -1,
+      "score_diff": -170,
+      "steps": 67
+    },
+    {
+      "game": 68,
+      "deal_seed": 61034,
+      "first": true,
+      "winner": -1,
+      "score_diff": -120,
+      "steps": 66
+    },
+    {
+      "game": 69,
+      "deal_seed": 61034,
+      "first": false,
+      "winner": -1,
+      "score_diff": -155,
+      "steps": 69
+    },
+    {
+      "game": 70,
+      "deal_seed": 61035,
+      "first": true,
+      "winner": -1,
+      "score_diff": -120,
+      "steps": 68
+    },
+    {
+      "game": 71,
+      "deal_seed": 61035,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 69
+    },
+    {
+      "game": 72,
+      "deal_seed": 61036,
+      "first": true,
+      "winner": -1,
+      "score_diff": -135,
+      "steps": 59
+    },
+    {
+      "game": 73,
+      "deal_seed": 61036,
+      "first": false,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 61
+    },
+    {
+      "game": 74,
+      "deal_seed": 61037,
+      "first": true,
+      "winner": 1,
+      "score_diff": 120,
+      "steps": 64
+    },
+    {
+      "game": 75,
+      "deal_seed": 61037,
+      "first": false,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 58
+    },
+    {
+      "game": 76,
+      "deal_seed": 61038,
+      "first": true,
+      "winner": -1,
+      "score_diff": -125,
+      "steps": 70
+    },
+    {
+      "game": 77,
+      "deal_seed": 61038,
+      "first": false,
+      "winner": 1,
+      "score_diff": 20,
+      "steps": 58
+    },
+    {
+      "game": 78,
+      "deal_seed": 61039,
+      "first": true,
+      "winner": -1,
+      "score_diff": -65,
+      "steps": 60
+    },
+    {
+      "game": 79,
+      "deal_seed": 61039,
+      "first": false,
+      "winner": -1,
+      "score_diff": -25,
+      "steps": 67
+    },
+    {
+      "game": 80,
+      "deal_seed": 61040,
+      "first": true,
+      "winner": -1,
+      "score_diff": -30,
+      "steps": 70
+    },
+    {
+      "game": 81,
+      "deal_seed": 61040,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 69
+    },
+    {
+      "game": 82,
+      "deal_seed": 61041,
+      "first": true,
+      "winner": 0,
+      "score_diff": 0,
+      "steps": 63
+    },
+    {
+      "game": 83,
+      "deal_seed": 61041,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 75
+    },
+    {
+      "game": 84,
+      "deal_seed": 61042,
+      "first": true,
+      "winner": -1,
+      "score_diff": -15,
+      "steps": 36
+    },
+    {
+      "game": 85,
+      "deal_seed": 61042,
+      "first": false,
+      "winner": -1,
+      "score_diff": -70,
+      "steps": 67
+    },
+    {
+      "game": 86,
+      "deal_seed": 61043,
+      "first": true,
+      "winner": -1,
+      "score_diff": -100,
+      "steps": 62
+    },
+    {
+      "game": 87,
+      "deal_seed": 61043,
+      "first": false,
+      "winner": -1,
+      "score_diff": -40,
+      "steps": 61
+    },
+    {
+      "game": 88,
+      "deal_seed": 61044,
+      "first": true,
+      "winner": -1,
+      "score_diff": -20,
+      "steps": 68
+    },
+    {
+      "game": 89,
+      "deal_seed": 61044,
+      "first": false,
+      "winner": -1,
+      "score_diff": -110,
+      "steps": 64
+    },
+    {
+      "game": 90,
+      "deal_seed": 61045,
+      "first": true,
+      "winner": 1,
+      "score_diff": 140,
+      "steps": 67
+    },
+    {
+      "game": 91,
+      "deal_seed": 61045,
+      "first": false,
+      "winner": -1,
+      "score_diff": -120,
+      "steps": 69
+    },
+    {
+      "game": 92,
+      "deal_seed": 61046,
+      "first": true,
+      "winner": -1,
+      "score_diff": -175,
+      "steps": 68
+    },
+    {
+      "game": 93,
+      "deal_seed": 61046,
+      "first": false,
+      "winner": -1,
+      "score_diff": -90,
+      "steps": 67
+    },
+    {
+      "game": 94,
+      "deal_seed": 61047,
+      "first": true,
+      "winner": -1,
+      "score_diff": -170,
+      "steps": 70
+    },
+    {
+      "game": 95,
+      "deal_seed": 61047,
+      "first": false,
+      "winner": 1,
+      "score_diff": 120,
+      "steps": 65
+    },
+    {
+      "game": 96,
+      "deal_seed": 61048,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 74
+    },
+    {
+      "game": 97,
+      "deal_seed": 61048,
+      "first": false,
+      "winner": -1,
+      "score_diff": -40,
+      "steps": 63
+    },
+    {
+      "game": 98,
+      "deal_seed": 61049,
+      "first": true,
+      "winner": -1,
+      "score_diff": -50,
+      "steps": 54
+    },
+    {
+      "game": 99,
+      "deal_seed": 61049,
+      "first": false,
+      "winner": -1,
+      "score_diff": -100,
+      "steps": 59
+    },
+    {
+      "game": 100,
+      "deal_seed": 61050,
+      "first": true,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 66
+    },
+    {
+      "game": 101,
+      "deal_seed": 61050,
+      "first": false,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 65
+    },
+    {
+      "game": 102,
+      "deal_seed": 61051,
+      "first": true,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 76
+    },
+    {
+      "game": 103,
+      "deal_seed": 61051,
+      "first": false,
+      "winner": 1,
+      "score_diff": 40,
+      "steps": 64
+    },
+    {
+      "game": 104,
+      "deal_seed": 61052,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 64
+    },
+    {
+      "game": 105,
+      "deal_seed": 61052,
+      "first": false,
+      "winner": -1,
+      "score_diff": -30,
+      "steps": 62
+    },
+    {
+      "game": 106,
+      "deal_seed": 61053,
+      "first": true,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 57
+    },
+    {
+      "game": 107,
+      "deal_seed": 61053,
+      "first": false,
+      "winner": -1,
+      "score_diff": -25,
+      "steps": 61
+    },
+    {
+      "game": 108,
+      "deal_seed": 61054,
+      "first": true,
+      "winner": -1,
+      "score_diff": -80,
+      "steps": 68
+    },
+    {
+      "game": 109,
+      "deal_seed": 61054,
+      "first": false,
+      "winner": -1,
+      "score_diff": -180,
+      "steps": 67
+    },
+    {
+      "game": 110,
+      "deal_seed": 61055,
+      "first": true,
+      "winner": -1,
+      "score_diff": -70,
+      "steps": 60
+    },
+    {
+      "game": 111,
+      "deal_seed": 61055,
+      "first": false,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 63
+    },
+    {
+      "game": 112,
+      "deal_seed": 61056,
+      "first": true,
+      "winner": 1,
+      "score_diff": 100,
+      "steps": 60
+    },
+    {
+      "game": 113,
+      "deal_seed": 61056,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 77
+    },
+    {
+      "game": 114,
+      "deal_seed": 61057,
+      "first": true,
+      "winner": -1,
+      "score_diff": -155,
+      "steps": 60
+    },
+    {
+      "game": 115,
+      "deal_seed": 61057,
+      "first": false,
+      "winner": -1,
+      "score_diff": -70,
+      "steps": 61
+    },
+    {
+      "game": 116,
+      "deal_seed": 61058,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 64
+    },
+    {
+      "game": 117,
+      "deal_seed": 61058,
+      "first": false,
+      "winner": -1,
+      "score_diff": -165,
+      "steps": 73
+    },
+    {
+      "game": 118,
+      "deal_seed": 61059,
+      "first": true,
+      "winner": -1,
+      "score_diff": -30,
+      "steps": 64
+    },
+    {
+      "game": 119,
+      "deal_seed": 61059,
+      "first": false,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 75
+    },
+    {
+      "game": 120,
+      "deal_seed": 61060,
+      "first": true,
+      "winner": -1,
+      "score_diff": -35,
+      "steps": 66
+    },
+    {
+      "game": 121,
+      "deal_seed": 61060,
+      "first": false,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 73
+    },
+    {
+      "game": 122,
+      "deal_seed": 61061,
+      "first": true,
+      "winner": -1,
+      "score_diff": -35,
+      "steps": 64
+    },
+    {
+      "game": 123,
+      "deal_seed": 61061,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 60
+    },
+    {
+      "game": 124,
+      "deal_seed": 61062,
+      "first": true,
+      "winner": 1,
+      "score_diff": 40,
+      "steps": 62
+    },
+    {
+      "game": 125,
+      "deal_seed": 61062,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 63
+    },
+    {
+      "game": 126,
+      "deal_seed": 61063,
+      "first": true,
+      "winner": 1,
+      "score_diff": 50,
+      "steps": 60
+    },
+    {
+      "game": 127,
+      "deal_seed": 61063,
+      "first": false,
+      "winner": 1,
+      "score_diff": 50,
+      "steps": 50
+    },
+    {
+      "game": 128,
+      "deal_seed": 61064,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 66
+    },
+    {
+      "game": 129,
+      "deal_seed": 61064,
+      "first": false,
+      "winner": -1,
+      "score_diff": -110,
+      "steps": 65
+    },
+    {
+      "game": 130,
+      "deal_seed": 61065,
+      "first": true,
+      "winner": -1,
+      "score_diff": -15,
+      "steps": 34
+    },
+    {
+      "game": 131,
+      "deal_seed": 61065,
+      "first": false,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 63
+    },
+    {
+      "game": 132,
+      "deal_seed": 61066,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 74
+    },
+    {
+      "game": 133,
+      "deal_seed": 61066,
+      "first": false,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 71
+    },
+    {
+      "game": 134,
+      "deal_seed": 61067,
+      "first": true,
+      "winner": -1,
+      "score_diff": -90,
+      "steps": 75
+    },
+    {
+      "game": 135,
+      "deal_seed": 61067,
+      "first": false,
+      "winner": -1,
+      "score_diff": -105,
+      "steps": 41
+    },
+    {
+      "game": 136,
+      "deal_seed": 61068,
+      "first": true,
+      "winner": -1,
+      "score_diff": -60,
+      "steps": 72
+    },
+    {
+      "game": 137,
+      "deal_seed": 61068,
+      "first": false,
+      "winner": -1,
+      "score_diff": -90,
+      "steps": 65
+    },
+    {
+      "game": 138,
+      "deal_seed": 61069,
+      "first": true,
+      "winner": -1,
+      "score_diff": -100,
+      "steps": 64
+    },
+    {
+      "game": 139,
+      "deal_seed": 61069,
+      "first": false,
+      "winner": -1,
+      "score_diff": -90,
+      "steps": 65
+    },
+    {
+      "game": 140,
+      "deal_seed": 61070,
+      "first": true,
+      "winner": 1,
+      "score_diff": 40,
+      "steps": 59
+    },
+    {
+      "game": 141,
+      "deal_seed": 61070,
+      "first": false,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 71
+    },
+    {
+      "game": 142,
+      "deal_seed": 61071,
+      "first": true,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 66
+    },
+    {
+      "game": 143,
+      "deal_seed": 61071,
+      "first": false,
+      "winner": 1,
+      "score_diff": 40,
+      "steps": 60
+    },
+    {
+      "game": 144,
+      "deal_seed": 61072,
+      "first": true,
+      "winner": -1,
+      "score_diff": -110,
+      "steps": 62
+    },
+    {
+      "game": 145,
+      "deal_seed": 61072,
+      "first": false,
+      "winner": -1,
+      "score_diff": -155,
+      "steps": 63
+    },
+    {
+      "game": 146,
+      "deal_seed": 61073,
+      "first": true,
+      "winner": -1,
+      "score_diff": -185,
+      "steps": 64
+    },
+    {
+      "game": 147,
+      "deal_seed": 61073,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 67
+    },
+    {
+      "game": 148,
+      "deal_seed": 61074,
+      "first": true,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 68
+    },
+    {
+      "game": 149,
+      "deal_seed": 61074,
+      "first": false,
+      "winner": -1,
+      "score_diff": -10,
+      "steps": 65
+    },
+    {
+      "game": 150,
+      "deal_seed": 61075,
+      "first": true,
+      "winner": 0,
+      "score_diff": 0,
+      "steps": 68
+    },
+    {
+      "game": 151,
+      "deal_seed": 61075,
+      "first": false,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 71
+    },
+    {
+      "game": 152,
+      "deal_seed": 61076,
+      "first": true,
+      "winner": -1,
+      "score_diff": -105,
+      "steps": 62
+    },
+    {
+      "game": 153,
+      "deal_seed": 61076,
+      "first": false,
+      "winner": -1,
+      "score_diff": -155,
+      "steps": 63
+    },
+    {
+      "game": 154,
+      "deal_seed": 61077,
+      "first": true,
+      "winner": -1,
+      "score_diff": -60,
+      "steps": 58
+    },
+    {
+      "game": 155,
+      "deal_seed": 61077,
+      "first": false,
+      "winner": -1,
+      "score_diff": -130,
+      "steps": 65
+    },
+    {
+      "game": 156,
+      "deal_seed": 61078,
+      "first": true,
+      "winner": -1,
+      "score_diff": -150,
+      "steps": 66
+    },
+    {
+      "game": 157,
+      "deal_seed": 61078,
+      "first": false,
+      "winner": -1,
+      "score_diff": -190,
+      "steps": 65
+    },
+    {
+      "game": 158,
+      "deal_seed": 61079,
+      "first": true,
+      "winner": -1,
+      "score_diff": -115,
+      "steps": 64
+    },
+    {
+      "game": 159,
+      "deal_seed": 61079,
+      "first": false,
+      "winner": -1,
+      "score_diff": -60,
+      "steps": 65
+    },
+    {
+      "game": 160,
+      "deal_seed": 61080,
+      "first": true,
+      "winner": 1,
+      "score_diff": 80,
+      "steps": 64
+    },
+    {
+      "game": 161,
+      "deal_seed": 61080,
+      "first": false,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 61
+    },
+    {
+      "game": 162,
+      "deal_seed": 61081,
+      "first": true,
+      "winner": 1,
+      "score_diff": 100,
+      "steps": 64
+    },
+    {
+      "game": 163,
+      "deal_seed": 61081,
+      "first": false,
+      "winner": -1,
+      "score_diff": -120,
+      "steps": 67
+    },
+    {
+      "game": 164,
+      "deal_seed": 61082,
+      "first": true,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 61
+    },
+    {
+      "game": 165,
+      "deal_seed": 61082,
+      "first": false,
+      "winner": -1,
+      "score_diff": -90,
+      "steps": 63
+    },
+    {
+      "game": 166,
+      "deal_seed": 61083,
+      "first": true,
+      "winner": -1,
+      "score_diff": -100,
+      "steps": 68
+    },
+    {
+      "game": 167,
+      "deal_seed": 61083,
+      "first": false,
+      "winner": -1,
+      "score_diff": -50,
+      "steps": 67
+    },
+    {
+      "game": 168,
+      "deal_seed": 61084,
+      "first": true,
+      "winner": 0,
+      "score_diff": 0,
+      "steps": 62
+    },
+    {
+      "game": 169,
+      "deal_seed": 61084,
+      "first": false,
+      "winner": -1,
+      "score_diff": -60,
+      "steps": 65
+    },
+    {
+      "game": 170,
+      "deal_seed": 61085,
+      "first": true,
+      "winner": 1,
+      "score_diff": 45,
+      "steps": 62
+    },
+    {
+      "game": 171,
+      "deal_seed": 61085,
+      "first": false,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 71
+    },
+    {
+      "game": 172,
+      "deal_seed": 61086,
+      "first": true,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 66
+    },
+    {
+      "game": 173,
+      "deal_seed": 61086,
+      "first": false,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 65
+    },
+    {
+      "game": 174,
+      "deal_seed": 61087,
+      "first": true,
+      "winner": -1,
+      "score_diff": -45,
+      "steps": 70
+    },
+    {
+      "game": 175,
+      "deal_seed": 61087,
+      "first": false,
+      "winner": -1,
+      "score_diff": -75,
+      "steps": 67
+    },
+    {
+      "game": 176,
+      "deal_seed": 61088,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 66
+    },
+    {
+      "game": 177,
+      "deal_seed": 61088,
+      "first": false,
+      "winner": -1,
+      "score_diff": -10,
+      "steps": 63
+    },
+    {
+      "game": 178,
+      "deal_seed": 61089,
+      "first": true,
+      "winner": -1,
+      "score_diff": -120,
+      "steps": 74
+    },
+    {
+      "game": 179,
+      "deal_seed": 61089,
+      "first": false,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 71
+    },
+    {
+      "game": 180,
+      "deal_seed": 61090,
+      "first": true,
+      "winner": 0,
+      "score_diff": 0,
+      "steps": 70
+    },
+    {
+      "game": 181,
+      "deal_seed": 61090,
+      "first": false,
+      "winner": -1,
+      "score_diff": -180,
+      "steps": 67
+    },
+    {
+      "game": 182,
+      "deal_seed": 61091,
+      "first": true,
+      "winner": -1,
+      "score_diff": -165,
+      "steps": 68
+    },
+    {
+      "game": 183,
+      "deal_seed": 61091,
+      "first": false,
+      "winner": -1,
+      "score_diff": -120,
+      "steps": 67
+    },
+    {
+      "game": 184,
+      "deal_seed": 61092,
+      "first": true,
+      "winner": -1,
+      "score_diff": -110,
+      "steps": 65
+    },
+    {
+      "game": 185,
+      "deal_seed": 61092,
+      "first": false,
+      "winner": 1,
+      "score_diff": 80,
+      "steps": 52
+    },
+    {
+      "game": 186,
+      "deal_seed": 61093,
+      "first": true,
+      "winner": 1,
+      "score_diff": 40,
+      "steps": 67
+    },
+    {
+      "game": 187,
+      "deal_seed": 61093,
+      "first": false,
+      "winner": -1,
+      "score_diff": -90,
+      "steps": 63
+    },
+    {
+      "game": 188,
+      "deal_seed": 61094,
+      "first": true,
+      "winner": -1,
+      "score_diff": -145,
+      "steps": 66
+    },
+    {
+      "game": 189,
+      "deal_seed": 61094,
+      "first": false,
+      "winner": -1,
+      "score_diff": -155,
+      "steps": 71
+    },
+    {
+      "game": 190,
+      "deal_seed": 61095,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 68
+    },
+    {
+      "game": 191,
+      "deal_seed": 61095,
+      "first": false,
+      "winner": -1,
+      "score_diff": -55,
+      "steps": 55
+    },
+    {
+      "game": 192,
+      "deal_seed": 61096,
+      "first": true,
+      "winner": -1,
+      "score_diff": -140,
+      "steps": 76
+    },
+    {
+      "game": 193,
+      "deal_seed": 61096,
+      "first": false,
+      "winner": -1,
+      "score_diff": -105,
+      "steps": 67
+    },
+    {
+      "game": 194,
+      "deal_seed": 61097,
+      "first": true,
+      "winner": -1,
+      "score_diff": -160,
+      "steps": 70
+    },
+    {
+      "game": 195,
+      "deal_seed": 61097,
+      "first": false,
+      "winner": -1,
+      "score_diff": -45,
+      "steps": 69
+    },
+    {
+      "game": 196,
+      "deal_seed": 61098,
+      "first": true,
+      "winner": 1,
+      "score_diff": 55,
+      "steps": 64
+    },
+    {
+      "game": 197,
+      "deal_seed": 61098,
+      "first": false,
+      "winner": -1,
+      "score_diff": -170,
+      "steps": 61
+    },
+    {
+      "game": 198,
+      "deal_seed": 61099,
+      "first": true,
+      "winner": 1,
+      "score_diff": 5,
+      "steps": 70
+    },
+    {
+      "game": 199,
+      "deal_seed": 61099,
+      "first": false,
+      "winner": -1,
+      "score_diff": -75,
+      "steps": 65
+    }
+  ],
+  "spec": {
+    "binary_sha256": "69c5fcd7afd1bfd1f69761daaee23e819881a6b125cf93f8771074bf98706eaf",
+    "config": {
+      "particles": 96,
+      "simulations": 24,
+      "horizon": 24,
+      "budget-ms": 60,
+      "exploration": 2.0,
+      "tolerance": 0.35,
+      "rollout-model": 2,
+      "prior0": 0.15,
+      "prior1": 0.6,
+      "prior2": 0.1,
+      "prior3": 0.1,
+      "prior4": 0.05
+    },
+    "opponent": "AI2",
+    "seed": 61000,
+    "candidate": "Fair2",
+    "games": 200
+  }
+}

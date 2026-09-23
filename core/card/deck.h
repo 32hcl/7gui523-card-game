@@ -1,8 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <random>
-#include <algorithm>
 #include "card.h"
 
 // 玩家结构体前向声明

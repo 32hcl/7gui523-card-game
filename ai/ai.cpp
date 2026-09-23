@@ -1,11 +1,15 @@
 #include "ai_types.h"
 #include "core/card/rank.h"
 #include "ai.h"
+#include "fair_engine.h"
+#include "engine/play_selector.h"
+#include "engine/counter_risk.h"
+#include <stdexcept>
 #include "searcher/minimax.h"
 #include "core/card/cardtype.h"
 #include "core/player.h"
-#include "ai_types.h"
 #include <sstream>
+#include <iostream>
 #include <random>
 #include <map>
 #include <set>
@@ -14,44 +18,6 @@
 AIParams g_ai4Params;
 void setAI4Params(const AIParams& p) { g_ai4Params = p; }
 AIParams getAI4Params() { return g_ai4Params; }
-
-namespace {
-    // P0 修复：对手反压风险权重
-    constexpr int kCounterRiskWeight = 2;
-
-    // 估算对手反压本手牌的风险分
-    int estimateCounterRisk(const std::vector<Card>& play,
-                            const Player& player,
-                            const Player& opponent,
-                            const CardTracker* tracker,
-                            const CardTypeResult& parsed,
-                            int tableScore) {
-        if (!tracker) return 0;
-        if (opponent.hand.empty()) return 0;
-        if (parsed.type == CardType::Rocket) return 0;
-        if (parsed.type == CardType::Special523) return 0;
-
-        auto it = RANK_MAP.find(parsed.keyPoint);
-        if (it == RANK_MAP.end()) return 0;
-        int myRank = it->second;
-
-        int oppBeatsCount = 0;
-        for (const auto& kv : RANK_MAP) {
-            if (kv.second < myRank) continue;
-            int total = tracker->totalCount(kv.first);
-            int played = tracker->playedCount(kv.first);
-            int mine = 0;
-            for (const Card& h : player.hand) if (h.point == kv.first) mine++;
-            int oppMightHave = total - played - mine;
-            if (oppMightHave > 0) oppBeatsCount += oppMightHave;
-        }
-
-        if (oppBeatsCount == 0) return 0;
-
-        int weight = 1 + tableScore / 10;
-        return oppBeatsCount * weight;
-    }
-}
 
 std::vector<std::vector<Card>> enumerateLegalPlays(const Player& player) {
     std::vector<std::vector<Card>> result;
@@ -182,7 +148,7 @@ static int playGain(const std::vector<Card>& play,
             if (tracker->isExhausted(c.point)) gain += 30;
         }
         auto parsed = parseCardType(play);
-        int risk = estimateCounterRisk(play, player, opponent, tracker, parsed, tableScore);
+        int risk = estimateCounterRisk(play, player, opponent, tracker, parsed, tableScore, deck);
         gain -= risk * kCounterRiskWeight;
     }
 
@@ -272,7 +238,7 @@ static int playGainAI4(const std::vector<Card>& play,
 
     if (tracker) {
         auto parsedRisk = parseCardType(play);
-        int risk = estimateCounterRisk(play, player, opponent, tracker, parsedRisk, tableScore);
+        int risk = estimateCounterRisk(play, player, opponent, tracker, parsedRisk, tableScore, deck);
         gain -= risk * kCounterRiskWeight;
     }
 
@@ -331,34 +297,11 @@ std::vector<Card> aiChoosePlayAI2(const Player& player,
     auto allPlays = enumerateLegalPlays(player);
     if (allPlays.empty()) return {};
 
-    if (previous.cards.empty()) {
-        for (const auto& play : allPlays) {
-            if (play.size() == player.hand.size()) return play;
-        }
-    }
+    auto finish = tryFinishPlay(player, allPlays, previous);
+    if (!finish.empty()) return finish;
 
-    if (!previous.cards.empty()) {
-        for (const auto& play : allPlays) {
-            auto parsed = parseCardType(play);
-            if (canBeat(parsed, previous) && play.size() == player.hand.size()) return play;
-        }
-    }
-
-    if (!previous.cards.empty() && (int)opponent.hand.size() <= 2) {
-        std::vector<Card> rocket, smallestBomb;
-        int smallestBombRank = INT_MAX;
-        for (const auto& play : allPlays) {
-            auto parsed = parseCardType(play);
-            if (!canBeat(parsed, previous)) continue;
-            if (parsed.type == CardType::Rocket) rocket = play;
-            else if (parsed.type == CardType::Bomb) {
-                int rank = getCardRank(parsed.keyPoint);
-                if (rank < smallestBombRank) { smallestBombRank = rank; smallestBomb = play; }
-            }
-        }
-        if (!rocket.empty()) return rocket;
-        if (!smallestBomb.empty()) return smallestBomb;
-    }
+    auto intercept = tryEndgameIntercept(player, allPlays, previous, (int)opponent.hand.size());
+    if (!intercept.empty()) return intercept;
 
     std::vector<Card> best;
     int bestGain = INT_MIN;
@@ -380,34 +323,11 @@ std::vector<Card> aiChoosePlayAI3(const Player& player,
     auto allPlays = enumerateLegalPlays(player);
     if (allPlays.empty()) return {};
 
-    if (previous.cards.empty()) {
-        for (const auto& play : allPlays) {
-            if (play.size() == player.hand.size()) return play;
-        }
-    }
+    auto finish = tryFinishPlay(player, allPlays, previous);
+    if (!finish.empty()) return finish;
 
-    if (!previous.cards.empty()) {
-        for (const auto& play : allPlays) {
-            auto parsed = parseCardType(play);
-            if (canBeat(parsed, previous) && play.size() == player.hand.size()) return play;
-        }
-    }
-
-    if (!previous.cards.empty() && (int)opponent.hand.size() <= 2) {
-        std::vector<Card> rocket, smallestBomb;
-        int smallestBombRank = INT_MAX;
-        for (const auto& play : allPlays) {
-            auto parsed = parseCardType(play);
-            if (!canBeat(parsed, previous)) continue;
-            if (parsed.type == CardType::Rocket) rocket = play;
-            else if (parsed.type == CardType::Bomb) {
-                int rank = getCardRank(parsed.keyPoint);
-                if (rank < smallestBombRank) { smallestBombRank = rank; smallestBomb = play; }
-            }
-        }
-        if (!rocket.empty()) return rocket;
-        if (!smallestBomb.empty()) return smallestBomb;
-    }
+    auto intercept = tryEndgameIntercept(player, allPlays, previous, (int)opponent.hand.size());
+    if (!intercept.empty()) return intercept;
 
     std::vector<Card> best;
     int bestGain = INT_MIN;
@@ -426,7 +346,7 @@ std::vector<Card> aiChoosePlayAI4(const Player& player,
                                   const Deck& deck,
                                   int tableScore,
                                   const CardTracker& tracker) {
-    return searchBestPlayCheat(player, opponent, previous, deck, tableScore, 6);
+    return searchBestPlayCheat(player, opponent, previous, deck, tableScore, g_searchBestPlayCheatDepth);
 }
 
 std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,
@@ -444,39 +364,11 @@ std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,
     auto allPlays = enumerateLegalPlays(player);
     if (allPlays.empty()) return {};
 
-    if (previous.cards.empty()) {
-        for (const auto& play : allPlays) {
-            if (play.size() == player.hand.size()) {
-                if (outBd) *outBd = DecisionBreakdown{};
-                return play;
-            }
-        }
-    }
-    if (!previous.cards.empty()) {
-        for (const auto& play : allPlays) {
-            auto parsed = parseCardType(play);
-            if (canBeat(parsed, previous) && play.size() == player.hand.size()) {
-                if (outBd) *outBd = DecisionBreakdown{};
-                return play;
-            }
-        }
-    }
+    auto finish = tryFinishPlay(player, allPlays, previous);
+    if (!finish.empty()) { if (outBd) *outBd = DecisionBreakdown{}; return finish; }
 
-    if (!previous.cards.empty() && (int)opponent.hand.size() <= 2) {
-        std::vector<Card> rocket, smallestBomb;
-        int smallestBombRank = INT_MAX;
-        for (const auto& play : allPlays) {
-            auto parsed = parseCardType(play);
-            if (!canBeat(parsed, previous)) continue;
-            if (parsed.type == CardType::Rocket) rocket = play;
-            else if (parsed.type == CardType::Bomb) {
-                int rank = getCardRank(parsed.keyPoint);
-                if (rank < smallestBombRank) { smallestBombRank = rank; smallestBomb = play; }
-            }
-        }
-        if (!rocket.empty()) { if (outBd) *outBd = DecisionBreakdown{}; return rocket; }
-        if (!smallestBomb.empty()) { if (outBd) *outBd = DecisionBreakdown{}; return smallestBomb; }
-    }
+    auto intercept = tryEndgameIntercept(player, allPlays, previous, (int)opponent.hand.size());
+    if (!intercept.empty()) { if (outBd) *outBd = DecisionBreakdown{}; return intercept; }
 
     const CardTracker* trackerPtr = (player.aiLevel == AILevel::AI3_Tracker) ? &tracker : nullptr;
     std::vector<Card> best;
@@ -495,6 +387,8 @@ std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,
     }
     return {};
 }
+
+int g_searchBestPlayCheatDepth = 6;
 
 std::vector<Card> aiChoosePlay(const Player& player,
                                const Player& opponent,
@@ -516,6 +410,9 @@ std::vector<Card> aiChoosePlay(const Player& player,
         case AILevel::AI4_Expert:
             play = aiChoosePlayAI4(player, opponent, previous, deck, tableScore, tracker);
             break;
+        case AILevel::AI_Fair_Lv1:
+        case AILevel::AI_Fair_Lv2:
+            throw std::invalid_argument("Use aiChooseFairPlay with public Observation");
         default:
             play = aiChoosePlayAI1(player, previous);
             break;
@@ -570,4 +467,8 @@ std::vector<Card> humanChoosePlay(const Player& player, const CardTypeResult& pr
         return {};
     }
     return chosen;
+}
+std::vector<Card> aiChooseFairPlay(FairEngine& engine,const Observation& obs,AILevel level){
+ if(level!=AILevel::AI_Fair_Lv1&&level!=AILevel::AI_Fair_Lv2)throw std::invalid_argument("Not a fair level");
+ return engine.choosePlay(obs,level==AILevel::AI_Fair_Lv1?1:2);
 }

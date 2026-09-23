@@ -1,22 +1,27 @@
 #pragma once
-#include <vector>
-#include "core/card/card.h"
 #include "core/card/cardtype.h"
-
-// AI 合法观测：不包含真实对手手牌、不包含未公开牌堆信息
-struct AIObservation {
-    std::vector<Card> myHand;           // 我的手牌（已知）
-    int myScore;                        // 我的累计得分
-    int oppHandCount;                   // 对手手牌剩余张数（不包含具体牌面）
-    int oppScore;                       // 对手累计得分（比分可知）
-    int deckCount;                      // 牌堆剩余张数（不包含具体牌面）
-    CardTypeResult lastPlay;            // 上一手牌型
-    int tableScore;                     // 桌面分
-    bool isMyTurn;                      // 是否轮到我出
-    
-    // CardTracker 公开信息：每张牌点数的剩余数量
-    // 通过 "总数 - 已打出 - 我手牌中" 推导，不暴露对手具体手牌
-    std::map<std::string, int> unseenCount;  // 每点数未出现张数（= 牌堆 + 对手手牌）
-    std::map<std::string, int> totalCount;   // 每点数总数（4 或 1）
-    std::map<std::string, int> playedCount;  // 每点数已打出张数
+#include <array>
+#include <vector>
+struct PublicEvent {
+    bool actorMe=true;
+    std::vector<Card> cards, myDraws;
+    int myCount=0, opponentCount=0, deckCount=0;
+};
+// No opponent cards or real draw order can enter the fair engine interface.
+struct Observation {
+    std::vector<Card> hand, initialHand;
+    std::array<int,15> played{};
+    int opponentCount=5, deckCount=44;
+    int myScore=0, opponentScore=0, tableScore=0, tableBonus=0;
+    CardTypeResult previous;
+    bool finalPhase=false, initialMyTurn=true;
+    int firstEmpty=0;
+    std::vector<PublicEvent> history;
+};
+struct FairConfig {
+    int particles=48, simulations=48, horizon=12, budgetMs=60;
+    double exploration=1.2, tolerance=0.08;
+    std::array<double,5> modelPrior{{.35,.3,.1,.15,.1}};
+    unsigned seed=714025;
+    int rolloutModel=1;
 };

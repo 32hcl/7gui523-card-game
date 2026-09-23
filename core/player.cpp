@@ -1,5 +1,7 @@
 #include "player.h"
 #include "core/card/deck.h"
+#include <iostream>
+#include <algorithm>
 
 Player createPlayer(const std::string& name) {
     Player p;

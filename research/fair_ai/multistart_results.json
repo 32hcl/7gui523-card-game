@@ -1,0 +1,112 @@
+[
+  {
+    "id": "screen-00",
+    "config": {
+      "particles": 48,
+      "simulations": 48,
+      "horizon": 12,
+      "budget-ms": 120,
+      "exploration": 1.2,
+      "tolerance": 0.08,
+      "rollout-model": 1
+    },
+    "score_rate": 0.3625,
+    "win_rate": 0.36,
+    "ci95": [
+      0.296691973,
+      0.4285847183
+    ]
+  },
+  {
+    "id": "screen-01",
+    "config": {
+      "particles": 96,
+      "simulations": 24,
+      "horizon": 24,
+      "budget-ms": 60,
+      "exploration": 2.0,
+      "tolerance": 0.35,
+      "rollout-model": 2,
+      "prior0": 0.15,
+      "prior1": 0.6,
+      "prior2": 0.1,
+      "prior3": 0.1,
+      "prior4": 0.05
+    },
+    "score_rate": 0.1825,
+    "win_rate": 0.17,
+    "ci95": [
+      0.1242790791,
+      0.2281588363
+    ]
+  },
+  {
+    "id": "screen-02",
+    "config": {
+      "particles": 96,
+      "simulations": 96,
+      "horizon": 24,
+      "budget-ms": 60,
+      "exploration": 0.5,
+      "tolerance": 0.15,
+      "rollout-model": 0,
+      "prior0": 0.2,
+      "prior1": 0.2,
+      "prior2": 0.2,
+      "prior3": 0.2,
+      "prior4": 0.2
+    },
+    "score_rate": 0.365,
+    "win_rate": 0.36,
+    "ci95": [
+      0.296691973,
+      0.4285847183
+    ]
+  },
+  {
+    "id": "screen-03",
+    "config": {
+      "particles": 24,
+      "simulations": 48,
+      "horizon": 48,
+      "budget-ms": 240,
+      "exploration": 0.5,
+      "tolerance": 0.15,
+      "rollout-model": 0,
+      "prior0": 0.6,
+      "prior1": 0.15,
+      "prior2": 0.1,
+      "prior3": 0.1,
+      "prior4": 0.05
+    },
+    "score_rate": 0.285,
+    "win_rate": 0.285,
+    "ci95": [
+      0.22695003,
+      0.3511534603
+    ]
+  },
+  {
+    "id": "screen-04",
+    "config": {
+      "particles": 96,
+      "simulations": 96,
+      "horizon": 24,
+      "budget-ms": 240,
+      "exploration": 0.5,
+      "tolerance": 0.35,
+      "rollout-model": 0,
+      "prior0": 0.15,
+      "prior1": 0.6,
+      "prior2": 0.1,
+      "prior3": 0.1,
+      "prior4": 0.05
+    },
+    "score_rate": 0.355,
+    "win_rate": 0.35,
+    "ci95": [
+      0.2872882413,
+      0.4183653566
+    ]
+  }
+]

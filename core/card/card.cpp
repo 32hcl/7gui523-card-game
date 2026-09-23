@@ -1,4 +1,5 @@
 #include "card.h"
+#include <iostream>
 
 // 牌面顺序映射（从大到小），值越大牌越大
 const std::map<std::string, int> RANK_MAP = {

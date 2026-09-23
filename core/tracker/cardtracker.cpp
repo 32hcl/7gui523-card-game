@@ -45,3 +45,17 @@ int CardTracker::playedCount(const std::string& point) const {
     auto it = m_playedCount.find(point);
     return (it == m_playedCount.end()) ? 0 : it->second;
 }
+
+double CardTracker::expectedOpponentCount(const std::string& point, int oppHandSize, int deckSize) const {
+    int unknown = remainingCount(point);
+    int total = oppHandSize + deckSize;
+    if (total == 0) return 0.0;
+    return (double)unknown * oppHandSize / total;
+}
+
+double CardTracker::expectedDeckCount(const std::string& point, int oppHandSize, int deckSize) const {
+    int unknown = remainingCount(point);
+    int total = oppHandSize + deckSize;
+    if (total == 0) return 0.0;
+    return (double)unknown * deckSize / total;
+}
