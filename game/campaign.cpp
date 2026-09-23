@@ -72,7 +72,7 @@ LevelResult Campaign::finishLevel(const RoundResult& rr,
     if (lr.playerWon) {
         playerHp_ += healAmount;
     } else {
-        playerHp_ -= healAmount;
+        playerHp_ -= healAmount / 2;  // 失败惩罚减半
     }
 
     playerHp_ = std::min(playerHp_, cfg_.playerMaxHp);

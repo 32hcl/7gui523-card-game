@@ -5,11 +5,11 @@
 #include "game/game.h"
 
 struct CampaignConfig {
-    int playerInitHp = 140;
-    int playerMaxHp  = 210;
+    int playerInitHp = 200;
+    int playerMaxHp  = 300;
     int bossMaxHp    = 110;
     int totalLevels  = 9;
-    int healPerCard  = 3;
+    int healPerCard  = 2;
 };
 
 struct LevelResult {
