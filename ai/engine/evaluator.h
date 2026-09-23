@@ -17,7 +17,8 @@ public:
                          const Deck& deck,
                          const CardTypeResult& previous,
                          int tableScore,
-                         const CardTracker* tracker) const = 0;
+                         const CardTracker* tracker,
+                         DeckSide mySide = DeckSide::PlayerA) const = 0;
 };
 
 class SimpleEvaluator : public Evaluator {
@@ -28,7 +29,8 @@ public:
                  const Deck& deck,
                  const CardTypeResult& previous,
                  int tableScore,
-                 const CardTracker* tracker) const override;
+                 const CardTracker* tracker,
+                 DeckSide mySide = DeckSide::PlayerA) const override;
 };
 
 class SmartEvaluator : public Evaluator {
@@ -39,7 +41,8 @@ public:
                  const Deck& deck,
                  const CardTypeResult& previous,
                  int tableScore,
-                 const CardTracker* tracker) const override;
+                 const CardTracker* tracker,
+                 DeckSide mySide = DeckSide::PlayerA) const override;
 };
 
 class AdvancedEvaluator : public Evaluator {
@@ -51,7 +54,8 @@ public:
                  const Deck& deck,
                  const CardTypeResult& previous,
                  int tableScore,
-                 const CardTracker* tracker) const override;
+                 const CardTracker* tracker,
+                 DeckSide mySide = DeckSide::PlayerA) const override;
 private:
     AIParams params_;
 };

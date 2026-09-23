@@ -19,7 +19,8 @@ public:
                                      const Deck& deck,
                                      int tableScore,
                                      const CardTracker* tracker,
-                                     const Evaluator* evaluator) = 0;
+                                     const Evaluator* evaluator,
+                                     DeckSide mySide = DeckSide::PlayerA) = 0;
 };
 
 class NoSearcher : public Searcher {
@@ -30,7 +31,8 @@ public:
                              const Deck& deck,
                              int tableScore,
                              const CardTracker* tracker,
-                             const Evaluator* evaluator) override;
+                             const Evaluator* evaluator,
+                             DeckSide mySide = DeckSide::PlayerA) override;
 };
 
 class MinimaxSearcher : public Searcher {
@@ -42,7 +44,8 @@ public:
                              const Deck& deck,
                              int tableScore,
                              const CardTracker* tracker,
-                             const Evaluator* evaluator) override;
+                             const Evaluator* evaluator,
+                             DeckSide mySide = DeckSide::PlayerA) override;
 private:
     int depth_;
     const StateEvaluator* stateEvaluator_;

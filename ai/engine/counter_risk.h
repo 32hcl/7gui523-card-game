@@ -15,7 +15,8 @@ inline int estimateCounterRisk(const std::vector<Card>& play,
                                 const CardTracker* tracker,
                                 const CardTypeResult& parsed,
                                 int tableScore,
-                                const Deck& deck) {
+                                const Deck& deck,
+                                DeckSide mySide = DeckSide::PlayerA) {
     (void)play;
     (void)player;
     if (!tracker) return 0;
@@ -32,7 +33,8 @@ inline int estimateCounterRisk(const std::vector<Card>& play,
         if (kv.second < myRank) continue;
         double oppMightHave = tracker->expectedOpponentCount(kv.first,
                                    (int)opponent.hand.size(),
-                                   (int)deck.cards.size());
+                                   (int)deck.cards.size(),
+                                   mySide);
         if (oppMightHave > 0.5) oppBeatsCount++;
     }
 

@@ -100,17 +100,17 @@ std::vector<Card> AIEngine::choosePlay(const Player& player,
                     Player sampledOpponent;
                     sampledOpponent.hand = sample.hand;
                     sampledOpponent.totalScore = opponent.totalScore;
-                    totalScore += evaluator_->evaluate(play, player, sampledOpponent, deck, previous, tableScore, trackerPtr);
+                    totalScore += evaluator_->evaluate(play, player, sampledOpponent, deck, previous, tableScore, trackerPtr, DeckSide::Boss);
                 }
                 score = totalScore / (int)samples.size();
             } else {
-                score = evaluator_->evaluate(play, player, opponent, deck, previous, tableScore, trackerPtr);
+                score = evaluator_->evaluate(play, player, opponent, deck, previous, tableScore, trackerPtr, DeckSide::Boss);
             }
             scoredPlays.emplace_back(play, score);
         }
         result = policy_->select(scoredPlays, rng_);
     } else {
-        result = searcher_->search(player, opponent, previous, deck, tableScore, trackerPtr, evaluator_.get());
+        result = searcher_->search(player, opponent, previous, deck, tableScore, trackerPtr, evaluator_.get(), DeckSide::Boss);
     }
 
     if (!result.empty()) {
@@ -126,6 +126,11 @@ std::vector<Card> AIEngine::choosePlay(const Player& player,
 
 void AIEngine::recordPlayed(const std::vector<Card>& cards) {
     tracker_->recordPlayed(cards);
+    turnsElapsed_++;
+}
+
+void AIEngine::recordPlayed(const std::vector<Card>& cards, DeckSide side) {
+    tracker_->recordPlayed(cards, side);
     turnsElapsed_++;
 }
 

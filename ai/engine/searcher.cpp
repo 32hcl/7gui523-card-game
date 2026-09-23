@@ -56,7 +56,8 @@ std::vector<Card> NoSearcher::search(const Player& player,
                                       const Deck& deck,
                                       int tableScore,
                                       const CardTracker* tracker,
-                                      const Evaluator* evaluator) {
+                                      const Evaluator* evaluator,
+                                      DeckSide mySide) {
     auto allPlays = enumerateLegalPlays(player);
     if (allPlays.empty()) return {};
 
@@ -65,7 +66,7 @@ std::vector<Card> NoSearcher::search(const Player& player,
     for (const auto& play : allPlays) {
         auto parsed = parseCardType(play);
         if (!previous.cards.empty() && !canBeat(parsed, previous)) continue;
-        int gain = evaluator->evaluate(play, player, opponent, deck, previous, tableScore, tracker);
+        int gain = evaluator->evaluate(play, player, opponent, deck, previous, tableScore, tracker, mySide);
         if (gain > bestGain) { bestGain = gain; best = play; }
     }
     return best;
@@ -80,7 +81,8 @@ std::vector<Card> MinimaxSearcher::search(const Player& player,
                                            const Deck& deck,
                                            int tableScore,
                                            const CardTracker* tracker,
-                                           const Evaluator* evaluator) {
+                                           const Evaluator* evaluator,
+                                           DeckSide /*mySide*/) {
     GamePosition state;
     state.myHand = player.hand;
     state.oppHand = opponent.hand;

@@ -9,7 +9,8 @@ int SimpleEvaluator::evaluate(const std::vector<Card>& play,
                                const Deck& /*deck*/,
                                const CardTypeResult& /*previous*/,
                                int tableScore,
-                               const CardTracker* /*tracker*/) const {
+                               const CardTracker* /*tracker*/,
+                               DeckSide /*mySide*/) const {
     int gain = 0;
     gain += tableScore * 2;
     gain += (int)play.size() * 10;
@@ -35,7 +36,8 @@ int SmartEvaluator::evaluate(const std::vector<Card>& play,
                               const Deck& deck,
                               const CardTypeResult& /*previous*/,
                               int tableScore,
-                              const CardTracker* tracker) const {
+                              const CardTracker* tracker,
+                              DeckSide mySide) const {
     int gain = 0;
     gain += tableScore * 2;
     gain += (int)play.size() * 10;
@@ -54,10 +56,10 @@ int SmartEvaluator::evaluate(const std::vector<Card>& play,
 
     if (tracker) {
         for (const Card& c : play) {
-            if (tracker->isExhausted(c.point)) gain += 30;
+            if (tracker->isExhausted(c.point, mySide)) gain += 30;
         }
         auto parsed = parseCardType(play);
-        int risk = estimateCounterRisk(play, player, opponent, tracker, parsed, tableScore, deck);
+        int risk = estimateCounterRisk(play, player, opponent, tracker, parsed, tableScore, deck, mySide);
         gain -= risk * kCounterRiskWeight;
     }
 
@@ -72,7 +74,8 @@ int AdvancedEvaluator::evaluate(const std::vector<Card>& play,
                                  const Deck& deck,
                                  const CardTypeResult& /*previous*/,
                                  int tableScore,
-                                 const CardTracker* tracker) const {
+                                 const CardTracker* tracker,
+                                 DeckSide mySide) const {
     const AIParams& P = params_;
     int gain = 0;
     gain += tableScore * P.tableScoreWeight;
@@ -102,7 +105,7 @@ int AdvancedEvaluator::evaluate(const std::vector<Card>& play,
 
     if (tracker) {
         for (const Card& c : play) {
-            if (tracker->isExhausted(c.point)) gain += P.deckTopBonus;
+            if (tracker->isExhausted(c.point, mySide)) gain += P.deckTopBonus;
         }
     }
 
@@ -149,7 +152,7 @@ int AdvancedEvaluator::evaluate(const std::vector<Card>& play,
 
     if (tracker) {
         auto parsedRisk = parseCardType(play);
-        int risk = estimateCounterRisk(play, player, opponent, tracker, parsedRisk, tableScore, deck);
+        int risk = estimateCounterRisk(play, player, opponent, tracker, parsedRisk, tableScore, deck, mySide);
         gain -= risk * kCounterRiskWeight;
     }
 

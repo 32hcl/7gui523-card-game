@@ -50,6 +50,7 @@ public:
                                   int tableScore);
 
     void recordPlayed(const std::vector<Card>& cards);
+    void recordPlayed(const std::vector<Card>& cards, DeckSide side);
 
     void setOpponentHand(const std::vector<Card>& hand);
 
