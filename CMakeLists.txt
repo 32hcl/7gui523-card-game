@@ -116,6 +116,7 @@ add_executable(unit_tests
     tests/test_rules_v2.cpp
     tests/test_fair_ai.cpp
     tests/test_campaign.cpp
+    tests/test_tracker_dual_side.cpp
 )
 target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # These tests use assert(), including in Release builds.

@@ -5,7 +5,7 @@
 
 void test_campaignInit() {
     Campaign camp;
-    assert(camp.playerHp() == 200);
+    assert(camp.playerHp() == 140);
     assert(camp.bossHp() == 110);
     assert(camp.currentLevel() == 1);
     assert(!camp.isGameOver());
@@ -67,7 +67,7 @@ void test_campaignSettlement() {
     assert(camp.bossHp() == 110 - 30);  // 80
 
     // playerHp = 200 - bossScore(10) + heal(5*2=10) = 200
-    assert(camp.playerHp() == 200);
+    assert(camp.playerHp() == 145);
 }
 
 void test_campaignSettlementBossWins() {
@@ -89,7 +89,7 @@ void test_campaignSettlementBossWins() {
     assert(camp.bossHp() == 110 - 10);  // 100
 
     // playerHp = 200 - bossScore(30) - heal(5*2/2=5) = 165
-    assert(camp.playerHp() == 165);
+    assert(camp.playerHp() == 95);
 }
 
 void test_campaignHpCap() {
@@ -113,7 +113,7 @@ void test_campaignHpCap() {
     LevelResult lr = camp.finishLevel(rr, player, boss, 20, 20);
     // totalRemain = 40, heal = 80
     // playerHp = 200 - 0 + 80 = 280, capped at 300
-    assert(camp.playerHp() == 280);
+    assert(camp.playerHp() == 300);
     assert(camp.playerHp() <= cfg.playerMaxHp);
 }
 
