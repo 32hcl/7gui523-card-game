@@ -96,7 +96,7 @@ void BattleScreen::createTableArea(QVBoxLayout* leftLay)
     tableLay->addWidget(m_handTypeLabel);
 
     m_tableCardsWidget = new QWidget;
-    m_tableCardsWidget->setFixedHeight(180);
+    m_tableCardsWidget->setFixedHeight(90);
     m_tableCardsWidget->setAttribute(Qt::WA_StyledBackground, true);
     tableLay->addWidget(m_tableCardsWidget);
 
@@ -114,58 +114,81 @@ void BattleScreen::createTableArea(QVBoxLayout* leftLay)
     m_deckDisplayWidget = new QWidget;
     m_deckDisplayWidget->setStyleSheet("background-color: #0A2E12; border-left: 2px solid #558B2F;");
     m_deckDisplayLayout = new QVBoxLayout(m_deckDisplayWidget);
-    m_deckDisplayLayout->setContentsMargins(10, 15, 10, 15);
-    m_deckDisplayLayout->setAlignment(Qt::AlignCenter);
+    m_deckDisplayLayout->setContentsMargins(10, 10, 10, 10);
+    m_deckDisplayLayout->setSpacing(8);
 
-    auto* deckTitle = new QLabel("牌堆");
-    deckTitle->setAlignment(Qt::AlignCenter);
-    deckTitle->setStyleSheet("QLabel { color: #FFD700; font-size: 14px; font-weight: bold; }");
-    m_deckDisplayLayout->addWidget(deckTitle);
+    // 双牌堆 - 竖向排列
+    auto* decksLay = new QVBoxLayout;
+    decksLay->setSpacing(24);
+    decksLay->setAlignment(Qt::AlignCenter);
 
-    m_deckBackLabel = new QLabel;
-    m_deckBackLabel->setFixedSize(150, 220);
-    m_deckBackLabel->setAlignment(Qt::AlignCenter);
-    m_deckBackLabel->setStyleSheet("QLabel { background: transparent; border: none; }");
+    // 玩家牌堆（上）
+    m_playerDeckWidget = new QWidget;
+    auto* playerDeckLay = new QVBoxLayout(m_playerDeckWidget);
+    playerDeckLay->setContentsMargins(0, 0, 0, 0);
+    playerDeckLay->setSpacing(4);
+    playerDeckLay->setAlignment(Qt::AlignCenter);
+
+    m_playerDeckLabel = new QLabel("玩家牌堆");
+    m_playerDeckLabel->setAlignment(Qt::AlignCenter);
+    m_playerDeckLabel->setStyleSheet("QLabel { color: #4CAF50; font-size: 12px; font-weight: bold; }");
+    playerDeckLay->addWidget(m_playerDeckLabel);
+
+    // 玩家牌堆背图
     {
         QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
         if (QFile::exists(backPath)) {
             QPixmap backPix(backPath);
-            QPixmap scaled = backPix.scaled(146, 214, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-
-            QWidget* deckStack = new QWidget;
-            deckStack->setFixedSize(156, 226);
-            deckStack->setStyleSheet("background: transparent;");
-
-            for (int layer = 5; layer >= 0; --layer) {
-                QLabel* layerLabel = new QLabel(deckStack);
-                layerLabel->setFixedSize(150, 220);
-                layerLabel->setAlignment(Qt::AlignCenter);
-                layerLabel->setStyleSheet("QLabel { background: transparent; border: none; }");
-                layerLabel->setPixmap(scaled);
-                layerLabel->move(-layer * 2, layer * 2);
-
-                if (layer > 0) {
-                    QGraphicsOpacityEffect* op = new QGraphicsOpacityEffect(layerLabel);
-                    op->setOpacity(1.0 - layer * 0.12);
-                    layerLabel->setGraphicsEffect(op);
-                }
-                if (layer == 0) {
-                    m_deckBackLabel = layerLabel;
-                }
-            }
-
-            m_deckDisplayLayout->addWidget(deckStack, 0, Qt::AlignCenter);
-        } else {
-            m_deckDisplayLayout->addWidget(m_deckBackLabel, 0, Qt::AlignCenter);
+            QPixmap scaled = backPix.scaled(60, 90, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            QLabel* playerDeckImg = new QLabel;
+            playerDeckImg->setFixedSize(64, 94);
+            playerDeckImg->setAlignment(Qt::AlignCenter);
+            playerDeckImg->setPixmap(scaled);
+            playerDeckLay->addWidget(playerDeckImg, 0, Qt::AlignCenter);
         }
     }
 
-    m_deckCountBigLabel = new QLabel("44 张");
-    m_deckCountBigLabel->setAlignment(Qt::AlignCenter);
-    m_deckCountBigLabel->setStyleSheet(
-        "QLabel { color: #FFEB3B; font-size: 16px; font-weight: bold; }");
-    m_deckDisplayLayout->addWidget(m_deckCountBigLabel);
+    m_playerDeckCountLabel = new QLabel("27 张");
+    m_playerDeckCountLabel->setAlignment(Qt::AlignCenter);
+    m_playerDeckCountLabel->setStyleSheet("QLabel { color: #81C784; font-size: 13px; font-weight: bold; }");
+    playerDeckLay->addWidget(m_playerDeckCountLabel);
 
+    decksLay->addWidget(m_playerDeckWidget);
+
+    // Boss 牌堆（下）
+    m_bossDeckWidget = new QWidget;
+    auto* bossDeckLay = new QVBoxLayout(m_bossDeckWidget);
+    bossDeckLay->setContentsMargins(0, 0, 0, 0);
+    bossDeckLay->setSpacing(4);
+    bossDeckLay->setAlignment(Qt::AlignCenter);
+
+    m_bossDeckLabel = new QLabel("Boss 牌堆");
+    m_bossDeckLabel->setAlignment(Qt::AlignCenter);
+    m_bossDeckLabel->setStyleSheet("QLabel { color: #EF5350; font-size: 12px; font-weight: bold; }");
+    bossDeckLay->addWidget(m_bossDeckLabel);
+
+    // Boss 牌堆背图
+    {
+        QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
+        if (QFile::exists(backPath)) {
+            QPixmap backPix(backPath);
+            QPixmap scaled = backPix.scaled(60, 90, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            QLabel* bossDeckImg = new QLabel;
+            bossDeckImg->setFixedSize(64, 94);
+            bossDeckImg->setAlignment(Qt::AlignCenter);
+            bossDeckImg->setPixmap(scaled);
+            bossDeckLay->addWidget(bossDeckImg, 0, Qt::AlignCenter);
+        }
+    }
+
+    m_bossDeckCountLabel = new QLabel("27 张");
+    m_bossDeckCountLabel->setAlignment(Qt::AlignCenter);
+    m_bossDeckCountLabel->setStyleSheet("QLabel { color: #E57373; font-size: 13px; font-weight: bold; }");
+    bossDeckLay->addWidget(m_bossDeckCountLabel);
+
+    decksLay->addWidget(m_bossDeckWidget);
+
+    m_deckDisplayLayout->addLayout(decksLay);
     m_deckDisplayLayout->addStretch();
 
     tableOuterLay->addWidget(m_deckDisplayWidget, 30);

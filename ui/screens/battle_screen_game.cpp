@@ -7,6 +7,7 @@
 #include "core/rule/score.h"
 #include "core/rule/special.h"
 #include "game/game.h"
+#include "game/campaign.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -14,7 +15,6 @@
 #include <QDialog>
 #include <QTimer>
 #include <QGraphicsDropShadowEffect>
-#include <QGraphicsOpacityEffect>
 #include <random>
 
 void BattleScreen::onPlayButtonClicked()
@@ -120,7 +120,7 @@ void BattleScreen::onPlayButtonClicked()
 
     bool playerAFinished = m_playerA.hand.empty();
 
-    if (playerAFinished && m_deck.cards.empty()) {
+    if (playerAFinished && m_playerDeck.cards.empty()) {
         endRound(m_playerA);
         finalSettlement(m_playerA, m_playerB, m_tableCards);
         compareAndAnnounce(m_playerA, m_playerB);
@@ -139,7 +139,7 @@ void BattleScreen::onPlayButtonClicked()
         return;
     }
 
-    if (m_playerB.hand.empty() && !m_deck.cards.empty()) {
+    if (m_playerB.hand.empty() && !m_bossDeck.cards.empty()) {
         appendLog("玩家A 出牌回应，玩家A 赢得本回合");
         endRound(m_playerA);
         refillBoth(m_playerA, m_playerB);
@@ -172,7 +172,7 @@ void BattleScreen::onPassButtonClicked()
 
     appendLog("玩家A 不要");
 
-    if (m_playerB.hand.empty() && !m_deck.cards.empty()) {
+    if (m_playerB.hand.empty() && !m_bossDeck.cards.empty()) {
         appendLog("电脑 赢得本回合");
         endRound(m_playerB);
         refillBoth(m_playerB, m_playerA);
@@ -281,26 +281,29 @@ void BattleScreen::startGameWithFirst(bool playerAFirst)
 
     if (m_firstChoiceWidget) m_firstChoiceWidget->hide();
 
+    // 从双牌堆中移除玩家选的牌
     for (const Card& c : m_pickedCards) {
-        auto it = std::find_if(m_deck.cards.begin(), m_deck.cards.end(),
+        auto it = std::find_if(m_playerDeck.cards.begin(), m_playerDeck.cards.end(),
             [&](const Card& h) { return h.point == c.point && h.suit == c.suit; });
-        if (it != m_deck.cards.end()) m_deck.cards.erase(it);
+        if (it != m_playerDeck.cards.end()) m_playerDeck.cards.erase(it);
     }
 
-    shuffleDeck(m_deck);
+    shuffleDeck(m_playerDeck);
+    shuffleDeck(m_bossDeck);
 
     emit gameStarted();
 
     m_playerA.hand = m_pickedCards;
     int needA = 5 - (int)m_playerA.hand.size();
-    if (needA > 0) dealCards(m_playerA, m_deck, needA);
+    if (needA > 0) dealCards(m_playerA, m_playerDeck, needA);
     sortHandSmart(m_playerA.hand);
 
-    dealCards(m_playerB, m_deck, 5);
+    dealCards(m_playerB, m_bossDeck, 5);
 
     appendLog(QString("玩家A 手牌: %1").arg(cardsToString(m_playerA.hand)));
     appendLog(QString("电脑 手牌: %1").arg(cardsToString(m_playerB.hand)));
-    appendLog(QString("牌堆剩余: %1 张").arg((int)m_deck.cards.size()));
+    appendLog(QString("玩家牌堆: %1 张 | Boss牌堆: %2 张")
+        .arg((int)m_playerDeck.cards.size()).arg((int)m_bossDeck.cards.size()));
     appendLog(QString("先手: %1").arg(playerAFirst ? "玩家A" : "电脑"));
 
     m_difficultyButton->setEnabled(false);
@@ -330,7 +333,7 @@ void BattleScreen::onDealAnimationFinished()
         disableActionButtons();
         QTimer::singleShot(300, this, &BattleScreen::doAITurn);
     }
-    updateUI(true);
+    updateUI(false);
 }
 
 void BattleScreen::onPickButtonClicked()
@@ -358,16 +361,16 @@ void BattleScreen::doAITurn()
     if (m_isLevelMode && m_levelAIEngine) {
         m_levelAIEngine->setOpponentHand(m_playerA.hand);
         chosen = m_levelAIEngine->choosePlay(
-            m_playerB, m_playerA, m_lastPlay, m_deck, tableScore);
+            m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
     } else {
         chosen = aiChoosePlay(
-            m_playerB, m_playerA, m_lastPlay, m_deck, tableScore, m_tracker);
+            m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore, m_tracker);
     }
 
     if (chosen.empty()) {
         appendLog("电脑 不要");
 
-        if (m_playerA.hand.empty() && !m_deck.cards.empty()) {
+        if (m_playerA.hand.empty() && !m_playerDeck.cards.empty()) {
             appendLog("玩家A 赢得本回合");
             endRound(m_playerA);
             refillBoth(m_playerA, m_playerB);
@@ -382,7 +385,7 @@ void BattleScreen::doAITurn()
 
         endRound(m_playerA);
 
-        if (!m_deck.cards.empty()) {
+        if (!m_playerDeck.cards.empty()) {
             refillBoth(m_playerA, m_playerB);
         }
 
@@ -465,7 +468,7 @@ void BattleScreen::doAITurn()
 
     bool playerBFinished = m_playerB.hand.empty();
 
-    if (playerBFinished && m_deck.cards.empty()) {
+    if (playerBFinished && m_bossDeck.cards.empty()) {
         endRound(m_playerB);
         finalSettlement(m_playerB, m_playerA, m_tableCards);
         compareAndAnnounce(m_playerA, m_playerB);
@@ -484,7 +487,7 @@ void BattleScreen::doAITurn()
         return;
     }
 
-    if (m_playerA.hand.empty() && !m_deck.cards.empty()) {
+    if (m_playerA.hand.empty() && !m_playerDeck.cards.empty()) {
         appendLog("电脑 出牌回应，电脑 赢得本回合");
         endRound(m_playerB);
         refillBoth(m_playerB, m_playerA);
@@ -524,6 +527,7 @@ void BattleScreen::startNewGame()
     m_pickedCards.clear();
 
     m_deck = createStandardDeck();
+    shuffleDeck(m_deck);
 
     m_playerA = createPlayer("玩家A");
     m_playerB = createPlayer("电脑");
@@ -541,29 +545,40 @@ void BattleScreen::startNewGame()
         m_logTextEdit->clear();
         appendLog(QString("========== 关卡模式 - 第 %1 关 ==========").arg(m_currentLevel));
         appendLog(QString("对手: %1").arg(getLevelDisplayName(m_currentLevel)));
-        appendLog("随机决定先后手...");
+        appendLog("请选择先手方...");
 
-        if (m_firstChoiceWidget) m_firstChoiceWidget->hide();
+        // 显示先后手选择（与练习模式相同）
+        if (m_firstChoiceWidget) {
+            m_firstChoiceWidget->setGeometry(m_tableCardsWidget->rect());
+            m_firstChoiceWidget->setVisible(true);
+            m_firstChoiceWidget->raise();
+            m_waitingForFirstChoice = true;
+        }
 
         m_pendingPick = false;
-        std::random_device rd;
-        std::mt19937 g(rd());
-        std::uniform_int_distribution<> d(0, 1);
-        m_playerAIsFirst = (d(g) == 0);
 
         m_pickedCards.clear();
 
-        dealCards(m_playerA, m_deck, 5);
+        // 双牌堆：玩家标准牌组，Boss 按关卡剔牌
+        {
+            auto playerCards = removeCards(m_deck.cards, {});
+            m_playerDeck.cards = drawRandom(playerCards, 27);
+            auto bossCards = removeCards(m_deck.cards, getLevelRemoveTable(m_currentLevel));
+            m_bossDeck.cards = drawRandom(bossCards, 27);
+        }
+
+        dealCards(m_playerA, m_playerDeck, 5);
         sortHandSmart(m_playerA.hand);
-        dealCards(m_playerB, m_deck, 5);
+        dealCards(m_playerB, m_bossDeck, 5);
 
         appendLog(QString("玩家A 手牌: %1").arg(cardsToString(m_playerA.hand)));
         appendLog(QString("电脑 手牌: %1").arg(cardsToString(m_playerB.hand)));
-        appendLog(QString("牌堆剩余: %1 张").arg((int)m_deck.cards.size()));
+        appendLog(QString("玩家牌堆: %1 张 | Boss牌堆: %2 张")
+            .arg((int)m_playerDeck.cards.size()).arg((int)m_bossDeck.cards.size()));
         appendLog(QString("先手: %1").arg(m_playerAIsFirst ? "玩家A" : "电脑"));
 
         if (m_deckCountLabel) {
-            m_deckCountLabel->setText(QString("关卡: %1/13").arg(m_currentLevel));
+            m_deckCountLabel->setText(QString("关卡: %1/9").arg(m_currentLevel));
         }
         if (m_roundLabel) {
             m_roundLabel->setText(QString("对手: %1").arg(getLevelDisplayName(m_currentLevel)));
@@ -587,8 +602,18 @@ void BattleScreen::startNewGame()
     m_tracker.reset();
     m_roundCount = 1;
 
+    // 练习模式也使用双牌堆（标准牌组，各27张）
+    {
+        auto playerCards = removeCards(m_deck.cards, {});
+        m_playerDeck.cards = drawRandom(playerCards, 27);
+        auto bossCards = removeCards(m_deck.cards, {});
+        m_bossDeck.cards = drawRandom(bossCards, 27);
+    }
+
     m_difficultyButton->setVisible(true);
     m_difficultyButton->setEnabled(true);
+
+    m_pendingPick = false;
 
     m_logTextEdit->clear();
     appendLog("========== 新游戏开始 ==========");
@@ -611,11 +636,21 @@ void BattleScreen::startNewGame()
 
 void BattleScreen::updateUI(bool rebuildHand)
 {
+    // 双牌堆显示
+    int playerDeckCount = static_cast<int>(m_playerDeck.cards.size());
+    int bossDeckCount = static_cast<int>(m_bossDeck.cards.size());
     m_deckCountLabel->setText(
-        QString("牌堆剩余: %1").arg(static_cast<int>(m_deck.cards.size())));
+        QString("玩家牌堆: %1 | Boss牌堆: %2").arg(playerDeckCount).arg(bossDeckCount));
     if (m_deckCountBigLabel) {
         m_deckCountBigLabel->setText(
-            QString("%1 张").arg(static_cast<int>(m_deck.cards.size())));
+            QString("%1 / %2").arg(playerDeckCount).arg(bossDeckCount));
+    }
+    // 更新双牌堆 UI
+    if (m_playerDeckCountLabel) {
+        m_playerDeckCountLabel->setText(QString("%1 张").arg(playerDeckCount));
+    }
+    if (m_bossDeckCountLabel) {
+        m_bossDeckCountLabel->setText(QString("%1 张").arg(bossDeckCount));
     }
     m_roundLabel->setText(
         QString("回合: %1").arg(m_roundCount));
@@ -753,8 +788,17 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
 {
     int beforeW = static_cast<int>(winner.hand.size());
     int beforeL = static_cast<int>(loser.hand.size());
-    refillToFive(winner, m_deck);
-    refillToFive(loser, m_deck);
+
+    // 双牌堆：赢家和输家各自从自己的牌堆补牌
+    Deck& winnerDeck = (winner.name == m_playerA.name) ? m_playerDeck : m_bossDeck;
+    Deck& loserDeck  = (loser.name  == m_playerA.name) ? m_playerDeck : m_bossDeck;
+
+    bool winnerIsPlayerA = (winner.name == m_playerA.name);
+    bool loserIsPlayerA = (loser.name == m_playerA.name);
+
+    refillToFive(winner, winnerDeck);
+    refillToFive(loser, loserDeck);
+
     int gotW = static_cast<int>(winner.hand.size()) - beforeW;
     int gotL = static_cast<int>(loser.hand.size()) - beforeL;
 
@@ -763,12 +807,47 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
         .arg(QString::fromStdString(loser.name)).arg(gotL).arg(static_cast<int>(loser.hand.size())));
 
     sortHandSmart(m_playerA.hand);
+
+    // 播放摸牌动画
+    if (gotW > 0) {
+        QWidget* targetHand = winnerIsPlayerA ? m_playerAHandWidget : m_playerBHandWidget;
+        if (targetHand) {
+            QPoint handPos = targetHand->mapTo(this, QPoint(0, 0));
+            for (int i = 0; i < gotW; ++i) {
+                Card drawnCard = winner.hand[beforeW + i];
+                QPoint targetPos(handPos.x() + (beforeW + i) * 90 + 20, handPos.y() + 10);
+                QTimer::singleShot(i * 150, this,
+                    [this, winnerIsPlayerA, drawnCard, targetPos]() {
+                        playDrawAnimation(winnerIsPlayerA, drawnCard, targetPos);
+                    });
+            }
+        }
+    }
+    if (gotL > 0) {
+        QWidget* targetHand = loserIsPlayerA ? m_playerAHandWidget : m_playerBHandWidget;
+        if (targetHand) {
+            QPoint handPos = targetHand->mapTo(this, QPoint(0, 0));
+            for (int i = 0; i < gotL; ++i) {
+                Card drawnCard = loser.hand[beforeL + i];
+                QPoint targetPos(handPos.x() + (beforeL + i) * 90 + 20, handPos.y() + 10);
+                QTimer::singleShot((gotW * 150) + i * 150, this,
+                    [this, loserIsPlayerA, drawnCard, targetPos]() {
+                        playDrawAnimation(loserIsPlayerA, drawnCard, targetPos);
+                    });
+            }
+        }
+    }
+
+    updateUI();
 }
 
 bool BattleScreen::checkGameEnd(Player& finisher, Player& opponent)
 {
     if (!finisher.hand.empty()) return false;
-    if (!m_deck.cards.empty()) return false;
+
+    // 双牌堆：检查该玩家的牌堆是否为空
+    Deck& finisherDeck = (finisher.name == m_playerA.name) ? m_playerDeck : m_bossDeck;
+    if (!finisherDeck.cards.empty()) return false;
 
     endRound(finisher);
     finalSettlement(finisher, opponent, m_tableCards);

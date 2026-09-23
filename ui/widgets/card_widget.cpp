@@ -13,7 +13,7 @@
 CardWidget::CardWidget(const Card& card, QWidget* parent)
     : QWidget(parent), m_card(card), m_currentYOffset(21)
 {
-    setFixedSize(110, 168);
+    setFixedSize(110, 180);   // 从 168 → 180，多出 12px 给阴影
     loadPixmap();
 }
 
@@ -268,12 +268,19 @@ void CardWidget::paintEvent(QPaintEvent*)
     }
 
     int cardBottom = imgY + imgH;
-    int shadowBottom = height() - 4;
-    if (shadowBottom > cardBottom) {
-        QLinearGradient grad(0, cardBottom, 0, shadowBottom);
-        grad.setColorAt(0.0, QColor(0, 0, 0, 180));
+
+    // 阴影紧贴卡片底部，宽度与卡片一致
+    // 卡片升起时，阴影只升起一半
+    constexpr int kRestY = 21;                                  // 未选中时的 yOffset
+    const int liftCompensation = (kRestY - m_currentYOffset) / 2; // 未选=0，选中=9
+    const int shadowTop = cardBottom + liftCompensation;
+
+    constexpr int kShadowHeight = 6;
+    if (shadowTop + kShadowHeight <= height()) {
+        QLinearGradient grad(0, shadowTop, 0, shadowTop + kShadowHeight);
+        grad.setColorAt(0.0, QColor(0, 0, 0, 130));
         grad.setColorAt(1.0, QColor(0, 0, 0, 0));
-        QRect shadowRect(4, cardBottom, w - 8, shadowBottom - cardBottom);
+        QRect shadowRect(imgX, shadowTop, imgW, kShadowHeight);  // 宽度 = 卡片宽度
         p.fillRect(shadowRect, grad);
     }
 

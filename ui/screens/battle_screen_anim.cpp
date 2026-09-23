@@ -18,15 +18,31 @@
 
 void BattleScreen::playDealAnimation()
 {
-    if (!m_deckBackLabel || !m_playerAHandWidget || !m_playerBHandWidget) {
+    if (!m_playerDeckWidget || !m_playerAHandWidget || !m_playerBHandWidget) {
         emit dealAnimationFinished();
         return;
     }
     m_dealAnimating = true;
 
-    QPoint deckPos = m_deckBackLabel->mapTo(this, QPoint(0, 0));
-    QPoint startPos(deckPos.x() + m_deckBackLabel->width() / 2,
-                    deckPos.y() + m_deckBackLabel->height() / 2);
+    // 1) 清空旧手牌 widget
+    {
+        QLayoutItem* item;
+        while ((item = m_playerALayout->takeAt(0)) != nullptr) {
+            if (item->widget()) { item->widget()->deleteLater(); }
+            delete item;
+        }
+        while ((item = m_playerBLayout->takeAt(0)) != nullptr) {
+            if (item->widget()) { item->widget()->deleteLater(); }
+            delete item;
+        }
+    }
+    m_playerACardWidgets.clear();
+    m_playerBCardWidgets.clear();
+
+    // 发牌起点：玩家牌堆中心
+    QPoint deckPos = m_playerDeckWidget->mapTo(this, QPoint(0, 0));
+    QPoint startPos(deckPos.x() + m_playerDeckWidget->width() / 2,
+                    deckPos.y() + m_playerDeckWidget->height() / 2);
 
     QPoint aPos = m_playerAHandWidget->mapTo(this, QPoint(0, 0));
     QPoint endA(aPos.x() + m_playerAHandWidget->width() / 2,
@@ -36,24 +52,23 @@ void BattleScreen::playDealAnimation()
     QPoint endB(bPos.x() + m_playerBHandWidget->width() / 2,
                 bPos.y() + m_playerBHandWidget->height() / 2);
 
-    // 60 x 84 face plus padding for rotation and the soft landing shadow.
-    const int cw = 96, ch = 120;
     const int delayPerCard = 70;
     const int flyDuration = 400;
 
     for (int i = 0; i < 10; ++i) {
         bool toA = (i % 2 == 0);
         QPoint target = toA ? endA : endB;
-        // Opponent animation intentionally carries no hidden card data.
         const Card dealtCard = toA ? m_playerA.hand.at(static_cast<size_t>(i / 2)) : Card{};
 
         QTimer::singleShot(i * delayPerCard, this, [=]() {
+            // 2) 创建真实手牌 widget（不覆盖 setFixedSize，使用默认 110x180）
             CardWidget* card = new CardWidget(dealtCard, this);
-            card->setFixedSize(cw, ch);
             card->setAttribute(Qt::WA_TransparentForMouseEvents);
             card->setDealAnimationEnabled(true, toA);
             card->setDealTilt(QRandomGenerator::global()->generateDouble() * 20.0 - 10.0);
 
+            const int cw = card->width();
+            const int ch = card->height();
             QPoint from = startPos - QPoint(cw / 2, ch / 2);
             QPoint to   = target   - QPoint(cw / 2, ch / 2);
 
@@ -68,8 +83,6 @@ void BattleScreen::playDealAnimation()
             anim->setStartValue(from);
             anim->setEndValue(to);
 
-            // Sample a quadratic Bezier arc; finish with a small overshoot
-            // along the incoming direction followed by a smooth return.
             const QPointF fromF(from);
             const QPointF toF(to);
             const qreal distance = QLineF(fromF, toF).length();
@@ -90,7 +103,31 @@ void BattleScreen::playDealAnimation()
             flip->setEasingCurve(QEasingCurve::Linear);
             flip->setStartValue(0.0);
             flip->setEndValue(1.0);
-            connect(flight, &QParallelAnimationGroup::finished, card, &QObject::deleteLater);
+
+            // 3) 动画结束后：原地转正，不删除，不回建
+            connect(flight, &QParallelAnimationGroup::finished, this,
+                [this, card, toA, to]() {
+                    card->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+                    card->setDealAnimationEnabled(false, false);
+                    card->setFlying(false);
+
+                    if (toA) {
+                        card->setParent(m_playerAHandWidget);
+                        QPoint relPos = to - m_playerAHandWidget->mapTo(this, QPoint(0, 0));
+                        card->move(relPos);
+                        m_playerALayout->addWidget(card);
+                        m_playerACardWidgets.push_back(card);
+                        connect(card, &CardWidget::clicked, this, [this]() { update(); });
+                    } else {
+                        card->setParent(m_playerBHandWidget);
+                        QPoint relPos = to - m_playerBHandWidget->mapTo(this, QPoint(0, 0));
+                        card->move(relPos);
+                        m_playerBLayout->addWidget(card);
+                        m_playerBCardWidgets.push_back(card);
+                    }
+                    card->show();
+                });
+
             if (i == 9) {
                 connect(flight, &QParallelAnimationGroup::finished,
                         this, &BattleScreen::dealAnimationFinished);
@@ -224,6 +261,50 @@ void BattleScreen::shakeWidget(QWidget* widget)
         (*counter)++;
     });
     timer->start(30);
+}
+
+void BattleScreen::playDrawAnimation(bool forPlayerA, const Card& card, const QPoint& targetPos)
+{
+    // 从对应牌堆位置开始动画
+    QWidget* deckSource = forPlayerA ? m_playerDeckWidget : m_bossDeckWidget;
+    if (!deckSource) return;
+
+    QPoint deckPos = deckSource->mapTo(this, QPoint(0, 0));
+    QPoint startPos(deckPos.x() + deckSource->width() / 2 - 48,
+                    deckPos.y() + deckSource->height() / 2 - 60);
+
+    const int cw = 96, ch = 120;
+    CardWidget* flyingCard = new CardWidget(Card{}, this);
+    flyingCard->setFixedSize(cw, ch);
+    flyingCard->setAttribute(Qt::WA_TransparentForMouseEvents);
+    flyingCard->setDealAnimationEnabled(true, forPlayerA);
+    flyingCard->move(startPos);
+    flyingCard->show();
+    flyingCard->raise();
+
+    auto* flight = new QParallelAnimationGroup(flyingCard);
+
+    // 位移动画
+    auto* posAnim = new QPropertyAnimation(flyingCard, "pos", flight);
+    posAnim->setDuration(450);
+    posAnim->setEasingCurve(QEasingCurve::OutCubic);
+    posAnim->setStartValue(startPos);
+    posAnim->setEndValue(targetPos);
+
+    // 翻面动画（0=背面，1=正面）
+    auto* flipAnim = new QPropertyAnimation(flyingCard, "dealProgress", flight);
+    flipAnim->setDuration(450);
+    flipAnim->setEasingCurve(QEasingCurve::InOutQuad);
+    flipAnim->setStartValue(0.0);
+    flipAnim->setEndValue(1.0);
+
+    connect(flight, &QParallelAnimationGroup::finished, this,
+        [this, flyingCard, card, forPlayerA]() {
+            flyingCard->deleteLater();
+            updateUI(true);
+        });
+
+    flight->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 void BattleScreen::showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage)

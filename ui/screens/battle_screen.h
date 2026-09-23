@@ -75,6 +75,7 @@ private:
     // Animation methods
     void flyCardsToTable(const std::vector<CardWidget*>& cards);
     void flyAICardsToTable(const std::vector<Card>& cards);
+    void playDrawAnimation(bool forPlayerA, const Card& card, const QPoint& targetPos);
     void shakeWidget(QWidget* widget);
     void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
     void showBonusFloat(int bonus);
@@ -107,7 +108,12 @@ private:
     QLabel*   m_scoreALabel       = nullptr;
     QLabel*   m_scoreBLabel       = nullptr;
     QLabel*   m_deckCountBigLabel = nullptr;
-    QLabel*   m_deckBackLabel     = nullptr;
+    QLabel*   m_playerDeckLabel  = nullptr;
+    QLabel*   m_bossDeckLabel    = nullptr;
+    QLabel*   m_playerDeckCountLabel = nullptr;
+    QLabel*   m_bossDeckCountLabel   = nullptr;
+    QWidget*  m_playerDeckWidget  = nullptr;
+    QWidget*  m_bossDeckWidget    = nullptr;
     QPushButton* m_playButton     = nullptr;
     QPushButton* m_passButton     = nullptr;
     QPushButton* m_pickButton     = nullptr;
@@ -130,6 +136,8 @@ private:
     Player m_playerA;
     Player m_playerB;
     Deck   m_deck;
+    Deck   m_playerDeck;
+    Deck   m_bossDeck;
     CardTracker m_tracker;
     CardTypeResult m_lastPlay;
     std::vector<Card> m_tableCards;

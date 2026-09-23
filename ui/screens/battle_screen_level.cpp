@@ -63,7 +63,7 @@ void BattleScreen::handleLevelModeEnd(bool playerWon)
 
     layout->addStretch();
 
-    if (playerWon && m_currentLevel >= 13) {
+    if (playerWon && m_currentLevel >= 9) {
         auto* finalTitle = new QLabel("全部通关！");
         QFont ft = finalTitle->font();
         ft.setPointSize(18);
@@ -73,7 +73,7 @@ void BattleScreen::handleLevelModeEnd(bool playerWon)
         finalTitle->setStyleSheet("QLabel { color: #FFD700; }");
         layout->addWidget(finalTitle);
 
-        auto* finalMsg = new QLabel("恭喜你击败了所有13个AI对手！");
+        auto* finalMsg = new QLabel("恭喜你击败了所有9个AI对手！");
         finalMsg->setAlignment(Qt::AlignCenter);
         finalMsg->setStyleSheet("QLabel { color: #A5D6A7; font-size: 15px; }");
         layout->addWidget(finalMsg);
