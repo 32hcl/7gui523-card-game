@@ -19,6 +19,7 @@
 #include "ai/engine/ai_engine.h"
 #include "ai/engine/ai_levels.h"
 #include "core/tracker/cardtracker.h"
+#include "game/campaign.h"
 
 class CardWidget;
 
@@ -75,7 +76,7 @@ private:
     // Animation methods
     void flyCardsToTable(const std::vector<CardWidget*>& cards);
     void flyAICardsToTable(const std::vector<Card>& cards);
-    void playDrawAnimation(bool forPlayerA, const Card& card, const QPoint& targetPos);
+    void playDrawAnimationSimple(bool forPlayerA, const QPoint& targetPos);
     void shakeWidget(QWidget* widget);
     void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
     void showBonusFloat(int bonus);
@@ -86,10 +87,12 @@ private:
     // UI helpers
     QWidget* createCardBack();
     void layoutTableCards();
+    QPoint handSlotPos(QWidget* handWidget, int index) const;
+    void layoutHandSlots(bool playerA, bool animate);
     void resizeEvent(QResizeEvent* event) override;
 
     // Level mode methods
-    void handleLevelModeEnd(bool playerWon);
+    void handleLevelModeEnd(const LevelResult& lr);
     int getLevelAILevel(int level) const;
     QString getLevelDisplayName(int level) const;
     void returnToMenu();
@@ -101,15 +104,14 @@ private:
     };
 
     // UI controls
+    QLabel*   m_titleLabel        = nullptr;
     QLabel*   m_deckCountLabel    = nullptr;
     QLabel*   m_roundLabel        = nullptr;
     QLabel*   m_tableScoreLabel   = nullptr;
     QLabel*   m_handTypeLabel     = nullptr;
     QLabel*   m_scoreALabel       = nullptr;
     QLabel*   m_scoreBLabel       = nullptr;
-    QLabel*   m_deckCountBigLabel = nullptr;
-    QLabel*   m_playerDeckLabel  = nullptr;
-    QLabel*   m_bossDeckLabel    = nullptr;
+    QLabel*   m_hpLabel           = nullptr;
     QLabel*   m_playerDeckCountLabel = nullptr;
     QLabel*   m_bossDeckCountLabel   = nullptr;
     QWidget*  m_playerDeckWidget  = nullptr;
@@ -125,21 +127,20 @@ private:
     QWidget* m_firstChoiceWidget  = nullptr;
     QWidget* m_tableCardsWidget   = nullptr;
     QFrame*  m_tableFrame         = nullptr;
-    QWidget* m_deckDisplayWidget  = nullptr;
-    QVBoxLayout* m_deckDisplayLayout = nullptr;
     QWidget* m_playerAHandWidget  = nullptr;
-    QHBoxLayout* m_playerALayout  = nullptr;
     QWidget* m_playerBHandWidget  = nullptr;
-    QHBoxLayout* m_playerBLayout  = nullptr;
 
     // Game state
     Player m_playerA;
     Player m_playerB;
-    Deck   m_deck;
     Deck   m_playerDeck;
     Deck   m_bossDeck;
+    Deck   m_playerHiddenDeck;
+    int    m_playerNextSeq = 0;
+    std::vector<Card> m_playerPlayedCards;
     CardTracker m_tracker;
     CardTypeResult m_lastPlay;
+    Campaign m_campaign;
     std::vector<Card> m_tableCards;
     std::vector<Card> m_pickedCards;
     int    m_tableBonus          = 0;
@@ -156,10 +157,11 @@ private:
     bool   m_opponentLastRound   = false;
     bool   m_pendingLevelRestart = false;
     bool   m_shaking             = false;
+    bool   m_pendingSpecialVictory = false;
     QString m_lastPlayerName;
 
     std::vector<CardWidget*> m_playerACardWidgets;
-    std::vector<CardWidget*> m_playerBCardWidgets;
+    std::vector<QWidget*> m_playerBCardWidgets;
     std::vector<CardWidget*> m_tableCardWidgets;
 
     AILevel m_aiLevel = AILevel::AI1_Simple;

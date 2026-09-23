@@ -58,7 +58,10 @@ LevelResult Campaign::finishLevel(const RoundResult& rr,
     bossHp_ -= player.totalScore;
     playerHp_ -= boss.totalScore;
 
-    if (bossHp_ <= 0) {
+    if (rr.specialVictory) {
+        lr.playerWon = true;
+        lr.bossCleared = true;
+    } else if (bossHp_ <= 0) {
         lr.playerWon = true;
         lr.bossCleared = true;
     } else {
@@ -72,7 +75,7 @@ LevelResult Campaign::finishLevel(const RoundResult& rr,
     if (lr.playerWon) {
         playerHp_ += healAmount;
     } else {
-        playerHp_ -= healAmount / 2;  // 失败惩罚减半
+        playerHp_ -= healAmount;
     }
 
     playerHp_ = std::min(playerHp_, cfg_.playerMaxHp);

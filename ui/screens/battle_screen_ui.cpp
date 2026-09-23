@@ -12,16 +12,16 @@ void BattleScreen::createTopBar(QVBoxLayout* leftLay)
 {
     auto* topBar = new QWidget;
     topBar->setFixedHeight(50);
-    topBar->setStyleSheet("QWidget { background-color: #0D3B16; border-radius: 8px; }");
+    topBar->setStyleSheet("QWidget { background-color: #1e1e2a; border-radius: 8px; }");
     auto* topLay = new QHBoxLayout(topBar);
     topLay->setContentsMargins(20, 0, 20, 0);
 
-    auto* titleLabel = new QLabel("7鬼523斗地主变体");
-    QFont titleFont = titleLabel->font();
+    m_titleLabel = new QLabel("练习模式");
+    QFont titleFont = m_titleLabel->font();
     titleFont.setPointSize(18);
     titleFont.setBold(true);
-    titleLabel->setFont(titleFont);
-    titleLabel->setStyleSheet("QLabel { color: #FFD700; }");
+    m_titleLabel->setFont(titleFont);
+    m_titleLabel->setStyleSheet("QLabel { color: #FFD700; }");
 
     m_deckCountLabel = new QLabel("牌堆: 44");
     m_roundLabel = new QLabel("回合: 1");
@@ -30,10 +30,10 @@ void BattleScreen::createTopBar(QVBoxLayout* leftLay)
     infoFont.setBold(true);
     m_deckCountLabel->setFont(infoFont);
     m_roundLabel->setFont(infoFont);
-    m_deckCountLabel->setStyleSheet("QLabel { color: #FFF59D; }");
-    m_roundLabel->setStyleSheet("QLabel { color: #FFF59D; }");
+    m_deckCountLabel->setStyleSheet("QLabel { color: #F5A623; }");
+    m_roundLabel->setStyleSheet("QLabel { color: #F5A623; }");
 
-    topLay->addWidget(titleLabel);
+    topLay->addWidget(m_titleLabel);
     topLay->addStretch();
     topLay->addWidget(m_deckCountLabel);
     topLay->addSpacing(30);
@@ -50,14 +50,42 @@ void BattleScreen::createTopBar(QVBoxLayout* leftLay)
 
 void BattleScreen::createOpponentArea(QVBoxLayout* leftLay)
 {
-    m_playerBHandWidget = new QWidget;
-    m_playerBLayout     = new QHBoxLayout(m_playerBHandWidget);
-    m_playerBLayout->setContentsMargins(0, 0, 0, 0);
-    m_playerBLayout->setSpacing(6);
-    m_playerBLayout->addStretch();
+    auto* wrapper = new QWidget;
+    auto* rowLay = new QHBoxLayout(wrapper);
+    rowLay->setContentsMargins(0, 0, 0, 0);
+    rowLay->setSpacing(6);
 
-    leftLay->addWidget(m_playerBHandWidget);
-    m_playerBHandWidget->setFixedHeight(100);
+    m_playerBHandWidget = new QWidget;
+    m_playerBHandWidget->setFixedHeight(190);
+    rowLay->addWidget(m_playerBHandWidget, 1);
+
+    // Boss 牌堆（右侧）
+    m_bossDeckWidget = new QWidget;
+    m_bossDeckWidget->setFixedWidth(90);
+    auto* bossDeckLay = new QVBoxLayout(m_bossDeckWidget);
+    bossDeckLay->setContentsMargins(0, 0, 0, 0);
+    bossDeckLay->setSpacing(2);
+    bossDeckLay->setAlignment(Qt::AlignCenter);
+    {
+        QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
+        if (QFile::exists(backPath)) {
+            QPixmap backPix(backPath);
+            QPixmap scaled = backPix.scaled(60, 90, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            auto* img = new QLabel;
+            img->setFixedSize(64, 94);
+            img->setAlignment(Qt::AlignCenter);
+            img->setPixmap(scaled);
+            bossDeckLay->addWidget(img, 0, Qt::AlignCenter);
+        }
+    }
+    m_bossDeckCountLabel = new QLabel("27 张");
+    m_bossDeckCountLabel->setAlignment(Qt::AlignCenter);
+    m_bossDeckCountLabel->setStyleSheet("QLabel { color: #B0BEC5; font-size: 12px; font-weight: bold; }");
+    bossDeckLay->addWidget(m_bossDeckCountLabel);
+    rowLay->addWidget(m_bossDeckWidget);
+
+    leftLay->addWidget(wrapper);
+    wrapper->setFixedHeight(110);
 }
 
 void BattleScreen::createTableArea(QVBoxLayout* leftLay)
@@ -66,12 +94,12 @@ void BattleScreen::createTableArea(QVBoxLayout* leftLay)
     m_tableFrame->setFrameShape(QFrame::StyledPanel);
     m_tableFrame->setStyleSheet(R"(
         QFrame {
-            background-color: #0D3B16;
-            border: 1px solid #1B5E20;
+            background-color: #1e1e2a;
+            border: 1px solid #FFFFFF;
             border-radius: 12px;
         }
     )");
-    m_tableFrame->setMinimumHeight(280);
+    // no setMinimumHeight — will stretch in leftLay
 
     QGraphicsDropShadowEffect* tableShadow = new QGraphicsDropShadowEffect(m_tableFrame);
     tableShadow->setBlurRadius(20);
@@ -79,132 +107,81 @@ void BattleScreen::createTableArea(QVBoxLayout* leftLay)
     tableShadow->setColor(QColor(0, 0, 0, 160));
     m_tableFrame->setGraphicsEffect(tableShadow);
 
-    auto* tableOuterLay = new QHBoxLayout(m_tableFrame);
-    tableOuterLay->setContentsMargins(0, 0, 0, 0);
+    auto* tableLay = new QVBoxLayout(m_tableFrame);
+    tableLay->setContentsMargins(12, 6, 12, 6);
+    tableLay->setSpacing(4);
 
-    auto* leftBox = new QWidget;
-    auto* tableLay = new QVBoxLayout(leftBox);
-    tableLay->setContentsMargins(20, 15, 10, 15);
-    tableLay->setSpacing(10);
+    m_tableCardsWidget = new QWidget;
+    m_tableCardsWidget->setAttribute(Qt::WA_StyledBackground, true);
+    tableLay->addWidget(m_tableCardsWidget, 1);
+
+    // 底行：上一手牌型 + 桌面分
+    auto* infoWidget = new QWidget;
+    infoWidget->setFixedHeight(32);
+    auto* infoRow = new QHBoxLayout(infoWidget);
+    infoRow->setContentsMargins(0, 0, 0, 0);
+    infoRow->setSpacing(8);
 
     m_handTypeLabel = new QLabel("上一手牌型: 无");
     QFont tf = m_handTypeLabel->font();
-    tf.setPointSize(13);
+    tf.setPointSize(11);
     m_handTypeLabel->setFont(tf);
     m_handTypeLabel->setStyleSheet("QLabel { color: #B0BEC5; }");
-    m_handTypeLabel->setAlignment(Qt::AlignCenter);
-    tableLay->addWidget(m_handTypeLabel);
-
-    m_tableCardsWidget = new QWidget;
-    m_tableCardsWidget->setFixedHeight(90);
-    m_tableCardsWidget->setAttribute(Qt::WA_StyledBackground, true);
-    tableLay->addWidget(m_tableCardsWidget);
+    m_handTypeLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    infoRow->addWidget(m_handTypeLabel);
 
     m_tableScoreLabel = new QLabel("原始分: 0 分 | 奖励分: 0 分 | 合计: 0 分");
     QFont tableFont = m_tableScoreLabel->font();
-    tableFont.setPointSize(14);
+    tableFont.setPointSize(11);
     tableFont.setBold(true);
     m_tableScoreLabel->setFont(tableFont);
-    m_tableScoreLabel->setStyleSheet("QLabel { color: #FFEB3B; }");
-    m_tableScoreLabel->setAlignment(Qt::AlignCenter);
-    tableLay->addWidget(m_tableScoreLabel);
+    m_tableScoreLabel->setStyleSheet("QLabel { color: #FFE082; }");
+    m_tableScoreLabel->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
+    infoRow->addWidget(m_tableScoreLabel, 1);
 
-    tableOuterLay->addWidget(leftBox, 65);
+    tableLay->addWidget(infoWidget);
 
-    m_deckDisplayWidget = new QWidget;
-    m_deckDisplayWidget->setStyleSheet("background-color: #0A2E12; border-left: 2px solid #558B2F;");
-    m_deckDisplayLayout = new QVBoxLayout(m_deckDisplayWidget);
-    m_deckDisplayLayout->setContentsMargins(10, 10, 10, 10);
-    m_deckDisplayLayout->setSpacing(8);
-
-    // 双牌堆 - 竖向排列
-    auto* decksLay = new QVBoxLayout;
-    decksLay->setSpacing(24);
-    decksLay->setAlignment(Qt::AlignCenter);
-
-    // 玩家牌堆（上）
-    m_playerDeckWidget = new QWidget;
-    auto* playerDeckLay = new QVBoxLayout(m_playerDeckWidget);
-    playerDeckLay->setContentsMargins(0, 0, 0, 0);
-    playerDeckLay->setSpacing(4);
-    playerDeckLay->setAlignment(Qt::AlignCenter);
-
-    m_playerDeckLabel = new QLabel("玩家牌堆");
-    m_playerDeckLabel->setAlignment(Qt::AlignCenter);
-    m_playerDeckLabel->setStyleSheet("QLabel { color: #4CAF50; font-size: 12px; font-weight: bold; }");
-    playerDeckLay->addWidget(m_playerDeckLabel);
-
-    // 玩家牌堆背图
-    {
-        QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
-        if (QFile::exists(backPath)) {
-            QPixmap backPix(backPath);
-            QPixmap scaled = backPix.scaled(60, 90, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            QLabel* playerDeckImg = new QLabel;
-            playerDeckImg->setFixedSize(64, 94);
-            playerDeckImg->setAlignment(Qt::AlignCenter);
-            playerDeckImg->setPixmap(scaled);
-            playerDeckLay->addWidget(playerDeckImg, 0, Qt::AlignCenter);
-        }
-    }
-
-    m_playerDeckCountLabel = new QLabel("27 张");
-    m_playerDeckCountLabel->setAlignment(Qt::AlignCenter);
-    m_playerDeckCountLabel->setStyleSheet("QLabel { color: #81C784; font-size: 13px; font-weight: bold; }");
-    playerDeckLay->addWidget(m_playerDeckCountLabel);
-
-    decksLay->addWidget(m_playerDeckWidget);
-
-    // Boss 牌堆（下）
-    m_bossDeckWidget = new QWidget;
-    auto* bossDeckLay = new QVBoxLayout(m_bossDeckWidget);
-    bossDeckLay->setContentsMargins(0, 0, 0, 0);
-    bossDeckLay->setSpacing(4);
-    bossDeckLay->setAlignment(Qt::AlignCenter);
-
-    m_bossDeckLabel = new QLabel("Boss 牌堆");
-    m_bossDeckLabel->setAlignment(Qt::AlignCenter);
-    m_bossDeckLabel->setStyleSheet("QLabel { color: #EF5350; font-size: 12px; font-weight: bold; }");
-    bossDeckLay->addWidget(m_bossDeckLabel);
-
-    // Boss 牌堆背图
-    {
-        QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
-        if (QFile::exists(backPath)) {
-            QPixmap backPix(backPath);
-            QPixmap scaled = backPix.scaled(60, 90, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            QLabel* bossDeckImg = new QLabel;
-            bossDeckImg->setFixedSize(64, 94);
-            bossDeckImg->setAlignment(Qt::AlignCenter);
-            bossDeckImg->setPixmap(scaled);
-            bossDeckLay->addWidget(bossDeckImg, 0, Qt::AlignCenter);
-        }
-    }
-
-    m_bossDeckCountLabel = new QLabel("27 张");
-    m_bossDeckCountLabel->setAlignment(Qt::AlignCenter);
-    m_bossDeckCountLabel->setStyleSheet("QLabel { color: #E57373; font-size: 13px; font-weight: bold; }");
-    bossDeckLay->addWidget(m_bossDeckCountLabel);
-
-    decksLay->addWidget(m_bossDeckWidget);
-
-    m_deckDisplayLayout->addLayout(decksLay);
-    m_deckDisplayLayout->addStretch();
-
-    tableOuterLay->addWidget(m_deckDisplayWidget, 30);
-
-    leftLay->addWidget(m_tableFrame);
+    leftLay->addWidget(m_tableFrame, 1);
 }
 
 void BattleScreen::createPlayerArea(QVBoxLayout* leftLay)
 {
-    m_playerAHandWidget = new QWidget;
-    m_playerALayout     = new QHBoxLayout(m_playerAHandWidget);
-    m_playerALayout->setContentsMargins(0, 0, 0, 0);
-    m_playerALayout->setSpacing(6);
+    auto* wrapper = new QWidget;
+    auto* rowLay = new QHBoxLayout(wrapper);
+    rowLay->setContentsMargins(0, 0, 0, 0);
+    rowLay->setSpacing(6);
 
-    leftLay->addWidget(m_playerAHandWidget);
-    m_playerAHandWidget->setFixedHeight(180);
+    m_playerAHandWidget = new QWidget;
+    m_playerAHandWidget->setFixedHeight(190);
+    rowLay->addWidget(m_playerAHandWidget, 1);
+
+    // 玩家牌堆（右侧）
+    m_playerDeckWidget = new QWidget;
+    m_playerDeckWidget->setFixedWidth(90);
+    auto* playerDeckLay = new QVBoxLayout(m_playerDeckWidget);
+    playerDeckLay->setContentsMargins(0, 0, 0, 0);
+    playerDeckLay->setSpacing(2);
+    playerDeckLay->setAlignment(Qt::AlignCenter);
+    {
+        QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
+        if (QFile::exists(backPath)) {
+            QPixmap backPix(backPath);
+            QPixmap scaled = backPix.scaled(60, 90, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            auto* img = new QLabel;
+            img->setFixedSize(64, 94);
+            img->setAlignment(Qt::AlignCenter);
+            img->setPixmap(scaled);
+            playerDeckLay->addWidget(img, 0, Qt::AlignCenter);
+        }
+    }
+    m_playerDeckCountLabel = new QLabel("27 张");
+    m_playerDeckCountLabel->setAlignment(Qt::AlignCenter);
+    m_playerDeckCountLabel->setStyleSheet("QLabel { color: #B0BEC5; font-size: 12px; font-weight: bold; }");
+    playerDeckLay->addWidget(m_playerDeckCountLabel);
+    rowLay->addWidget(m_playerDeckWidget);
+
+    leftLay->addWidget(wrapper);
+    wrapper->setFixedHeight(190);
 }
 
 QWidget* BattleScreen::createBottomBar()
@@ -217,12 +194,17 @@ QWidget* BattleScreen::createBottomBar()
     auto* scoreRow = new QHBoxLayout;
     m_scoreALabel = new QLabel("玩家A: 0 分");
     m_scoreBLabel = new QLabel("电脑: 0 分");
-    m_scoreALabel->setStyleSheet("QLabel { color: #FFD700; font-size: 14px; font-weight: bold; }");
-    m_scoreBLabel->setStyleSheet("QLabel { color: #FFD700; font-size: 14px; font-weight: bold; }");
+    m_scoreALabel->setStyleSheet("QLabel { color: #F5A623; font-size: 14px; font-weight: bold; }");
+    m_scoreBLabel->setStyleSheet("QLabel { color: #F5A623; font-size: 14px; font-weight: bold; }");
     scoreRow->addWidget(m_scoreALabel);
     scoreRow->addStretch();
     scoreRow->addWidget(m_scoreBLabel);
     bottomLay->addLayout(scoreRow);
+
+    m_hpLabel = new QLabel("");
+    m_hpLabel->setStyleSheet("QLabel { color: #FFAB40; font-size: 13px; font-weight: bold; }");
+    m_hpLabel->setAlignment(Qt::AlignCenter);
+    bottomLay->addWidget(m_hpLabel);
 
     auto* btnGrid = new QGridLayout;
     btnGrid->setSpacing(6);
@@ -275,7 +257,7 @@ void BattleScreen::createRightPanel(QHBoxLayout* rootLayout, QWidget* bottomBar)
     logFont.setPointSize(15);
     logFont.setBold(true);
     logLabel->setFont(logFont);
-    logLabel->setStyleSheet("QLabel { color: #FFD700; }");
+    logLabel->setStyleSheet("QLabel { color: #F5A623; }");
     rightLay->addWidget(logLabel);
 
     m_logTextEdit = new QTextEdit;
@@ -400,4 +382,51 @@ void BattleScreen::resizeEvent(QResizeEvent* event) {
         m_firstChoiceWidget->setGeometry(m_tableCardsWidget->rect());
     }
     layoutTableCards();
+    layoutHandSlots(true, false);
+    layoutHandSlots(false, false);
+}
+
+QPoint BattleScreen::handSlotPos(QWidget* handWidget, int index) const {
+    const int cw = 110, ch = 180, gap = 6;
+    const int W = handWidget->width();
+    const int H = handWidget->height();
+    const int totalW = 5 * cw + 4 * gap;
+    const int left = (W - totalW) / 2;
+    const int y = (H - ch) / 2;
+    return QPoint(left + index * (cw + gap), y);
+}
+
+void BattleScreen::layoutHandSlots(bool playerA, bool animate) {
+    QWidget* handWidget = playerA ? m_playerAHandWidget : m_playerBHandWidget;
+    if (!handWidget) return;
+
+    if (playerA) {
+        for (size_t i = 0; i < m_playerACardWidgets.size(); ++i) {
+            CardWidget* cw = m_playerACardWidgets[i];
+            QPoint target = handSlotPos(handWidget, static_cast<int>(i));
+            if (animate) {
+                QPropertyAnimation* a = new QPropertyAnimation(cw, "pos");
+                a->setDuration(150);
+                a->setEasingCurve(QEasingCurve::OutCubic);
+                a->setEndValue(target);
+                a->start(QAbstractAnimation::DeleteWhenStopped);
+            } else {
+                cw->move(target);
+            }
+        }
+    } else {
+        for (size_t i = 0; i < m_playerBCardWidgets.size(); ++i) {
+            QWidget* w = m_playerBCardWidgets[i];
+            QPoint target = handSlotPos(handWidget, static_cast<int>(i));
+            if (animate) {
+                QPropertyAnimation* a = new QPropertyAnimation(w, "pos");
+                a->setDuration(150);
+                a->setEasingCurve(QEasingCurve::OutCubic);
+                a->setEndValue(target);
+                a->start(QAbstractAnimation::DeleteWhenStopped);
+            } else {
+                w->move(target);
+            }
+        }
+    }
 }

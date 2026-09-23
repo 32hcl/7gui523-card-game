@@ -9,7 +9,7 @@
 #include <QFile>
 
 CardPickerDialog::CardPickerDialog(QWidget* parent) : QDialog(parent) {
-    setWindowTitle("选择起始手牌（可选 0~5 张）");
+    setWindowTitle("选择起始手牌（自选 0~5 张，放弃则随机发牌）");
     setMinimumSize(950, 700);
     setStyleSheet("QDialog { background-color: #1a1a1a; }");
 
