@@ -49,3 +49,56 @@ void dealCards(Player& player, Deck& deck, int count) {
     std::vector<Card> drawn = drawCards(deck, count);
     player.hand.insert(player.hand.end(), drawn.begin(), drawn.end());
 }
+
+std::vector<Card> removeCards(const std::vector<Card>& full,
+                              const std::vector<std::string>& pointsToRemove) {
+    std::vector<Card> result;
+    std::vector<std::string> remaining = pointsToRemove;
+
+    for (const auto& card : full) {
+        auto it = std::find(remaining.begin(), remaining.end(), card.point);
+        if (it != remaining.end()) {
+            remaining.erase(it);
+        } else {
+            result.push_back(card);
+        }
+    }
+    return result;
+}
+
+std::vector<Card> drawRandom(std::vector<Card>& pool, int n) {
+    int actual = std::min(n, static_cast<int>(pool.size()));
+    if (actual <= 0) return {};
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(pool.begin(), pool.end(), g);
+
+    std::vector<Card> drawn;
+    for (int i = 0; i < actual; ++i) {
+        drawn.push_back(pool.back());
+        pool.pop_back();
+    }
+    return drawn;
+}
+
+void splitDeck(std::vector<Card>& deck,
+               std::vector<Card>& outPlayer,
+               std::vector<Card>& outAI) {
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(deck.begin(), deck.end(), g);
+
+    int half = static_cast<int>(deck.size()) / 2;
+    outPlayer.clear();
+    outAI.clear();
+
+    for (int i = 0; i < half && !deck.empty(); ++i) {
+        outPlayer.push_back(deck.back());
+        deck.pop_back();
+    }
+    for (int i = 0; i < half && !deck.empty(); ++i) {
+        outAI.push_back(deck.back());
+        deck.pop_back();
+    }
+}

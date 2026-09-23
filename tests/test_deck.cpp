@@ -80,3 +80,61 @@ void test_refillToFive()
         assert(d.cards.size() == 54);
     }
 }
+
+void test_removeCards()
+{
+    Deck full = createStandardDeck();
+
+    {
+        auto r = removeCards(full.cards, {});
+        assert(r.size() == 54);
+    }
+    {
+        auto r = removeCards(full.cards, {"4"});
+        assert(r.size() == 53);
+    }
+    {
+        auto r = removeCards(full.cards, {"4", "4"});
+        assert(r.size() == 52);
+    }
+    {
+        auto r = removeCards(full.cards, {"4", "4", "4", "4", "6", "6", "6", "6", "8", "8", "8", "8"});
+        assert(r.size() == 42);
+    }
+    {
+        auto r = removeCards(full.cards, {"大鬼"});
+        assert(r.size() == 53);
+    }
+}
+
+void test_drawRandom()
+{
+    std::vector<Card> pool = createStandardDeck().cards;
+
+    {
+        auto drawn = drawRandom(pool, 10);
+        assert(drawn.size() == 10);
+        assert(pool.size() == 44);
+    }
+    {
+        auto drawn = drawRandom(pool, 100);
+        assert(drawn.size() == 44);
+        assert(pool.size() == 0);
+    }
+    {
+        auto drawn = drawRandom(pool, 5);
+        assert(drawn.size() == 0);
+    }
+}
+
+void test_splitDeck()
+{
+    std::vector<Card> deck = createStandardDeck().cards;
+    std::vector<Card> player, ai;
+
+    splitDeck(deck, player, ai);
+
+    assert(player.size() == 27);
+    assert(ai.size() == 27);
+    assert(deck.empty());
+}

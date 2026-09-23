@@ -115,6 +115,7 @@ add_executable(unit_tests
     tests/test_search_p0.cpp
     tests/test_rules_v2.cpp
     tests/test_fair_ai.cpp
+    tests/test_campaign.cpp
 )
 target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # These tests use assert(), including in Release builds.
@@ -225,3 +226,11 @@ target_include_directories(debug_l6b PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(debug_l6d $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/debug_l6d.cpp)
 target_include_directories(debug_l6d PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(sim_campaign
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
+    tests/sim_campaign.cpp
+)
+target_include_directories(sim_campaign PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -11,7 +11,17 @@ void test_checkSpecialVictory();
 void test_createStandardDeck();
 void test_drawCards();
 void test_refillToFive();
+void test_removeCards();
+void test_drawRandom();
+void test_splitDeck();
 void test_removeCardsFromHand();
+void test_campaignInit();
+void test_campaignStartLevel();
+void test_removeTable();
+void test_campaignSettlement();
+void test_campaignSettlementBossWins();
+void test_campaignHpCap();
+void test_campaignGameOver();
 void test_sampledWorldConservation();
 void test_searchFinalSettlement();
 void test_searchTerminalUtility();
@@ -64,8 +74,38 @@ int main()
     GROUP("deck: refillToFive")
     TEST(refillToFive);
 
+    GROUP("deck: removeCards")
+    TEST(removeCards);
+
+    GROUP("deck: drawRandom")
+    TEST(drawRandom);
+
+    GROUP("deck: splitDeck")
+    TEST(splitDeck);
+
     GROUP("player: removeCardsFromHand")
     TEST(removeCardsFromHand);
+
+    GROUP("campaign: init")
+    TEST(campaignInit);
+
+    GROUP("campaign: startLevel")
+    TEST(campaignStartLevel);
+
+    GROUP("campaign: removeTable")
+    TEST(removeTable);
+
+    GROUP("campaign: settlement win")
+    TEST(campaignSettlement);
+
+    GROUP("campaign: settlement lose")
+    TEST(campaignSettlementBossWins);
+
+    GROUP("campaign: hp cap")
+    TEST(campaignHpCap);
+
+    GROUP("campaign: game over")
+    TEST(campaignGameOver);
 
     GROUP("search: P0 regressions")
     TEST(sampledWorldConservation);
