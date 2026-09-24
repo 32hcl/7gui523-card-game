@@ -42,10 +42,12 @@ void BattleScreen::playDealAnimation()
     const int delayPerCard = 70;
     const int flyDuration = 400;
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 2 * kMaxHandSize; ++i) {
         bool toA = (i % 2 == 0);
-        int slotIdx = i / 2; // 0..4
-        const Card dealtCard = toA ? m_playerA.hand.at(static_cast<size_t>(slotIdx)) : Card{};
+        const size_t handIdx = static_cast<size_t>(i / 2);
+        const Card dealtCard = (toA && handIdx < m_playerA.hand.size())
+            ? m_playerA.hand[handIdx]
+            : Card{};
 
         QTimer::singleShot(i * delayPerCard, this, [=]() {
             // 2) 创建真实手牌 widget
@@ -61,7 +63,7 @@ void BattleScreen::playDealAnimation()
 
             // 目标 = 槽位坐标（相对 this）
             QWidget* handWidget = toA ? m_playerAHandWidget : m_playerBHandWidget;
-            QPoint slotRel = handSlotPos(handWidget, slotIdx);
+            QPoint slotRel = handSlotPos(handWidget, handIdx);
             QPoint target = handWidget->mapTo(this, slotRel);
             QPoint to = target;
 
@@ -85,8 +87,8 @@ void BattleScreen::playDealAnimation()
             const QPointF control = (fromF + toF) / 2.0 + QPointF(toA ? -24.0 : 24.0, -55.0);
             QPainterPath arc(fromF);
             arc.quadTo(control, overshoot);
-            for (int frame = 1; frame <= 20; ++frame) {
-                const qreal phase = static_cast<qreal>(frame) / 20.0;
+            for (int frame = 1; frame <= 8; ++frame) {
+                const qreal phase = static_cast<qreal>(frame) / 8.0;
                 const qreal eased = 1.0 - (1.0 - phase) * (1.0 - phase);
                 anim->setKeyValueAt(0.85 * phase, arc.pointAtPercent(eased).toPoint());
             }
@@ -99,7 +101,7 @@ void BattleScreen::playDealAnimation()
 
             // 3) 动画结束后：直接设在槽位，不进 layout
             connect(flight, &QParallelAnimationGroup::finished, this,
-                [this, card, slotIdx, toA, target]() {
+                [this, card, handIdx, toA, target]() {
                     card->setAttribute(Qt::WA_TransparentForMouseEvents, false);
                     card->setDealAnimationEnabled(false, false);
                     card->setFlying(false);
@@ -126,7 +128,7 @@ void BattleScreen::playDealAnimation()
                     }
                 });
 
-            if (i == 9) {
+            if (i == 2 * kMaxHandSize - 1) {
                 connect(flight, &QParallelAnimationGroup::finished,
                         this, &BattleScreen::dealAnimationFinished);
             }

@@ -10,7 +10,7 @@ Player createPlayer(const std::string& name) {
 }
 
 void refillToFive(Player& player, Deck& deck) {
-    int need = 5 - static_cast<int>(player.hand.size());
+    int need = kMaxHandSize - static_cast<int>(player.hand.size());
     if (need > 0) {
         dealCards(player, deck, need);
     }

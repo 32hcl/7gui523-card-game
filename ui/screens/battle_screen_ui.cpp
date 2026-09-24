@@ -399,7 +399,7 @@ QPoint BattleScreen::handSlotPos(QWidget* handWidget, int index) const {
     const int cw = 110, ch = 180, gap = 6;
     const int W = handWidget->width();
     const int H = handWidget->height();
-    const int totalW = 5 * cw + 4 * gap;
+    const int totalW = kMaxHandSize * cw + (kMaxHandSize - 1) * gap;
     const int left = (W - totalW) / 2;
     const int y = (H - ch) / 2;
     return QPoint(left + index * (cw + gap), y);

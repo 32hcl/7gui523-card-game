@@ -301,11 +301,11 @@ void BattleScreen::startGameWithFirst(bool playerAFirst)
     emit gameStarted();
 
     m_playerA.hand = m_pickedCards;
-    int needA = 5 - (int)m_playerA.hand.size();
+    int needA = kMaxHandSize - (int)m_playerA.hand.size();
     if (needA > 0) dealCards(m_playerA, m_playerDeck, needA);
     sortHandSmart(m_playerA.hand);
 
-    dealCards(m_playerB, m_bossDeck, 5);
+    dealCards(m_playerB, m_bossDeck, kMaxHandSize);
 
     appendLog(QString("玩家A 手牌: %1").arg(cardsToString(m_playerA.hand)));
     appendLog(QString("电脑 手牌: %1").arg(cardsToString(m_playerB.hand)));
@@ -645,9 +645,9 @@ void BattleScreen::startNewGame()
             ai2_variant_deck(m_bossDeck.cards);
         }
 
-        dealCards(m_playerA, m_playerDeck, 5);
+        dealCards(m_playerA, m_playerDeck, kMaxHandSize);
         sortHandSmart(m_playerA.hand);
-        dealCards(m_playerB, m_bossDeck, 5);
+        dealCards(m_playerB, m_bossDeck, kMaxHandSize);
 
         appendLog(QString("玩家A 手牌: %1").arg(cardsToString(m_playerA.hand)));
         appendLog(QString("电脑 手牌: %1").arg(cardsToString(m_playerB.hand)));

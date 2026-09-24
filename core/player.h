@@ -4,6 +4,8 @@
 #include <vector>
 #include "core/card/card.h"
 
+constexpr int kMaxHandSize = 5;
+
 struct Deck;
 
 enum class AILevel {
