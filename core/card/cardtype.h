@@ -10,6 +10,7 @@ struct CardTypeResult {
     std::string keyPoint;
     std::vector<Card> cards;
     int bonusScore = 0;
+    int count = 0;
 };
 
 bool isJoker(const Card& card);

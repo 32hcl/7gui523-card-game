@@ -27,6 +27,7 @@ void test_searchFinalSettlement();
 void test_searchTerminalUtility();
 void test_rulesV2();
 void test_trackerDualSide();
+void test_variantRegistry();
 
 static int g_total = 0;
 static int g_passed = 0;
@@ -117,6 +118,9 @@ int main()
 
     GROUP("tracker: dual side")
     TEST(trackerDualSide);
+
+    GROUP("variant: registry")
+    TEST(variantRegistry);
 
     std::cout << std::endl;
     std::cout << "Result: " << g_passed << " / " << g_total << " passed";

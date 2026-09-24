@@ -106,6 +106,37 @@ void test_parseCardType()
     }
 
     {
+        auto r = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"), makeCard("7")
+        });
+        assert(r.type == CardType::Bomb);
+        assert(r.count == 4);
+    }
+    {
+        auto r = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"),
+            makeCard("7"), makeCard("7")
+        });
+        assert(r.type == CardType::Bomb);
+        assert(r.count == 5);
+    }
+    {
+        auto r = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"),
+            makeCard("7"), makeCard("7"), makeCard("7")
+        });
+        assert(r.type == CardType::Bomb);
+        assert(r.count == 6);
+    }
+    {
+        auto r = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7")
+        });
+        assert(r.type == CardType::Triple);
+        assert(r.count == 0);
+    }
+
+    {
         CardType t = parseCardType({makeCard("大鬼"), makeCard("小鬼")}).type;
         assert(t == CardType::Rocket);
     }
@@ -172,5 +203,61 @@ void test_canBeat()
             makeCard("3"), makeCard("3"), makeCard("3"), makeCard("3")
         });
         assert(canBeat(bomb, tripleWithTwo));
+    }
+
+    {
+        auto bomb5 = parseCardType({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("3"), makeCard("3")
+        });
+        auto rocket = parseCardType({makeCard("大鬼"), makeCard("小鬼")});
+        assert(canBeat(bomb5, rocket));
+        assert(!canBeat(rocket, bomb5));
+    }
+
+    {
+        auto bomb4x5 = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"), makeCard("5")
+        });
+        auto rocket = parseCardType({makeCard("大鬼"), makeCard("小鬼")});
+        assert(canBeat(rocket, bomb4x5));
+    }
+
+    {
+        auto bomb5x3 = parseCardType({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("3"), makeCard("3")
+        });
+        auto bomb4x5 = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"), makeCard("5")
+        });
+        assert(canBeat(bomb5x3, bomb4x5));
+        assert(!canBeat(bomb4x5, bomb5x3));
+    }
+
+    {
+        auto bomb5x5 = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"),
+            makeCard("5"), makeCard("5")
+        });
+        auto bomb5x3 = parseCardType({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("3"), makeCard("3")
+        });
+        assert(canBeat(bomb5x5, bomb5x3));
+        assert(!canBeat(bomb5x3, bomb5x5));
+    }
+
+    {
+        auto special = parseCardType({
+            makeCard("7"), makeCard("大鬼"),
+            makeCard("5"), makeCard("2"), makeCard("3")
+        });
+        auto bomb5 = parseCardType({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("3"), makeCard("3")
+        });
+        assert(canBeat(special, bomb5));
+        assert(!canBeat(bomb5, special));
     }
 }

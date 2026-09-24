@@ -23,6 +23,14 @@ Card CardWidget::getCard() const
     return m_card;
 }
 
+void CardWidget::setCard(const Card& card)
+{
+    m_card = card;
+    m_pixmap = QPixmap();
+    loadPixmap();
+    update();
+}
+
 void CardWidget::setSelected(bool selected)
 {
     if (m_selected == selected) return;

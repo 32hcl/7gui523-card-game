@@ -1,6 +1,7 @@
 #include "battle_screen.h"
 #include "ui/widgets/card_widget.h"
 #include "core/card/cardtype.h"
+#include "core/variant/variant_registry.h"
 #include <QPropertyAnimation>
 #include <QParallelAnimationGroup>
 #include <QPainterPath>
@@ -205,7 +206,12 @@ void BattleScreen::flyAICardsToTable(const std::vector<Card>& cards) {
     int targetY = tablePos.y() + (tableH - 150) / 2;
 
     for (int i = 0; i < n; ++i) {
-        CardWidget* cw = new CardWidget(cards[i], this);
+        Card displayCard = cards[i];
+        bool hasVariant = VariantRegistry::has(cards[i].seq);
+        if (hasVariant) {
+            displayCard = VariantRegistry::lookup(cards[i].seq);
+        }
+        CardWidget* cw = new CardWidget(displayCard, this);
         cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         cw->move(startPos);
         cw->show();
@@ -220,8 +226,9 @@ void BattleScreen::flyAICardsToTable(const std::vector<Card>& cards) {
         anim->setStartValue(startPos);
         anim->setEndValue(endPos);
 
+        Card variantCardData = cards[i];
         connect(anim, &QPropertyAnimation::finished, this,
-            [this, cw, endPos]() {
+            [this, cw, endPos, hasVariant, variantCardData]() {
                 cw->setParent(m_tableCardsWidget);
                 QPoint relPos = endPos - m_tableCardsWidget->mapTo(this, QPoint(0, 0));
                 cw->move(relPos);
@@ -229,6 +236,13 @@ void BattleScreen::flyAICardsToTable(const std::vector<Card>& cards) {
                 cw->setFlying(false);
                 cw->setAttribute(Qt::WA_TransparentForMouseEvents, true);
                 m_tableCardWidgets.push_back(cw);
+
+                if (hasVariant) {
+                    shakeWidget(cw);
+                    QTimer::singleShot(250, this, [cw, variantCardData]() {
+                        cw->setCard(variantCardData);
+                    });
+                }
             });
 
         anim->start(QAbstractAnimation::DeleteWhenStopped);

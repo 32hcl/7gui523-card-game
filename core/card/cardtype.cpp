@@ -102,6 +102,7 @@ CardTypeResult parseCardType(const std::vector<Card>& cards) {
         if (isSamePoint(cards) && !isJoker(cards[0])) {
             result.type = CardType::Bomb;
             result.keyPoint = cards[0].point;
+            result.count = 4;
         } else {
             std::string triplePoint;
             if (hasTriple(cards, triplePoint)) {
@@ -109,18 +110,23 @@ CardTypeResult parseCardType(const std::vector<Card>& cards) {
                 result.keyPoint = triplePoint;
             }
         }
-    } else if (size == 5) {
-        // 优先检测 Special523（必须放在 TripleWithTwo 之前）
+    } else if (size >= 5) {
         if (isSpecial523(cards)) {
             result.type = CardType::Special523;
             result.keyPoint = "Special523";
             return result;
         }
-        std::string triplePoint;
-        std::string pairPoint;
-        if (hasTriple(cards, triplePoint) && hasPair(cards, pairPoint, triplePoint)) {
-            result.type = CardType::TripleWithTwo;
-            result.keyPoint = triplePoint;
+        if (isSamePoint(cards) && !isJoker(cards[0])) {
+            result.type = CardType::Bomb;
+            result.keyPoint = cards[0].point;
+            result.count = (int)size;
+        } else if (size == 5) {
+            std::string triplePoint;
+            std::string pairPoint;
+            if (hasTriple(cards, triplePoint) && hasPair(cards, pairPoint, triplePoint)) {
+                result.type = CardType::TripleWithTwo;
+                result.keyPoint = triplePoint;
+            }
         }
     }
     return result;
@@ -129,36 +135,49 @@ CardTypeResult parseCardType(const std::vector<Card>& cards) {
 bool canBeat(const CardTypeResult& candidate, const CardTypeResult& previous) {
     if (previous.cards.empty()) return true;
     if (candidate.type == CardType::Invalid) return false;
-    // Special523 压过一切（含王炸）
+
     if (candidate.type == CardType::Special523) return true;
     if (previous.type == CardType::Special523) return false;
+
+    if (candidate.type == CardType::Bomb && previous.type == CardType::Bomb) {
+        if (candidate.count != previous.count)
+            return candidate.count > previous.count;
+        return getCardRank(candidate.keyPoint) >= getCardRank(previous.keyPoint);
+    }
+
+    if (candidate.type == CardType::Bomb && candidate.count >= 5) return true;
+    if (previous.type == CardType::Bomb && previous.count >= 5) return false;
+
     if (candidate.type == CardType::Rocket) {
         return previous.type != CardType::Rocket;
     }
     if (previous.type == CardType::Rocket) return false;
-    if (candidate.type == CardType::Bomb) {
-        if (previous.type == CardType::Bomb) {
-            return getCardRank(candidate.keyPoint) >= getCardRank(previous.keyPoint);
-        }
-        return true;
-    }
+
+    if (candidate.type == CardType::Bomb) return true;
     if (previous.type == CardType::Bomb) return false;
+
     if (candidate.type != previous.type) return false;
     return getCardRank(candidate.keyPoint) >= getCardRank(previous.keyPoint);
 }
 
 int calculatePressureBonus(const CardTypeResult& candidate,
                            const CardTypeResult& previous) {
-    // 压分奖励规则：同牌型且同 keyPoint 时触发，
-    // 奖励本次出牌中所有分值牌（score > 0）之和。
     if (previous.cards.empty()) return 0;
-    if (candidate.type != previous.type) return 0;
-    if (candidate.keyPoint != previous.keyPoint) return 0;
-    int bonus = 0;
-    for (const Card& c : candidate.cards) {
-        if (c.score > 0) bonus += c.score;
+
+    bool prevHasScore = false;
+    for (const Card& c : previous.cards) {
+        if (c.score > 0) { prevHasScore = true; break; }
     }
-    return bonus;
+    if (!prevHasScore) return 0;
+
+    bool currHasScore = false;
+    int currScore = 0;
+    for (const Card& c : candidate.cards) {
+        if (c.score > 0) { currHasScore = true; currScore += c.score; }
+    }
+    if (!currHasScore) return 0;
+
+    return currScore;
 }
 
 void printCardTypeResult(const CardTypeResult& result) {

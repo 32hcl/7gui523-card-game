@@ -12,6 +12,7 @@ class CardWidget : public QWidget {
 public:
     explicit CardWidget(const Card& card, QWidget* parent = nullptr);
     Card getCard() const;
+    void setCard(const Card& card);
     void setSelected(bool selected);
     bool isSelected() const;
 

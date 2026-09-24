@@ -90,7 +90,7 @@ void test_pressureBonus()
     {
         auto s1 = parseCardType({makeCard("5")});
         auto s2 = parseCardType({makeCard("10")});
-        assert(calculatePressureBonus(s2, s1) == 0);
+        assert(calculatePressureBonus(s2, s1) == 10);
     }
 
     {
@@ -115,6 +115,6 @@ void test_pressureBonus()
     {
         auto s5 = parseCardType({makeCard("5")});
         auto p5 = parseCardType({makeCard("5"), makeCard("5")});
-        assert(calculatePressureBonus(p5, s5) == 0);
+        assert(calculatePressureBonus(p5, s5) == 10);
     }
 }

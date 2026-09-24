@@ -3,6 +3,8 @@
 #include "ui/dialogs/card_picker.h"
 #include "ai/ai.h"
 #include "ai/players/ai1_idiot.h"
+#include "ai/players/ai2_liar.h"
+#include "core/variant/variant_registry.h"
 #include "ai/engine/ai_levels.h"
 #include "core/card/cardtype.h"
 #include "core/rule/score.h"
@@ -373,6 +375,10 @@ void BattleScreen::doAITurn()
             chosen = ai1_idiot_choose(m_playerB, m_playerA, m_lastPlay,
                                       m_bossDeck, tableScore);
             break;
+        case 2:
+            chosen = ai2_liar_choose(m_playerB, m_playerA, m_lastPlay,
+                                     m_bossDeck, tableScore);
+            break;
         default:
             if (m_levelAIEngine) {
                 m_levelAIEngine->setOpponentHand(m_playerA.hand);
@@ -530,6 +536,8 @@ void BattleScreen::doAITurn()
 
 void BattleScreen::startNewGame()
 {
+    VariantRegistry::clear();
+
     for (CardWidget* cw : m_tableCardWidgets) cw->deleteLater();
     m_tableCardWidgets.clear();
 
@@ -616,6 +624,10 @@ void BattleScreen::startNewGame()
         {
             auto bossCards = removeCards(createStandardDeck().cards, getLevelRemoveTable(m_currentLevel));
             m_bossDeck.cards = drawRandom(bossCards, 27);
+        }
+
+        if (m_currentLevel == 2) {
+            ai2_variant_deck(m_bossDeck.cards);
         }
 
         dealCards(m_playerA, m_playerDeck, 5);
