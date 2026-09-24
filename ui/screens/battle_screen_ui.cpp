@@ -3,6 +3,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFrame>
+#include <QDebug>
 #include <QGraphicsDropShadowEffect>
 #include <QFile>
 #include <QCoreApplication>
@@ -114,6 +115,14 @@ void BattleScreen::createTableArea(QVBoxLayout* leftLay)
     m_tableCardsWidget = new QWidget;
     m_tableCardsWidget->setAttribute(Qt::WA_StyledBackground, true);
     tableLay->addWidget(m_tableCardsWidget, 1);
+
+    m_tableHintLabel = new QLabel("等待出牌", m_tableCardsWidget);
+    m_tableHintLabel->setAlignment(Qt::AlignCenter);
+    m_tableHintLabel->setStyleSheet("QLabel { color: #F5A623; }");
+    QFont hintFont = m_tableHintLabel->font();
+    hintFont.setPointSize(16);
+    m_tableHintLabel->setFont(hintFont);
+    m_tableHintLabel->hide();
 
     // 底行：上一手牌型 + 桌面分
     auto* infoWidget = new QWidget;
@@ -399,6 +408,12 @@ QPoint BattleScreen::handSlotPos(QWidget* handWidget, int index) const {
 void BattleScreen::layoutHandSlots(bool playerA, bool animate) {
     QWidget* handWidget = playerA ? m_playerAHandWidget : m_playerBHandWidget;
     if (!handWidget) return;
+
+    qDebug() << "[layoutHandSlots] playerA=" << playerA
+             << "count=" << (int)(playerA ? m_playerACardWidgets.size() : m_playerBCardWidgets.size())
+             << "W=" << handWidget->width()
+             << "H=" << handWidget->height()
+             << "firstSlot=" << handSlotPos(handWidget, 0);
 
     if (playerA) {
         for (size_t i = 0; i < m_playerACardWidgets.size(); ++i) {

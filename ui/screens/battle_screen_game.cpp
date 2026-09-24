@@ -3,6 +3,7 @@
 #include "ui/dialogs/card_picker.h"
 #include "ai/ai.h"
 #include "ai/players/ai1_idiot.h"
+#include <QDebug>
 #include "ai/players/ai2_liar.h"
 #include "core/variant/variant_registry.h"
 #include "ai/engine/ai_levels.h"
@@ -156,7 +157,6 @@ void BattleScreen::onPlayButtonClicked()
         m_lastPlay.cards.clear();
         m_lastPlay.keyPoint.clear();
         m_lastPlayerName.clear();
-        updateUI();
         enableActionButtons();
         return;
     }
@@ -189,7 +189,6 @@ void BattleScreen::onPassButtonClicked()
         m_lastPlay.cards.clear();
         m_lastPlay.keyPoint.clear();
         m_lastPlayerName.clear();
-        updateUI();
 
         if (checkSpecialVictory(m_playerA)) {
             appendLog("玩家A 达成七鬼523，直接获胜！");
@@ -213,8 +212,6 @@ void BattleScreen::onPassButtonClicked()
     endRound(m_playerB);
 
     refillBoth(m_playerB, m_playerA);
-
-    updateUI();
 
     if (checkSpecialVictory(m_playerA)) {
         appendLog("玩家A 达成七鬼523，直接获胜！");
@@ -406,7 +403,6 @@ void BattleScreen::doAITurn()
             m_lastPlay.cards.clear();
             m_lastPlay.keyPoint.clear();
             m_lastPlayerName.clear();
-            updateUI();
             enableActionButtons();
             return;
         }
@@ -415,9 +411,9 @@ void BattleScreen::doAITurn()
 
         if (!m_playerDeck.cards.empty()) {
             refillBoth(m_playerA, m_playerB);
+        } else {
+            updateUI();
         }
-
-        updateUI();
 
         if (checkSpecialVictory(m_playerA)) {
             appendLog("玩家A 达成七鬼523，直接获胜！");
@@ -434,13 +430,13 @@ void BattleScreen::doAITurn()
         }
 
         m_lastPlay.type = CardType::Invalid;
-        m_lastPlay.cards.clear();
-        m_lastPlay.keyPoint.clear();
-        m_lastPlayerName.clear();
-        enableActionButtons();
-        updateUI();
-        return;
-    }
+    m_lastPlay.cards.clear();
+    m_lastPlay.keyPoint.clear();
+    m_lastPlayerName.clear();
+    enableActionButtons();
+    updateUI(false);
+    return;
+}
 
     for (const Card& c : chosen) {
         auto it = std::find_if(m_playerB.hand.begin(), m_playerB.hand.end(),
@@ -524,7 +520,6 @@ void BattleScreen::doAITurn()
         m_lastPlay.cards.clear();
         m_lastPlay.keyPoint.clear();
         m_lastPlayerName.clear();
-        updateUI();
         m_waitingForAI = true;
         QTimer::singleShot(700, this, &BattleScreen::doAITurn);
         return;
@@ -537,6 +532,26 @@ void BattleScreen::doAITurn()
 void BattleScreen::startNewGame()
 {
     VariantRegistry::clear();
+
+    qDebug() << "[startNewGame] before cleanup: A=" << (int)m_playerACardWidgets.size()
+             << "B=" << (int)m_playerBCardWidgets.size();
+
+    for (CardWidget* cw : m_playerACardWidgets) {
+        cw->hide();
+        cw->setParent(nullptr);
+        cw->deleteLater();
+    }
+    m_playerACardWidgets.clear();
+
+    for (QWidget* w : m_playerBCardWidgets) {
+        w->hide();
+        w->setParent(nullptr);
+        w->deleteLater();
+    }
+    m_playerBCardWidgets.clear();
+
+    qDebug() << "[startNewGame] after cleanup: A=" << (int)m_playerACardWidgets.size()
+             << "B=" << (int)m_playerBCardWidgets.size();
 
     for (CardWidget* cw : m_tableCardWidgets) cw->deleteLater();
     m_tableCardWidgets.clear();
@@ -554,7 +569,6 @@ void BattleScreen::startNewGame()
     m_tableCards.clear();
     m_tableBonus = 0;
     m_lastPlayerName.clear();
-    m_playerACardWidgets.clear();
     m_pickedCards.clear();
     m_playerPlayedCards.clear();
     m_pendingSpecialVictory = false;
@@ -695,6 +709,15 @@ void BattleScreen::startNewGame()
 
 void BattleScreen::updateUI(bool rebuildHand)
 {
+    qDebug() << "[updateUI] rebuildHand=" << rebuildHand
+             << "m_dealAnimating=" << m_dealAnimating
+             << "playerA.hand=" << (int)m_playerA.hand.size()
+             << "playerAWidgets=" << (int)m_playerACardWidgets.size()
+             << "playerB.hand=" << (int)m_playerB.hand.size()
+             << "playerBWidgets=" << (int)m_playerBCardWidgets.size()
+             << "handWidgetW=" << (m_playerAHandWidget ? m_playerAHandWidget->width() : -1)
+             << "handWidgetH=" << (m_playerAHandWidget ? m_playerAHandWidget->height() : -1);
+
     // 双牌堆显示
     int playerDeckCount = static_cast<int>(m_playerDeck.cards.size());
     int bossDeckCount = static_cast<int>(m_bossDeck.cards.size());
@@ -762,19 +785,17 @@ void BattleScreen::updateUI(bool rebuildHand)
         .arg(m_tableBonus)
         .arg(tableScore));
 
-    if (!m_waitingForFirstChoice && !m_pendingPick && m_tableCardWidgets.empty()) {
-        if (m_lastPlay.type == CardType::Invalid || m_lastPlay.cards.empty()) {
-            auto children = m_tableCardsWidget->findChildren<QLabel*>();
-            for (QLabel* lbl : children) lbl->deleteLater();
-            QLabel* hint = new QLabel("等待出牌", m_tableCardsWidget);
-            hint->setAlignment(Qt::AlignCenter);
-            hint->setGeometry(0, 0, m_tableCardsWidget->width(), m_tableCardsWidget->height());
-            QFont hintFont = hint->font();
-            hintFont.setPointSize(16);
-            hint->setFont(hintFont);
-            hint->setStyleSheet("QLabel { color: #F5A623; }");
-            hint->show();
-        }
+    bool needHint = (!m_waitingForFirstChoice && !m_pendingPick
+                      && m_tableCardWidgets.empty()
+                      && (m_lastPlay.type == CardType::Invalid
+                          || m_lastPlay.cards.empty()));
+    if (needHint) {
+        m_tableHintLabel->setGeometry(0, 0,
+            m_tableCardsWidget->width(), m_tableCardsWidget->height());
+        m_tableHintLabel->show();
+        m_tableHintLabel->raise();
+    } else {
+        m_tableHintLabel->hide();
     }
 
     if (m_dealAnimating) return;
@@ -785,6 +806,8 @@ void BattleScreen::updateUI(bool rebuildHand)
             // 先删除多余的
             while (m_playerACardWidgets.size() > m_playerA.hand.size()) {
                 CardWidget* cw = m_playerACardWidgets.back();
+                cw->hide();
+                cw->setParent(nullptr);
                 cw->deleteLater();
                 m_playerACardWidgets.pop_back();
             }
@@ -793,9 +816,15 @@ void BattleScreen::updateUI(bool rebuildHand)
                 CardWidget* cw = m_playerACardWidgets[i];
                 const Card& handCard = m_playerA.hand[i];
                 if (cw->getCard().point != handCard.point ||
-                    cw->getCard().suit != handCard.suit) {
-                    // 内容不匹配 → 重建
-                    disconnect(cw, &CardWidget::clicked, nullptr, nullptr);
+                cw->getCard().suit != handCard.suit) {
+                qDebug() << "[rebuildHand] MISMATCH idx=" << i
+                         << "widget=" << QString::fromStdString(cw->getCard().point)
+                         << QString::fromStdString(cw->getCard().suit)
+                         << "hand=" << QString::fromStdString(handCard.point)
+                         << QString::fromStdString(handCard.suit);
+                disconnect(cw, &CardWidget::clicked, nullptr, nullptr);
+                    cw->hide();
+                    cw->setParent(nullptr);
                     cw->deleteLater();
                     CardWidget* nw = new CardWidget(handCard, m_playerAHandWidget);
                     connect(nw, &CardWidget::clicked, this, [this]() { update(); });
@@ -818,6 +847,8 @@ void BattleScreen::updateUI(bool rebuildHand)
         {
             while (m_playerBCardWidgets.size() > m_playerB.hand.size()) {
                 QWidget* w = m_playerBCardWidgets.back();
+                w->hide();
+                w->setParent(nullptr);
                 w->deleteLater();
                 m_playerBCardWidgets.pop_back();
             }
@@ -829,6 +860,9 @@ void BattleScreen::updateUI(bool rebuildHand)
             }
             layoutHandSlots(false, false);
         }
+
+        if (m_playerAHandWidget) m_playerAHandWidget->update();
+        if (m_playerBHandWidget) m_playerBHandWidget->update();
     }
 
     if (!m_gameOver) {
@@ -920,6 +954,12 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
     int gotW = static_cast<int>(winner.hand.size()) - beforeW;
     int gotL = static_cast<int>(loser.hand.size()) - beforeL;
 
+    qDebug() << "[refillBoth] enter winner=" << QString::fromStdString(winner.name)
+             << "loser=" << QString::fromStdString(loser.name)
+             << "winnerIsPlayerA=" << winnerIsPlayerA
+             << "beforeW=" << beforeW << "beforeL=" << beforeL
+             << "gotW=" << gotW << "gotL=" << gotL;
+
     appendLog(QString("补牌: %1 +%2张 → %3张, %4 +%5张 → %6张")
         .arg(QString::fromStdString(winner.name)).arg(gotW).arg(static_cast<int>(winner.hand.size()))
         .arg(QString::fromStdString(loser.name)).arg(gotL).arg(static_cast<int>(loser.hand.size())));
@@ -929,8 +969,13 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
     // updateUI(true) 先重建所有手牌 widget，让每张牌都在最终 layout 位置
     updateUI(true);
 
+    qDebug() << "[refillBoth] after updateUI, playerAWidgets="
+             << (int)m_playerACardWidgets.size()
+             << "playerBWidgets=" << (int)m_playerBCardWidgets.size();
+
     // 对玩家A的新增牌：找到 widget → 移到牌堆起点 → 动画飞回最终位置
     if (gotW > 0 && winnerIsPlayerA) {
+        qDebug() << "[refillBoth] playerA-winner branch gotW=" << gotW;
         // 识别新增牌（在 new hand 但不在 old hand 中）
         std::vector<int> newIndices;
         for (int i = 0; i < static_cast<int>(m_playerA.hand.size()); ++i) {
@@ -955,11 +1000,16 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
         for (int idx : newIndices) {
             if (idx < static_cast<int>(m_playerACardWidgets.size())) {
                 CardWidget* cw = m_playerACardWidgets[idx];
-                QPoint finalPos = cw->mapTo(this, QPoint(0, 0));
+
+                // finalPos 用 cw 在父控件里的当前位置（layoutHandSlots 刚设过）
+                QPoint finalPosInParent = cw->pos();
+
+                // startPos 从 BattleScreen 坐标转到父控件坐标
+                QPoint startPosInParent = m_playerAHandWidget->mapFrom(this, startPos);
 
                 // 先移到牌堆起点
                 cw->setDealAnimationEnabled(true);
-                cw->move(startPos);
+                cw->move(startPosInParent);
                 cw->raise();
                 cw->show();
 
@@ -967,14 +1017,19 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
                 auto* anim = new QPropertyAnimation(cw, "pos");
                 anim->setDuration(450);
                 anim->setEasingCurve(QEasingCurve::OutCubic);
-                anim->setStartValue(startPos);
-                anim->setEndValue(finalPos);
+                anim->setStartValue(startPosInParent);
+                anim->setEndValue(finalPosInParent);
                 connect(anim, &QPropertyAnimation::finished, this,
-                    [cw]() { cw->setDealAnimationEnabled(false); });
+                    [this, cw]() {
+                        if (!cw) return;
+                        cw->setDealAnimationEnabled(false);
+                        layoutHandSlots(true, false);
+                    }, Qt::SingleShotConnection);
                 anim->start(QAbstractAnimation::DeleteWhenStopped);
             }
         }
     } else if (gotW > 0 || gotL > 0) {
+        qDebug() << "[refillBoth] else-if branch gotW=" << gotW << "gotL=" << gotL;
         // 非玩家A的补牌：使用简化动画（临时 widget 飞入，完成后不重建手牌）
         // 赢家
         if (gotW > 0) {

@@ -126,6 +126,7 @@ private:
     QStackedWidget* m_buttonStack = nullptr;
     QWidget* m_firstChoiceWidget  = nullptr;
     QWidget* m_tableCardsWidget   = nullptr;
+    QLabel*  m_tableHintLabel     = nullptr;
     QFrame*  m_tableFrame         = nullptr;
     QWidget* m_playerAHandWidget  = nullptr;
     QWidget* m_playerBHandWidget  = nullptr;
