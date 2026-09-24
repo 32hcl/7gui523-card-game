@@ -9,7 +9,9 @@
 #include <QPolygonF>
 #include <QRadialGradient>
 #include <QTransform>
+#include <QDebug>
 #include <cmath>
+#include <algorithm>
 
 CardWidget::CardWidget(const Card& card, QWidget* parent)
     : QWidget(parent), m_card(card), m_currentYOffset(21)
@@ -130,13 +132,25 @@ void CardWidget::loadPixmap() {
     }
 }
 
+static const QPixmap& cardBackPixmap() {
+    static QPixmap s_back;
+    if (s_back.isNull()) {
+        s_back.load(QCoreApplication::applicationDirPath() + "/cards/card_back.png");
+    }
+    return s_back;
+}
+
 void CardWidget::setDealAnimationEnabled(bool enabled, bool revealFace)
 {
+    qDebug() << "[CardWidget] setDealAnimationEnabled enabled=" << enabled
+             << "seq=" << m_card.seq
+             << "point=" << QString::fromStdString(m_card.point);
+
     m_dealAnimationEnabled = enabled;
     m_dealRevealFace = revealFace;
     m_dealProgress = 0.0;
     if (enabled && m_backPixmap.isNull()) {
-        m_backPixmap.load(QCoreApplication::applicationDirPath() + "/cards/card_back.png");
+        m_backPixmap = cardBackPixmap();
     }
     update();
 }
@@ -159,36 +173,44 @@ void CardWidget::paintDealCard()
     p.setRenderHint(QPainter::Antialiasing);
     p.setRenderHint(QPainter::SmoothPixmapTransform);
 
-    // Keep the face readable after the edge-on midpoint (no mirrored text).
     constexpr qreal pi = 3.14159265358979323846;
     const qreal lift = std::sin(pi * m_dealProgress);
     const qreal scaleX = qMax(qreal(0.015), std::abs(std::cos(pi * m_dealProgress)));
     const bool showFace = m_dealRevealFace && m_dealProgress >= 0.5;
 
-    // The temporary deal widget reserves 18 px around the 60 x 84 card.
-    // Paint its ground shadow before transforming the card, so the shadow
-    // remains visible while the face is edge-on.
+    // 卡片绘制区域与 paintEvent 比例一致：93%宽 × 79%高
+    const qreal cardW = width() * 0.93;
+    const qreal cardH = height() * 0.79;
+    const qreal halfW = cardW / 2.0;
+    const qreal halfH = cardH / 2.0;
+    const QRectF cardRect(-halfW, -halfH, cardW, cardH);
+
+    // 地面阴影（卡片下方，跟随 lift 动画）
     p.save();
-    p.translate(width() / 2.0 + 3.0 * lift, height() / 2.0 + 41.0 + 5.0 * lift);
+    p.translate(width() / 2.0 + 3.0 * lift,
+                height() / 2.0 + halfH - 1.0 + 5.0 * lift);
     p.scale(1.0 - 0.35 * lift, 0.24);
-    QRadialGradient shadow(QPointF(0.0, 0.0), 33.0);
+    const qreal shadowR = halfW * 1.1;
+    QRadialGradient shadow(QPointF(0.0, 0.0), shadowR);
     shadow.setColorAt(0.0, QColor(0, 0, 0, qRound(115.0 - 80.0 * lift)));
     shadow.setColorAt(1.0, QColor(0, 0, 0, 0));
     p.setPen(Qt::NoPen);
     p.setBrush(shadow);
-    p.drawEllipse(QRectF(-33.0, -33.0, 66.0, 66.0));
+    p.drawEllipse(QRectF(-shadowR, -shadowR, 2.0 * shadowR, 2.0 * shadowR));
     p.restore();
 
+    // 卡片翻转（带透视）
     p.translate(width() / 2.0, height() / 2.0);
     p.rotate(m_dealTilt * lift);
     p.scale(scaleX, 1.0);
-    const QRectF cardRect(-30.0, -42.0, 60.0, 84.0);
-    const qreal inset = 4.0 * lift;
+    const qreal inset = halfW * 0.13 * lift;
     const QPolygonF source{cardRect.topLeft(), cardRect.topRight(),
                            cardRect.bottomRight(), cardRect.bottomLeft()};
-    const QPolygonF projected{QPointF(-30.0 + inset, -42.0 + inset),
-                              QPointF(30.0 - inset, -42.0 + inset),
-                              QPointF(30.0, 42.0), QPointF(-30.0, 42.0)};
+    const QPolygonF projected{
+        QPointF(-halfW + inset, -halfH + inset),
+        QPointF( halfW - inset, -halfH + inset),
+        QPointF( halfW,  halfH),
+        QPointF(-halfW,  halfH)};
     QTransform perspective;
     if (QTransform::quadToQuad(source, projected, perspective)) {
         p.setWorldTransform(perspective, true);
@@ -199,7 +221,7 @@ void CardWidget::paintDealCard()
         return;
     }
 
-    // Missing assets must still show a back before the midpoint, never the face.
+    // 无贴图资产的降级渲染
     p.setPen(QPen(QColor(35, 50, 75), 1.0));
     p.setBrush(showFace ? QColor(Qt::white) : QColor(45, 70, 120));
     p.drawRoundedRect(cardRect, 4.0, 4.0);
@@ -216,6 +238,18 @@ void CardWidget::paintDealCard()
 
 void CardWidget::paintEvent(QPaintEvent*)
 {
+    static int s_paintCount = 0;
+    if (s_paintCount < 30) {
+        qDebug() << "[paint] seq=" << m_card.seq
+                 << "point=" << QString::fromStdString(m_card.point)
+                 << "dealAnim=" << m_dealAnimationEnabled
+                 << "visible=" << isVisible()
+                 << "pos=" << pos()
+                 << "size=" << size()
+                 << "parentVisible=" << (parentWidget() ? parentWidget()->isVisible() : false);
+        ++s_paintCount;
+    }
+
     if (m_dealAnimationEnabled) {
         paintDealCard();
         return;
@@ -289,12 +323,14 @@ void CardWidget::paintEvent(QPaintEvent*)
     const int liftCompensation = (kRestY - m_currentYOffset) / 2; // 未选=0，选中=9
     const int shadowTop = cardBottom + liftCompensation;
 
-    constexpr int kShadowHeight = 4;
-    if (shadowTop + kShadowHeight <= height()) {
-        QLinearGradient grad(0, shadowTop, 0, shadowTop + kShadowHeight);
-        grad.setColorAt(0.0, QColor(0, 0, 0, 180));
+    constexpr int kShadowHeightMax = 20;
+    const int shadowHeight = std::min(kShadowHeightMax, height() - shadowTop);
+    if (shadowHeight > 0) {
+        QLinearGradient grad(0, shadowTop, 0, shadowTop + shadowHeight);
+        grad.setColorAt(0.0, QColor(0, 0, 0, 200));
+        grad.setColorAt(0.5, QColor(0, 0, 0, 100));
         grad.setColorAt(1.0, QColor(0, 0, 0, 0));
-        QRect shadowRect(imgX, shadowTop, imgW, kShadowHeight);  // 宽度 = 卡片宽度
+        QRect shadowRect(0, shadowTop, width(), shadowHeight);
         p.fillRect(shadowRect, grad);
     }
 
