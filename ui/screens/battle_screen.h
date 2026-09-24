@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QStackedWidget>
+#include <QPointer>
 #include <QPropertyAnimation>
 #include <QFrame>
 #include <QMainWindow>
@@ -126,7 +127,7 @@ private:
     QStackedWidget* m_buttonStack = nullptr;
     QWidget* m_firstChoiceWidget  = nullptr;
     QWidget* m_tableCardsWidget   = nullptr;
-    QLabel*  m_tableHintLabel     = nullptr;
+    QPointer<QLabel>  m_tableHintLabel;
     QFrame*  m_tableFrame         = nullptr;
     QWidget* m_playerAHandWidget  = nullptr;
     QWidget* m_playerBHandWidget  = nullptr;

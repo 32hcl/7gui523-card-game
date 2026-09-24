@@ -789,19 +789,22 @@ void BattleScreen::updateUI(bool rebuildHand)
                       && m_tableCardWidgets.empty()
                       && (m_lastPlay.type == CardType::Invalid
                           || m_lastPlay.cards.empty()));
-    qDebug() << "[updateUI] needHint=" << needHint
-             << "hintLabel=" << (m_tableHintLabel ? "ptr" : "null");
-    if (m_tableHintLabel) {
-        if (needHint) {
-            m_tableHintLabel->setGeometry(0, 0,
-                m_tableCardsWidget->width(), m_tableCardsWidget->height());
-            m_tableHintLabel->show();
-            m_tableHintLabel->raise();
-        } else {
-            m_tableHintLabel->hide();
+    if (needHint) {
+        if (m_tableHintLabel.isNull()) {
+            m_tableHintLabel = new QLabel("等待出牌", m_tableCardsWidget);
+            m_tableHintLabel->setAlignment(Qt::AlignCenter);
+            m_tableHintLabel->setStyleSheet("QLabel { color: #F5A623; }");
+            QFont hintFont = m_tableHintLabel->font();
+            hintFont.setPointSize(16);
+            m_tableHintLabel->setFont(hintFont);
         }
+        m_tableHintLabel->setGeometry(0, 0,
+            m_tableCardsWidget->width(), m_tableCardsWidget->height());
+        m_tableHintLabel->show();
+        m_tableHintLabel->raise();
+    } else if (!m_tableHintLabel.isNull()) {
+        m_tableHintLabel->hide();
     }
-    qDebug() << "[updateUI] hintLabel done";
 
     if (m_dealAnimating) return;
 
