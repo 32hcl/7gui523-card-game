@@ -789,14 +789,19 @@ void BattleScreen::updateUI(bool rebuildHand)
                       && m_tableCardWidgets.empty()
                       && (m_lastPlay.type == CardType::Invalid
                           || m_lastPlay.cards.empty()));
-    if (needHint) {
-        m_tableHintLabel->setGeometry(0, 0,
-            m_tableCardsWidget->width(), m_tableCardsWidget->height());
-        m_tableHintLabel->show();
-        m_tableHintLabel->raise();
-    } else {
-        m_tableHintLabel->hide();
+    qDebug() << "[updateUI] needHint=" << needHint
+             << "hintLabel=" << (m_tableHintLabel ? "ptr" : "null");
+    if (m_tableHintLabel) {
+        if (needHint) {
+            m_tableHintLabel->setGeometry(0, 0,
+                m_tableCardsWidget->width(), m_tableCardsWidget->height());
+            m_tableHintLabel->show();
+            m_tableHintLabel->raise();
+        } else {
+            m_tableHintLabel->hide();
+        }
     }
+    qDebug() << "[updateUI] hintLabel done";
 
     if (m_dealAnimating) return;
 
