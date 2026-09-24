@@ -714,11 +714,24 @@ void BattleScreen::updateUI(bool rebuildHand)
              << "handWidgetW=" << (m_playerAHandWidget ? m_playerAHandWidget->width() : -1)
              << "handWidgetH=" << (m_playerAHandWidget ? m_playerAHandWidget->height() : -1);
 
-    // 双牌堆显示
+    updateLabels();
+
+    updateTableHint();
+
+    if (m_dealAnimating) return;
+
+    if (rebuildHand) {
+        rebuildPlayerHands();
+    }
+
+    updateButtonStates();
+}
+
+void BattleScreen::updateLabels()
+{
     int playerDeckCount = static_cast<int>(m_playerDeck.cards.size());
     int bossDeckCount = static_cast<int>(m_bossDeck.cards.size());
 
-    // 顶栏牌堆数量：关卡模式显示关卡进度，练习模式隐藏
     if (m_isLevelMode) {
         m_deckCountLabel->setText(
             QString("关卡: %1/9").arg(m_currentLevel));
@@ -727,7 +740,6 @@ void BattleScreen::updateUI(bool rebuildHand)
         m_deckCountLabel->setVisible(false);
     }
 
-    // 更新双牌堆 UI
     if (m_playerDeckCountLabel) {
         m_playerDeckCountLabel->setText(QString("%1 张").arg(playerDeckCount));
     }
@@ -737,7 +749,6 @@ void BattleScreen::updateUI(bool rebuildHand)
     m_roundLabel->setText(
         QString("回合: %1").arg(m_roundCount));
 
-    // 更新顶栏标题
     if (m_titleLabel) {
         if (m_isLevelMode) {
             m_titleLabel->setText(
@@ -758,6 +769,7 @@ void BattleScreen::updateUI(bool rebuildHand)
             .arg(m_campaign.config().playerMaxHp)
             .arg(m_campaign.bossHp())
             .arg(m_campaign.config().bossMaxHp));
+        qDebug() << "[updateLabels] hp text=" << m_hpLabel->text();
         m_hpLabel->setVisible(true);
     } else if (m_hpLabel) {
         m_hpLabel->setVisible(false);
@@ -780,7 +792,10 @@ void BattleScreen::updateUI(bool rebuildHand)
         .arg(originalScore)
         .arg(m_tableBonus)
         .arg(tableScore));
+}
 
+void BattleScreen::updateTableHint()
+{
     bool needHint = (!m_waitingForFirstChoice && !m_pendingPick
                       && m_tableCardWidgets.empty()
                       && (m_lastPlay.type == CardType::Invalid
@@ -801,87 +816,86 @@ void BattleScreen::updateUI(bool rebuildHand)
     } else if (!m_tableHintLabel.isNull()) {
         m_tableHintLabel->hide();
     }
+}
 
-    if (m_dealAnimating) return;
-
-    if (rebuildHand) {
-        // 玩家手牌：按 seq 匹配（优先），seq=0 时用 point+suit 回退
-        {
-            std::map<int, CardWidget*> widgetBySeq;
-            std::map<std::pair<std::string, std::string>, CardWidget*> widgetByFallback;
-            for (CardWidget* cw : m_playerACardWidgets) {
-                if (!cw) continue;
-                const Card& c = cw->getCard();
-                if (c.seq > 0) {
-                    widgetBySeq[c.seq] = cw;
-                } else {
-                    widgetByFallback[{c.point, c.suit}] = cw;
-                }
+void BattleScreen::rebuildPlayerHands()
+{
+    {
+        std::map<int, CardWidget*> widgetBySeq;
+        std::map<std::pair<std::string, std::string>, CardWidget*> widgetByFallback;
+        for (CardWidget* cw : m_playerACardWidgets) {
+            if (!cw) continue;
+            const Card& c = cw->getCard();
+            if (c.seq > 0) {
+                widgetBySeq[c.seq] = cw;
+            } else {
+                widgetByFallback[{c.point, c.suit}] = cw;
             }
-
-            std::vector<CardWidget*> newOrder;
-            for (const Card& hc : m_playerA.hand) {
-                CardWidget* reuse = nullptr;
-                if (hc.seq > 0) {
-                    auto it = widgetBySeq.find(hc.seq);
-                    if (it != widgetBySeq.end()) {
-                        reuse = it->second;
-                        widgetBySeq.erase(it);
-                    }
-                }
-                if (!reuse) {
-                    auto it = widgetByFallback.find({hc.point, hc.suit});
-                    if (it != widgetByFallback.end()) {
-                        reuse = it->second;
-                        widgetByFallback.erase(it);
-                    }
-                }
-                if (reuse) {
-                    reuse->setCard(hc);
-                    newOrder.push_back(reuse);
-                } else {
-                    CardWidget* nw = new CardWidget(hc, m_playerAHandWidget);
-                    connect(nw, &CardWidget::clicked, this, [this]() { update(); });
-                    nw->show();
-                    newOrder.push_back(nw);
-                }
-            }
-
-            // 清理所有未命中的孤儿 widget
-            for (auto& [seq, cw] : widgetBySeq) {
-                cw->setParent(nullptr);
-                delete cw;
-            }
-            for (auto& [key, cw] : widgetByFallback) {
-                cw->setParent(nullptr);
-                delete cw;
-            }
-
-            m_playerACardWidgets = std::move(newOrder);
-            layoutHandSlots(true, false);
         }
 
-        // Boss 手牌（卡背）：调整 m_playerBCardWidgets
-        {
-            while (m_playerBCardWidgets.size() > m_playerB.hand.size()) {
-                QWidget* w = m_playerBCardWidgets.back();
-                w->setParent(nullptr);
-                delete w;
-                m_playerBCardWidgets.pop_back();
+        std::vector<CardWidget*> newOrder;
+        for (const Card& hc : m_playerA.hand) {
+            CardWidget* reuse = nullptr;
+            if (hc.seq > 0) {
+                auto it = widgetBySeq.find(hc.seq);
+                if (it != widgetBySeq.end()) {
+                    reuse = it->second;
+                    widgetBySeq.erase(it);
+                }
             }
-            while (m_playerBCardWidgets.size() < m_playerB.hand.size()) {
-                QWidget* w = createCardBack();
-                w->setParent(m_playerBHandWidget);
-                w->show();
-                m_playerBCardWidgets.push_back(w);
+            if (!reuse) {
+                auto it = widgetByFallback.find({hc.point, hc.suit});
+                if (it != widgetByFallback.end()) {
+                    reuse = it->second;
+                    widgetByFallback.erase(it);
+                }
             }
-            layoutHandSlots(false, false);
+            if (reuse) {
+                reuse->setCard(hc);
+                newOrder.push_back(reuse);
+            } else {
+                CardWidget* nw = new CardWidget(hc, m_playerAHandWidget);
+                connect(nw, &CardWidget::clicked, this, [this]() { update(); });
+                nw->show();
+                newOrder.push_back(nw);
+            }
         }
 
-        if (m_playerAHandWidget) m_playerAHandWidget->update();
-        if (m_playerBHandWidget) m_playerBHandWidget->update();
+        for (auto& [seq, cw] : widgetBySeq) {
+            cw->setParent(nullptr);
+            delete cw;
+        }
+        for (auto& [key, cw] : widgetByFallback) {
+            cw->setParent(nullptr);
+            delete cw;
+        }
+
+        m_playerACardWidgets = std::move(newOrder);
+        layoutHandSlots(true, false);
     }
 
+    {
+        while (m_playerBCardWidgets.size() > m_playerB.hand.size()) {
+            QWidget* w = m_playerBCardWidgets.back();
+            w->setParent(nullptr);
+            delete w;
+            m_playerBCardWidgets.pop_back();
+        }
+        while (m_playerBCardWidgets.size() < m_playerB.hand.size()) {
+            QWidget* w = createCardBack();
+            w->setParent(m_playerBHandWidget);
+            w->show();
+            m_playerBCardWidgets.push_back(w);
+        }
+        layoutHandSlots(false, false);
+    }
+
+    if (m_playerAHandWidget) m_playerAHandWidget->update();
+    if (m_playerBHandWidget) m_playerBHandWidget->update();
+}
+
+void BattleScreen::updateButtonStates()
+{
     if (!m_gameOver) {
         if (m_pendingPick) {
             m_buttonStack->setCurrentIndex(1);
@@ -914,6 +928,17 @@ void BattleScreen::endRound(Player& winner)
             .arg(QString::fromStdString(winner.name))
             .arg(score)
             .arg(m_tableBonus > 0 ? QString(" (压分奖励 %1)").arg(m_tableBonus) : ""));
+    }
+
+    if (m_isLevelMode && score > 0) {
+        if (&winner == &m_playerA) {
+            m_campaign.applyRoundDamage(score, 0);
+            showHpDamageFloat(score, true);
+        } else {
+            m_campaign.applyRoundDamage(0, score);
+            showHpDamageFloat(score, false);
+        }
+        updateLabels();
     }
 
     m_tableCards.clear();

@@ -65,6 +65,10 @@ private:
     void onPlayerTurnTimeout();
     void appendLog(const QString& text);
     void updateUI(bool rebuildHand = true);
+    void updateLabels();
+    void updateTableHint();
+    void rebuildPlayerHands();
+    void updateButtonStates();
     void enableActionButtons();
     void disableActionButtons();
     void playDealAnimation();
@@ -81,6 +85,7 @@ private:
     void shakeWidget(QWidget* widget);
     void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
     void showBonusFloat(int bonus);
+    void showHpDamageFloat(int damage, bool toBoss);
 
     // Audio
     void playSound(QMediaPlayer* player);

@@ -420,3 +420,47 @@ void BattleScreen::showBonusFloat(int bonus) {
     moveAnim->start(QAbstractAnimation::DeleteWhenStopped);
     fadeAnim->start(QAbstractAnimation::DeleteWhenStopped);
 }
+
+void BattleScreen::showHpDamageFloat(int damage, bool toBoss) {
+    if (damage <= 0) return;
+    if (!m_hpLabel || !m_hpLabel->isVisible()) return;
+
+    QString text = toBoss ? QString("Boss -%1").arg(damage)
+                          : QString("玩家 -%1").arg(damage);
+
+    QLabel* floatLabel = new QLabel(text, this);
+    floatLabel->setStyleSheet(
+        "QLabel {"
+        "  color: #E8503A;"
+        "  font-size: 24px;"
+        "  font-weight: bold;"
+        "  background: transparent;"
+        "}"
+    );
+    floatLabel->setAlignment(Qt::AlignCenter);
+    floatLabel->adjustSize();
+
+    QPoint labelPos = m_hpLabel->mapTo(this, QPoint(0, 0));
+    int x = labelPos.x() + m_hpLabel->width() / 2 - floatLabel->width() / 2;
+    int y = labelPos.y() - floatLabel->height() - 5;
+    floatLabel->move(x, y);
+    floatLabel->show();
+    floatLabel->raise();
+
+    QPropertyAnimation* moveAnim = new QPropertyAnimation(floatLabel, "pos");
+    moveAnim->setDuration(1200);
+    moveAnim->setStartValue(QPoint(x, y));
+    moveAnim->setEndValue(QPoint(x, y - 60));
+    moveAnim->setEasingCurve(QEasingCurve::OutCubic);
+
+    QGraphicsOpacityEffect* effect = new QGraphicsOpacityEffect(floatLabel);
+    floatLabel->setGraphicsEffect(effect);
+    QPropertyAnimation* fadeAnim = new QPropertyAnimation(effect, "opacity");
+    fadeAnim->setDuration(1200);
+    fadeAnim->setStartValue(1.0);
+    fadeAnim->setEndValue(0.0);
+
+    connect(moveAnim, &QPropertyAnimation::finished, floatLabel, &QLabel::deleteLater);
+    moveAnim->start(QAbstractAnimation::DeleteWhenStopped);
+    fadeAnim->start(QAbstractAnimation::DeleteWhenStopped);
+}

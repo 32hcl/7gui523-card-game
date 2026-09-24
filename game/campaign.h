@@ -32,6 +32,7 @@ public:
 
     void startNew();
     void startLevel(int level);
+    void applyRoundDamage(int playerScore, int bossScore);
     LevelResult finishLevel(const RoundResult& rr,
                             const Player& player,
                             const Player& boss,

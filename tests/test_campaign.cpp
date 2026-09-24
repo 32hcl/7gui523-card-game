@@ -61,6 +61,7 @@ void test_campaignSettlement() {
     Player boss = createPlayer("boss");
     boss.totalScore = 10;
 
+    camp.applyRoundDamage(30, 10);
     LevelResult lr = camp.finishLevel(rr, player, boss, 2, 3);
 
     assert(lr.playerWon == true);
@@ -83,6 +84,7 @@ void test_campaignSettlementBossWins() {
     Player boss = createPlayer("boss");
     boss.totalScore = 30;
 
+    camp.applyRoundDamage(10, 30);
     LevelResult lr = camp.finishLevel(rr, player, boss, 0, 5);
 
     assert(lr.playerWon == false);
@@ -110,9 +112,10 @@ void test_campaignHpCap() {
     boss.totalScore = 0;
     boss.hand = {};
 
+    camp.applyRoundDamage(30, 0);
     LevelResult lr = camp.finishLevel(rr, player, boss, 20, 20);
-    // totalRemain = 40, heal = 80
-    // playerHp = 200 - 0 + 80 = 280, capped at 300
+    // totalRemain = 40, healAmount = 40 * 3 = 120
+    // playerHp = 200 + 120 = 320, capped at 300
     assert(camp.playerHp() == 300);
     assert(camp.playerHp() <= cfg.playerMaxHp);
 }
@@ -134,6 +137,7 @@ void test_campaignGameOver() {
     boss.totalScore = 30;
     boss.hand = {};
 
+    camp.applyRoundDamage(5, 30);
     camp.finishLevel(rr, player, boss, 10, 10);
     // playerHp = 30 - 30 = 0 → game over
     assert(camp.playerHp() <= 0);

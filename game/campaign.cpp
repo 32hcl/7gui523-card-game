@@ -1,4 +1,5 @@
 #include "game/campaign.h"
+#include <cstdio>
 #include <algorithm>
 
 static const std::vector<std::string> g_removeTables[] = {
@@ -37,8 +38,17 @@ void Campaign::startNew() {
 }
 
 void Campaign::startLevel(int level) {
+    fprintf(stderr, "[startLevel] enter level=%d playerHp(before)=%d bossHp(before)=%d\n",
+            level, playerHp_, bossHp_);
     currentLevel_ = level;
     bossHp_ = cfg_.bossMaxHp;
+    fprintf(stderr, "[startLevel] exit, playerHp=%d bossHp=%d\n",
+            playerHp_, bossHp_);
+}
+
+void Campaign::applyRoundDamage(int playerScore, int bossScore) {
+    bossHp_ -= playerScore;
+    playerHp_ -= bossScore;
 }
 
 LevelResult Campaign::finishLevel(const RoundResult& rr,
@@ -46,6 +56,8 @@ LevelResult Campaign::finishLevel(const RoundResult& rr,
                                   const Player& boss,
                                   int playerDeckRemain,
                                   int bossDeckRemain) {
+    fprintf(stderr, "[finishLevel] enter, playerHp=%d bossHp=%d playerScore=%d bossScore=%d\n",
+            playerHp_, bossHp_, player.totalScore, boss.totalScore);
     LevelResult lr;
     lr.playerScore = player.totalScore;
     lr.bossScore = boss.totalScore;
@@ -54,9 +66,6 @@ LevelResult Campaign::finishLevel(const RoundResult& rr,
 
     int prevPlayerHp = playerHp_;
     int prevBossHp = bossHp_;
-
-    bossHp_ -= player.totalScore;
-    playerHp_ -= boss.totalScore;
 
     if (rr.specialVictory) {
         lr.playerWon = true;
@@ -82,6 +91,9 @@ LevelResult Campaign::finishLevel(const RoundResult& rr,
 
     lr.playerHpDelta = playerHp_ - prevPlayerHp;
     lr.bossHpDelta = bossHp_ - prevBossHp;
+
+    fprintf(stderr, "[finishLevel] exit, playerHp=%d bossHp=%d playerWon=%d bossCleared=%d\n",
+            playerHp_, bossHp_, (int)lr.playerWon, (int)lr.bossCleared);
 
     return lr;
 }
