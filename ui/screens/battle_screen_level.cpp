@@ -7,6 +7,10 @@
 #include <QDialog>
 #include <QGraphicsDropShadowEffect>
 
+namespace {
+    const QColor kDialogShadowColor(0, 0, 0, 180);
+}
+
 void BattleScreen::handleLevelModeEnd(const LevelResult& lr)
 {
     m_gameOver = true;
@@ -35,7 +39,7 @@ void BattleScreen::handleLevelModeEnd(const LevelResult& lr)
     QGraphicsDropShadowEffect* dlgShadow = new QGraphicsDropShadowEffect(&dlg);
     dlgShadow->setBlurRadius(24);
     dlgShadow->setOffset(0, 10);
-    dlgShadow->setColor(QColor(0, 0, 0, 180));
+    dlgShadow->setColor(kDialogShadowColor);
     dlg.setGraphicsEffect(dlgShadow);
 
     auto* layout = new QVBoxLayout(&dlg);
@@ -87,10 +91,11 @@ void BattleScreen::handleLevelModeEnd(const LevelResult& lr)
         .arg(m_campaign.playerHp() - lr.playerHpDelta)
         .arg(lr.playerHpDelta >= 0 ? QString("+%1").arg(lr.playerHpDelta) : QString("%1").arg(lr.playerHpDelta));
 
-    auto* hpInfo = new QLabel(QString("血量: 玩家 %1/%2  |  Boss %3/110")
+    auto* hpInfo = new QLabel(QString("血量: 玩家 %1/%2  |  Boss %3/%4")
         .arg(m_campaign.playerHp())
         .arg(m_campaign.config().playerMaxHp)
-        .arg(m_campaign.bossHp()));
+        .arg(m_campaign.bossHp())
+        .arg(m_campaign.config().bossMaxHp));
     hpInfo->setAlignment(Qt::AlignCenter);
     hpInfo->setStyleSheet("QLabel { color: #FFAB40; font-size: 15px; font-weight: bold; }");
     layout->addWidget(hpInfo);

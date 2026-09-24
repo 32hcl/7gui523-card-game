@@ -556,8 +556,7 @@ void BattleScreen::startNewGame()
     m_playerA.isHuman = true;
 
     if (m_isLevelMode) {
-        int aiLevelNum = getLevelAILevel(m_currentLevel);
-        m_levelEngineConfig = buildAIEngineConfig(aiLevelNum);
+        m_levelEngineConfig = buildAIEngineConfig(m_currentLevel);
         m_levelAIEngine = std::make_unique<AIEngine>(m_levelEngineConfig);
         m_levelAIEngine->setOpponentHand(m_playerA.hand);
         m_playerB.aiLevel = AILevel::AI4_Expert;
@@ -723,10 +722,11 @@ void BattleScreen::updateUI(bool rebuildHand)
         QString("电脑: %1 分").arg(m_playerB.totalScore));
 
     if (m_hpLabel && m_isLevelMode) {
-        m_hpLabel->setText(QString("血量: 玩家 %1/%2  |  Boss %3/110")
+        m_hpLabel->setText(QString("血量: 玩家 %1/%2  |  Boss %3/%4")
             .arg(m_campaign.playerHp())
             .arg(m_campaign.config().playerMaxHp)
-            .arg(m_campaign.bossHp()));
+            .arg(m_campaign.bossHp())
+            .arg(m_campaign.config().bossMaxHp));
         m_hpLabel->setVisible(true);
     } else if (m_hpLabel) {
         m_hpLabel->setVisible(false);

@@ -23,7 +23,7 @@ void BattleScreen::createTopBar(QVBoxLayout* leftLay)
     m_titleLabel->setFont(titleFont);
     m_titleLabel->setStyleSheet("QLabel { color: #FFD700; }");
 
-    m_deckCountLabel = new QLabel("牌堆: 44");
+    m_deckCountLabel = new QLabel("牌堆");
     m_roundLabel = new QLabel("回合: 1");
     QFont infoFont = m_deckCountLabel->font();
     infoFont.setPointSize(14);

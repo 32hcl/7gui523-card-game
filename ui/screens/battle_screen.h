@@ -8,8 +8,6 @@
 #include <QGridLayout>
 #include <QStackedWidget>
 #include <QPropertyAnimation>
-#include <QMediaPlayer>
-#include <QAudioOutput>
 #include <QFrame>
 #include <QMainWindow>
 
@@ -22,6 +20,8 @@
 #include "game/campaign.h"
 
 class CardWidget;
+class QMediaPlayer;
+class QAudioOutput;
 
 class BattleScreen : public QWidget {
     Q_OBJECT
@@ -93,7 +93,7 @@ private:
 
     // Level mode methods
     void handleLevelModeEnd(const LevelResult& lr);
-    int getLevelAILevel(int level) const;
+    
     QString getLevelDisplayName(int level) const;
     void returnToMenu();
 

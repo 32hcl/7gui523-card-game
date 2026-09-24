@@ -166,11 +166,6 @@ void BattleScreen::setLevelMode(bool isLevelMode, int startLevel)
     m_currentLevel = startLevel;
 }
 
-int BattleScreen::getLevelAILevel(int level) const
-{
-    return level;
-}
-
 QString BattleScreen::getLevelDisplayName(int level) const
 {
     return QString::fromLatin1(getAILevelName(level));
