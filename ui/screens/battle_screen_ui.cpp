@@ -387,6 +387,8 @@ void BattleScreen::layoutTableCards() {
 
 void BattleScreen::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
+    qDebug() << "[resizeEvent] A widgets=" << m_playerACardWidgets.size()
+             << "B widgets=" << m_playerBCardWidgets.size();
     if (m_firstChoiceWidget && m_tableCardsWidget) {
         m_firstChoiceWidget->setGeometry(m_tableCardsWidget->rect());
     }

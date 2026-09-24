@@ -16,8 +16,18 @@
 CardWidget::CardWidget(const Card& card, QWidget* parent)
     : QWidget(parent), m_card(card), m_currentYOffset(21)
 {
+    qDebug() << "[CardWidget-ctor] seq=" << card.seq
+             << "point=" << QString::fromStdString(card.point)
+             << "ptr=" << (void*)this;
     setFixedSize(110, 180);   // 从 168 → 180，多出 12px 给阴影
     loadPixmap();
+}
+
+CardWidget::~CardWidget()
+{
+    qDebug() << "[CardWidget-dtor] seq=" << m_card.seq
+             << "point=" << QString::fromStdString(m_card.point)
+             << "ptr=" << (void*)this;
 }
 
 Card CardWidget::getCard() const

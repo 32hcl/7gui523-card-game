@@ -5,6 +5,7 @@
 #include "ai/players/ai1_idiot.h"
 #include <QDebug>
 #include <map>
+#include <QRandomGenerator>
 #include "ai/players/ai2_liar.h"
 #include "core/variant/variant_registry.h"
 #include "ai/engine/ai_levels.h"
@@ -537,20 +538,27 @@ void BattleScreen::startNewGame()
     qDebug() << "[startNewGame] before cleanup: A=" << (int)m_playerACardWidgets.size()
              << "B=" << (int)m_playerBCardWidgets.size();
 
+    qDebug() << "[cleanup-A] start, size=" << m_playerACardWidgets.size();
     for (CardWidget* cw : m_playerACardWidgets) {
+        qDebug() << "[cleanup-A] deleting seq=" << cw->getCard().seq
+                 << "point=" << QString::fromStdString(cw->getCard().point)
+                 << "ptr=" << (void*)cw
+                 << "parent=" << (void*)cw->parentWidget();
         cw->setParent(nullptr);
         delete cw;
     }
     m_playerACardWidgets.clear();
+    qDebug() << "[cleanup-A] cleared, size=" << m_playerACardWidgets.size();
 
+    qDebug() << "[cleanup-B] start, size=" << m_playerBCardWidgets.size();
     for (QWidget* w : m_playerBCardWidgets) {
+        qDebug() << "[cleanup-B] deleting ptr=" << (void*)w
+                 << "parent=" << (void*)w->parentWidget();
         w->setParent(nullptr);
         delete w;
     }
     m_playerBCardWidgets.clear();
-
-    qDebug() << "[startNewGame] after cleanup: A=" << (int)m_playerACardWidgets.size()
-             << "B=" << (int)m_playerBCardWidgets.size();
+    qDebug() << "[cleanup-B] cleared";
 
     for (CardWidget* cw : m_tableCardWidgets) cw->deleteLater();
     m_tableCardWidgets.clear();
@@ -591,15 +599,14 @@ void BattleScreen::startNewGame()
         appendLog(QString("对手: %1").arg(getLevelDisplayName(m_currentLevel)));
         appendLog("请选择先手方...");
 
-        // 显示先后手选择（与练习模式相同）
+        // 关卡模式：不显示先后手选择，随机先手
         if (m_firstChoiceWidget) {
-            m_firstChoiceWidget->setGeometry(m_tableCardsWidget->rect());
-            m_firstChoiceWidget->setVisible(true);
-            m_firstChoiceWidget->raise();
-            m_waitingForFirstChoice = true;
+            m_firstChoiceWidget->setVisible(false);
         }
-
+        m_waitingForFirstChoice = false;
         m_pendingPick = false;
+
+        m_playerAIsFirst = (QRandomGenerator::global()->bounded(2) == 0);
 
         m_pickedCards.clear();
 

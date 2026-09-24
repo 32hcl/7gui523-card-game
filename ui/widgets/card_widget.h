@@ -11,6 +11,7 @@ class CardWidget : public QWidget {
     Q_PROPERTY(qreal dealProgress READ dealProgress WRITE setDealProgress)
 public:
     explicit CardWidget(const Card& card, QWidget* parent = nullptr);
+    ~CardWidget() override;
     Card getCard() const;
     void setCard(const Card& card);
     void setSelected(bool selected);
