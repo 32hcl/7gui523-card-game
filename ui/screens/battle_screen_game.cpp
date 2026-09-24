@@ -538,16 +538,14 @@ void BattleScreen::startNewGame()
              << "B=" << (int)m_playerBCardWidgets.size();
 
     for (CardWidget* cw : m_playerACardWidgets) {
-        cw->hide();
         cw->setParent(nullptr);
-        cw->deleteLater();
+        delete cw;
     }
     m_playerACardWidgets.clear();
 
     for (QWidget* w : m_playerBCardWidgets) {
-        w->hide();
         w->setParent(nullptr);
-        w->deleteLater();
+        delete w;
     }
     m_playerBCardWidgets.clear();
 
@@ -833,9 +831,8 @@ void BattleScreen::updateUI(bool rebuildHand)
             }
 
             for (auto& [seq, cw] : widgetBySeq) {
-                cw->hide();
                 cw->setParent(nullptr);
-                cw->deleteLater();
+                delete cw;
             }
 
             m_playerACardWidgets = std::move(newOrder);
@@ -846,9 +843,8 @@ void BattleScreen::updateUI(bool rebuildHand)
         {
             while (m_playerBCardWidgets.size() > m_playerB.hand.size()) {
                 QWidget* w = m_playerBCardWidgets.back();
-                w->hide();
                 w->setParent(nullptr);
-                w->deleteLater();
+                delete w;
                 m_playerBCardWidgets.pop_back();
             }
             while (m_playerBCardWidgets.size() < m_playerB.hand.size()) {
