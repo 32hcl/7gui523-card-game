@@ -330,7 +330,7 @@ void CardWidget::paintEvent(QPaintEvent*)
         grad.setColorAt(0.0, QColor(0, 0, 0, 200));
         grad.setColorAt(0.5, QColor(0, 0, 0, 100));
         grad.setColorAt(1.0, QColor(0, 0, 0, 0));
-        QRect shadowRect(0, shadowTop, width(), shadowHeight);
+        QRect shadowRect(imgX, shadowTop, imgW, shadowHeight);
         p.fillRect(shadowRect, grad);
     }
 
