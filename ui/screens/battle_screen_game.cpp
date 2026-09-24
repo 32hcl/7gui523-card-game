@@ -2,6 +2,7 @@
 #include "ui/widgets/card_widget.h"
 #include "ui/dialogs/card_picker.h"
 #include "ai/ai.h"
+#include "ai/players/ai1_idiot.h"
 #include "ai/engine/ai_levels.h"
 #include "core/card/cardtype.h"
 #include "core/rule/score.h"
@@ -366,10 +367,23 @@ void BattleScreen::doAITurn()
 
     int tableScore = calculateScore(m_tableCards);
     std::vector<Card> chosen;
-    if (m_isLevelMode && m_levelAIEngine) {
-        m_levelAIEngine->setOpponentHand(m_playerA.hand);
-        chosen = m_levelAIEngine->choosePlay(
-            m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
+    if (m_isLevelMode) {
+        switch (m_currentLevel) {
+        case 1:
+            chosen = ai1_idiot_choose(m_playerB, m_playerA, m_lastPlay,
+                                      m_bossDeck, tableScore);
+            break;
+        default:
+            if (m_levelAIEngine) {
+                m_levelAIEngine->setOpponentHand(m_playerA.hand);
+                chosen = m_levelAIEngine->choosePlay(
+                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
+            } else {
+                chosen = aiChoosePlay(
+                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore, m_tracker);
+            }
+            break;
+        }
     } else {
         chosen = aiChoosePlay(
             m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore, m_tracker);
@@ -521,7 +535,7 @@ void BattleScreen::startNewGame()
 
     {
         auto children = m_tableCardsWidget->findChildren<QLabel*>();
-        for (QLabel* lbl : children) delete lbl;
+        for (QLabel* lbl : children) lbl->deleteLater();
     }
 
     m_gameOver = false;
@@ -739,7 +753,7 @@ void BattleScreen::updateUI(bool rebuildHand)
     if (!m_waitingForFirstChoice && !m_pendingPick && m_tableCardWidgets.empty()) {
         if (m_lastPlay.type == CardType::Invalid || m_lastPlay.cards.empty()) {
             auto children = m_tableCardsWidget->findChildren<QLabel*>();
-            for (QLabel* lbl : children) delete lbl;
+            for (QLabel* lbl : children) lbl->deleteLater();
             QLabel* hint = new QLabel("等待出牌", m_tableCardsWidget);
             hint->setAlignment(Qt::AlignCenter);
             hint->setGeometry(0, 0, m_tableCardsWidget->width(), m_tableCardsWidget->height());

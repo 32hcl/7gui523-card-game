@@ -66,7 +66,7 @@ void test_campaignSettlement() {
     assert(lr.playerWon == true);
     assert(camp.bossHp() == 110 - 30);  // 80
 
-    // playerHp = 200 - bossScore(10) + heal(5*2=10) = 200
+    // playerHp = 140 - 10 + (2+3)*3 = 145
     assert(camp.playerHp() == 145);
 }
 
@@ -88,7 +88,7 @@ void test_campaignSettlementBossWins() {
     assert(lr.playerWon == false);
     assert(camp.bossHp() == 110 - 10);  // 100
 
-    // playerHp = 200 - bossScore(30) - heal(5*2/2=5) = 165
+    // playerHp = 140 - 30 - (0+5)*3 = 95
     assert(camp.playerHp() == 95);
 }
 

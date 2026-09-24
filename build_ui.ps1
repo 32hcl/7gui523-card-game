@@ -7,4 +7,4 @@ cmake -B build -G Ninja `
   -DQT_NO_PACKAGE_VERSION_CHECK=ON `
   -DQT_NO_PACKAGE_VERSION_INCOMPATIBLE_WARNING=TRUE
 
-cmake --build build --target game
+cmake --build build --target game --parallel 1

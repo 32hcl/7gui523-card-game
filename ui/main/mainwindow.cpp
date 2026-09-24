@@ -14,7 +14,7 @@ MainWindow::MainWindow(QWidget* parent)
     setStyleSheet(R"(
         QMainWindow {
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #1B5E20, stop:0.5 #2E7D32, stop:1 #1B5E20);
+                stop:0 #2a1a1a, stop:0.5 #3a2020, stop:1 #2a1a1a);
         }
     )");
 
@@ -43,15 +43,15 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::onPracticeMode()
 {
     m_battleScreen->setLevelMode(false, 1);
-    m_battleScreen->startNewGame();
     m_router->switchTo(ScreenId::Battle);
+    m_battleScreen->startNewGame();
 }
 
 void MainWindow::onLevelMode()
 {
     m_battleScreen->setLevelMode(true, 1);
-    m_battleScreen->startNewGame();
     m_router->switchTo(ScreenId::Battle);
+    m_battleScreen->startNewGame();
 }
 
 void MainWindow::onBattleGameEnded()

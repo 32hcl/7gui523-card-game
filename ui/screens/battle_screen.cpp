@@ -101,9 +101,9 @@ BattleScreen::BattleScreen(QWidget* parent)
             color: #FFFFFF;
         }
         QPushButton {
-            background-color: #2E7D32;
+            background-color: #E8503A;
             color: #FFFFFF;
-            border: 2px solid #66BB6A;
+            border: 2px solid #FFFFFF;
             border-radius: 10px;
             padding: 8px 20px;
             font-size: 14px;
@@ -112,11 +112,10 @@ BattleScreen::BattleScreen(QWidget* parent)
             min-height: 32px;
         }
         QPushButton:hover {
-            background-color: #388E3C;
-            border-color: #81C784;
+            background-color: #F0634E;
         }
         QPushButton:pressed {
-            background-color: #1B5E20;
+            background-color: #C43D28;
         }
         QPushButton:disabled {
             background-color: #555555;
@@ -124,9 +123,9 @@ BattleScreen::BattleScreen(QWidget* parent)
             border-color: #777777;
         }
         QTextEdit {
-            background-color: #1A2428;
+            background-color: #1e1e2a;
             color: #ECEFF1;
-            border: 1px solid #37474F;
+            border: 1px solid #FFFFFF;
             border-radius: 8px;
             font-family: "Microsoft YaHei";
             font-size: 13px;

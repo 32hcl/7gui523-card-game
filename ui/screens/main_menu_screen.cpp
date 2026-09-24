@@ -13,9 +13,9 @@ MainMenuScreen::MainMenuScreen(QWidget* parent)
             font-family: "Microsoft YaHei";
         }
         QPushButton {
-            background-color: #2E7D32;
+            background-color: #E8503A;
             color: #FFFFFF;
-            border: 2px solid #66BB6A;
+            border: 2px solid #FFFFFF;
             border-radius: 14px;
             padding: 20px 40px;
             font-size: 22px;
@@ -23,11 +23,10 @@ MainMenuScreen::MainMenuScreen(QWidget* parent)
             min-width: 300px;
         }
         QPushButton:hover {
-            background-color: #388E3C;
-            border-color: #81C784;
+            background-color: #F0634E;
         }
         QPushButton:pressed {
-            background-color: #1B5E20;
+            background-color: #C43D28;
         }
         QLabel#descLabel {
             color: #B0BEC5;
@@ -53,7 +52,7 @@ MainMenuScreen::MainMenuScreen(QWidget* parent)
     // Subtitle
     auto* subtitle = new QLabel("选择游戏模式");
     subtitle->setAlignment(Qt::AlignCenter);
-    subtitle->setStyleSheet("QLabel { color: #A5D6A7; font-size: 18px; }");
+    subtitle->setStyleSheet("QLabel { color: #F5A623; font-size: 18px; }");
     layout->addWidget(subtitle);
 
     layout->addSpacing(40);
@@ -86,7 +85,7 @@ MainMenuScreen::MainMenuScreen(QWidget* parent)
         s->setColor(QColor(0, 0, 0, 140));
         levelBtn->setGraphicsEffect(s);
     }
-    auto* levelDesc = new QLabel("依次挑战 13 个电脑，全部通关才算赢");
+    auto* levelDesc = new QLabel("依次挑战 9 个电脑，全部通关才算赢");
     levelDesc->setObjectName("descLabel");
     levelDesc->setAlignment(Qt::AlignCenter);
 

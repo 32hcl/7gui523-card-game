@@ -5,6 +5,7 @@
 #include <QPropertyAnimation>
 #include <QCoreApplication>
 #include <QFile>
+#include <QHash>
 #include <QPolygonF>
 #include <QRadialGradient>
 #include <QTransform>
@@ -111,8 +112,13 @@ void CardWidget::loadPixmap() {
     QString cardsDir = QCoreApplication::applicationDirPath() + "/cards/";
     QString fileName = cardImageFileName(m_card);
     QString fullPath = cardsDir + fileName;
-    if (QFile::exists(fullPath)) {
+    static QHash<QString, QPixmap> s_cache;
+    auto it = s_cache.constFind(fullPath);
+    if (it != s_cache.constEnd()) {
+        m_pixmap = it.value();
+    } else if (QFile::exists(fullPath)) {
         m_pixmap = QPixmap(fullPath);
+        s_cache.insert(fullPath, m_pixmap);
     }
 }
 
@@ -275,10 +281,10 @@ void CardWidget::paintEvent(QPaintEvent*)
     const int liftCompensation = (kRestY - m_currentYOffset) / 2; // 未选=0，选中=9
     const int shadowTop = cardBottom + liftCompensation;
 
-    constexpr int kShadowHeight = 6;
+    constexpr int kShadowHeight = 4;
     if (shadowTop + kShadowHeight <= height()) {
         QLinearGradient grad(0, shadowTop, 0, shadowTop + kShadowHeight);
-        grad.setColorAt(0.0, QColor(0, 0, 0, 130));
+        grad.setColorAt(0.0, QColor(0, 0, 0, 180));
         grad.setColorAt(1.0, QColor(0, 0, 0, 0));
         QRect shadowRect(imgX, shadowTop, imgW, kShadowHeight);  // 宽度 = 卡片宽度
         p.fillRect(shadowRect, grad);

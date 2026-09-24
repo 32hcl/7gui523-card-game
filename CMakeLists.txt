@@ -28,9 +28,6 @@ endif()
 file(GLOB_RECURSE CORE_SOURCES "core/*.cpp")
 file(GLOB_RECURSE GAME_SOURCES "game/*.cpp")
 file(GLOB_RECURSE AI_SOURCES "ai/*.cpp")
-file(GLOB_RECURSE DATA_SOURCES "data/*.cpp")
-file(GLOB_RECURSE DIALOGUE_SOURCES "dialogue/*.cpp")
-file(GLOB_RECURSE SHOP_SOURCES "shop/*.cpp")
 file(GLOB_RECURSE UI_SOURCES "ui/*.cpp")
 
 # ── Object Libraries for faster incremental builds ──
@@ -48,9 +45,6 @@ if(BUILD_GUI)
         $<TARGET_OBJECTS:core_obj>
         $<TARGET_OBJECTS:game_obj>
         $<TARGET_OBJECTS:ai_obj>
-        ${DATA_SOURCES}
-        ${DIALOGUE_SOURCES}
-        ${SHOP_SOURCES}
         ${UI_SOURCES}
         main.cpp
     )

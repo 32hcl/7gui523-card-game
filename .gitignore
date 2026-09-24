@@ -1,6 +1,10 @@
 # ========== 编译产物 ==========
 build/
 build2/
+build-main/
+build-qt-test/
+build-local/
+build-native/
 release/
 *.exe
 *.o
