@@ -538,27 +538,17 @@ void BattleScreen::startNewGame()
     qDebug() << "[startNewGame] before cleanup: A=" << (int)m_playerACardWidgets.size()
              << "B=" << (int)m_playerBCardWidgets.size();
 
-    qDebug() << "[cleanup-A] start, size=" << m_playerACardWidgets.size();
     for (CardWidget* cw : m_playerACardWidgets) {
-        qDebug() << "[cleanup-A] deleting seq=" << cw->getCard().seq
-                 << "point=" << QString::fromStdString(cw->getCard().point)
-                 << "ptr=" << (void*)cw
-                 << "parent=" << (void*)cw->parentWidget();
         cw->setParent(nullptr);
         delete cw;
     }
     m_playerACardWidgets.clear();
-    qDebug() << "[cleanup-A] cleared, size=" << m_playerACardWidgets.size();
 
-    qDebug() << "[cleanup-B] start, size=" << m_playerBCardWidgets.size();
     for (QWidget* w : m_playerBCardWidgets) {
-        qDebug() << "[cleanup-B] deleting ptr=" << (void*)w
-                 << "parent=" << (void*)w->parentWidget();
         w->setParent(nullptr);
         delete w;
     }
     m_playerBCardWidgets.clear();
-    qDebug() << "[cleanup-B] cleared";
 
     for (CardWidget* cw : m_tableCardWidgets) cw->deleteLater();
     m_tableCardWidgets.clear();
@@ -815,20 +805,40 @@ void BattleScreen::updateUI(bool rebuildHand)
     if (m_dealAnimating) return;
 
     if (rebuildHand) {
-        // 玩家手牌：按 seq 匹配，避免排序导致索引错位
+        // 玩家手牌：按 seq 匹配（优先），seq=0 时用 point+suit 回退
         {
             std::map<int, CardWidget*> widgetBySeq;
+            std::map<std::pair<std::string, std::string>, CardWidget*> widgetByFallback;
             for (CardWidget* cw : m_playerACardWidgets) {
-                if (cw) widgetBySeq[cw->getCard().seq] = cw;
+                if (!cw) continue;
+                const Card& c = cw->getCard();
+                if (c.seq > 0) {
+                    widgetBySeq[c.seq] = cw;
+                } else {
+                    widgetByFallback[{c.point, c.suit}] = cw;
+                }
             }
 
             std::vector<CardWidget*> newOrder;
             for (const Card& hc : m_playerA.hand) {
-                auto it = (hc.seq > 0) ? widgetBySeq.find(hc.seq) : widgetBySeq.end();
-                if (it != widgetBySeq.end()) {
-                    it->second->setCard(hc);
-                    newOrder.push_back(it->second);
-                    widgetBySeq.erase(it);
+                CardWidget* reuse = nullptr;
+                if (hc.seq > 0) {
+                    auto it = widgetBySeq.find(hc.seq);
+                    if (it != widgetBySeq.end()) {
+                        reuse = it->second;
+                        widgetBySeq.erase(it);
+                    }
+                }
+                if (!reuse) {
+                    auto it = widgetByFallback.find({hc.point, hc.suit});
+                    if (it != widgetByFallback.end()) {
+                        reuse = it->second;
+                        widgetByFallback.erase(it);
+                    }
+                }
+                if (reuse) {
+                    reuse->setCard(hc);
+                    newOrder.push_back(reuse);
                 } else {
                     CardWidget* nw = new CardWidget(hc, m_playerAHandWidget);
                     connect(nw, &CardWidget::clicked, this, [this]() { update(); });
@@ -837,7 +847,12 @@ void BattleScreen::updateUI(bool rebuildHand)
                 }
             }
 
+            // 清理所有未命中的孤儿 widget
             for (auto& [seq, cw] : widgetBySeq) {
+                cw->setParent(nullptr);
+                delete cw;
+            }
+            for (auto& [key, cw] : widgetByFallback) {
                 cw->setParent(nullptr);
                 delete cw;
             }

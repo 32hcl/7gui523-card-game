@@ -8,11 +8,13 @@ Deck createStandardDeck() {
     std::vector<std::string> suits = {"黑桃", "红桃", "梅花", "方块"};
     std::vector<std::string> points = {"A", "2", "3", "4", "5", "6", "7",
                                        "8", "9", "10", "J", "Q", "K"};
+    int seq = 0;
     for (const auto& suit : suits) {
         for (const auto& point : points) {
             Card card;
             card.point = point;
             card.suit  = suit;
+            card.seq   = seq++;
             if (point == "5")       card.score = 5;
             else if (point == "10") card.score = 10;
             else if (point == "K")  card.score = 20;
@@ -21,10 +23,10 @@ Deck createStandardDeck() {
         }
     }
     Card bigJoker;
-    bigJoker.point = "大鬼"; bigJoker.suit = ""; bigJoker.score = 0;
+    bigJoker.point = "大鬼"; bigJoker.suit = ""; bigJoker.score = 0; bigJoker.seq = seq++;
     deck.cards.push_back(bigJoker);
     Card smallJoker;
-    smallJoker.point = "小鬼"; smallJoker.suit = ""; smallJoker.score = 0;
+    smallJoker.point = "小鬼"; smallJoker.suit = ""; smallJoker.score = 0; smallJoker.seq = seq++;
     deck.cards.push_back(smallJoker);
     return deck;
 }
