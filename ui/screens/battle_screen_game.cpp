@@ -4,6 +4,7 @@
 #include "ai/ai.h"
 #include "ai/players/ai1_idiot.h"
 #include <QDebug>
+#include <map>
 #include "ai/players/ai2_liar.h"
 #include "core/variant/variant_registry.h"
 #include "ai/engine/ai_levels.h"
@@ -809,45 +810,35 @@ void BattleScreen::updateUI(bool rebuildHand)
     if (m_dealAnimating) return;
 
     if (rebuildHand) {
-        // 玩家手牌：调整 m_playerACardWidgets 数量 + 内容
+        // 玩家手牌：按 seq 匹配，避免排序导致索引错位
         {
-            // 先删除多余的
-            while (m_playerACardWidgets.size() > m_playerA.hand.size()) {
-                CardWidget* cw = m_playerACardWidgets.back();
+            std::map<int, CardWidget*> widgetBySeq;
+            for (CardWidget* cw : m_playerACardWidgets) {
+                if (cw) widgetBySeq[cw->getCard().seq] = cw;
+            }
+
+            std::vector<CardWidget*> newOrder;
+            for (const Card& hc : m_playerA.hand) {
+                auto it = (hc.seq > 0) ? widgetBySeq.find(hc.seq) : widgetBySeq.end();
+                if (it != widgetBySeq.end()) {
+                    it->second->setCard(hc);
+                    newOrder.push_back(it->second);
+                    widgetBySeq.erase(it);
+                } else {
+                    CardWidget* nw = new CardWidget(hc, m_playerAHandWidget);
+                    connect(nw, &CardWidget::clicked, this, [this]() { update(); });
+                    nw->show();
+                    newOrder.push_back(nw);
+                }
+            }
+
+            for (auto& [seq, cw] : widgetBySeq) {
                 cw->hide();
                 cw->setParent(nullptr);
                 cw->deleteLater();
-                m_playerACardWidgets.pop_back();
             }
-            // 匹配已有 widget 的内容（若 point/suit 不同则重建）
-            for (size_t i = 0; i < m_playerACardWidgets.size(); ++i) {
-                CardWidget* cw = m_playerACardWidgets[i];
-                const Card& handCard = m_playerA.hand[i];
-                if (cw->getCard().point != handCard.point ||
-                cw->getCard().suit != handCard.suit) {
-                qDebug() << "[rebuildHand] MISMATCH idx=" << i
-                         << "widget=" << QString::fromStdString(cw->getCard().point)
-                         << QString::fromStdString(cw->getCard().suit)
-                         << "hand=" << QString::fromStdString(handCard.point)
-                         << QString::fromStdString(handCard.suit);
-                disconnect(cw, &CardWidget::clicked, nullptr, nullptr);
-                    cw->hide();
-                    cw->setParent(nullptr);
-                    cw->deleteLater();
-                    CardWidget* nw = new CardWidget(handCard, m_playerAHandWidget);
-                    connect(nw, &CardWidget::clicked, this, [this]() { update(); });
-                    nw->show();
-                    m_playerACardWidgets[i] = nw;
-                }
-            }
-            // 补新的
-            while (m_playerACardWidgets.size() < m_playerA.hand.size()) {
-                size_t idx = m_playerACardWidgets.size();
-                CardWidget* cw = new CardWidget(m_playerA.hand[idx], m_playerAHandWidget);
-                connect(cw, &CardWidget::clicked, this, [this]() { update(); });
-                cw->show();
-                m_playerACardWidgets.push_back(cw);
-            }
+
+            m_playerACardWidgets = std::move(newOrder);
             layoutHandSlots(true, false);
         }
 
