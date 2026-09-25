@@ -13,6 +13,7 @@
 #include "core/rule/score.h"
 #include "core/rule/special.h"
 #include "game/game.h"
+#include <QParallelAnimationGroup>
 #include "game/campaign.h"
 
 #include <QVBoxLayout>
@@ -26,7 +27,7 @@
 
 void BattleScreen::onPlayButtonClicked()
 {
-    if (m_waitingForAI || m_gameOver) return;
+    if (m_phase != GamePhase::PlayerTurn) return;
 
     std::vector<Card> selected;
     for (CardWidget* cw : m_playerACardWidgets) {
@@ -82,6 +83,7 @@ void BattleScreen::onPlayButtonClicked()
             });
         if (it != m_playerA.hand.end()) m_playerA.hand.erase(it);
     }
+    m_handDirty = true;
 
     if (result.type == CardType::Bomb || result.type == CardType::Rocket) {
         shakeWidget(m_tableFrame);
@@ -133,21 +135,7 @@ void BattleScreen::onPlayButtonClicked()
     bool playerAFinished = m_playerA.hand.empty();
 
     if (playerAFinished && m_playerDeck.cards.empty()) {
-        endRound(m_playerA);
-        finalSettlement(m_playerA, m_playerB, m_tableCards);
-        compareAndAnnounce(m_playerA, m_playerB);
-
-        appendLog("========== 游戏结束 ==========");
-        appendLog("出完牌者: 玩家A");
-        appendLog(QString("玩家A 总分: %1").arg(m_playerA.totalScore));
-        appendLog(QString("电脑 总分: %1").arg(m_playerB.totalScore));
-        QString w = (m_playerA.totalScore >= m_playerB.totalScore) ? "玩家A" : "电脑";
-        appendLog(QString("最终胜者: %1").arg(w));
-
-        playSound(m_soundSuccess);
-        showGameOverDialog(QString("玩家A 出完牌！\n玩家A: %1 分\n电脑: %2 分")
-            .arg(m_playerA.totalScore).arg(m_playerB.totalScore));
-        disableActionButtons();
+        finishGame(m_playerA, "玩家A", m_soundSuccess);
         return;
     }
 
@@ -155,21 +143,13 @@ void BattleScreen::onPlayButtonClicked()
         appendLog("玩家A 出牌回应，玩家A 赢得本回合");
         endRound(m_playerA);
         refillBoth(m_playerA, m_playerB);
-        m_lastPlay.type = CardType::Invalid;
-        m_lastPlay.cards.clear();
-        m_lastPlay.keyPoint.clear();
-    m_lastPlayerName.clear();
-    if (!m_isLevelMode || m_playerAIsFirst) {
-        enableActionButtons();
-    } else {
-        m_waitingForAI = true;
-        QTimer::singleShot(700, this, &BattleScreen::doAITurn);
-    }
-    return;
+        clearLastPlay();
+        startNextTurn();
+        return;
     }
 
-    m_waitingForAI = true;
-    QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+    m_phase = GamePhase::AITurn;
+    QTimer::singleShot(m_aiTurnDelayMs, this, &BattleScreen::doAITurn);
     if (playerAFinished) {
         m_playButton->setEnabled(false);
     }
@@ -178,7 +158,7 @@ void BattleScreen::onPlayButtonClicked()
 void BattleScreen::onPassButtonClicked()
 {
     playSound(m_soundClick);
-    if (m_waitingForAI || m_gameOver) return;
+    if (m_phase != GamePhase::PlayerTurn) return;
 
     if (m_lastPlay.type == CardType::Invalid) {
         QMessageBox::warning(this, "提示", "首出不能不要");
@@ -192,27 +172,10 @@ void BattleScreen::onPassButtonClicked()
         appendLog("电脑 赢得本回合");
         endRound(m_playerB);
         refillBoth(m_playerB, m_playerA);
-        m_lastPlay.type = CardType::Invalid;
-        m_lastPlay.cards.clear();
-        m_lastPlay.keyPoint.clear();
-        m_lastPlayerName.clear();
-
-        if (checkSpecialVictory(m_playerA)) {
-            appendLog("玩家A 达成七鬼523，直接获胜！");
-            playSound(m_soundSuccess);
-            m_pendingSpecialVictory = true;
-            showSpecialVictoryEffect("玩家A", "玩家A 达成七鬼523，直接获胜！");
-            return;
-        }
-        if (checkSpecialVictory(m_playerB)) {
-            appendLog("电脑 达成七鬼523，直接获胜！");
-            playSound(m_soundFailure);
-            showSpecialVictoryEffect("电脑", "电脑 达成七鬼523，直接获胜！");
-            return;
-        }
-
-        m_waitingForAI = true;
-        QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+        clearLastPlay();
+        if (handleSpecialVictoryCheck()) return;
+        m_phase = GamePhase::AITurn;
+        QTimer::singleShot(m_aiTurnDelayMs, this, &BattleScreen::doAITurn);
         return;
     }
 
@@ -220,26 +183,11 @@ void BattleScreen::onPassButtonClicked()
 
     refillBoth(m_playerB, m_playerA);
 
-    if (checkSpecialVictory(m_playerA)) {
-        appendLog("玩家A 达成七鬼523，直接获胜！");
-        playSound(m_soundSuccess);
-        m_pendingSpecialVictory = true;
-        showSpecialVictoryEffect("玩家A", "玩家A 达成七鬼523，直接获胜！");
-        return;
-    }
-    if (checkSpecialVictory(m_playerB)) {
-        appendLog("电脑 达成七鬼523，直接获胜！");
-        playSound(m_soundFailure);
-        showSpecialVictoryEffect("电脑", "电脑 达成七鬼523，直接获胜！");
-        return;
-    }
+    if (handleSpecialVictoryCheck()) return;
 
-    m_lastPlay.type = CardType::Invalid;
-    m_lastPlay.cards.clear();
-    m_lastPlay.keyPoint.clear();
-    m_lastPlayerName.clear();
-    m_waitingForAI = true;
-    QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+    clearLastPlay();
+    m_phase = GamePhase::AITurn;
+    QTimer::singleShot(m_aiTurnDelayMs, this, &BattleScreen::doAITurn);
 }
 
 void BattleScreen::onNewGameButtonClicked()
@@ -249,7 +197,7 @@ void BattleScreen::onNewGameButtonClicked()
         cw->deleteLater();
     }
     m_tableCardWidgets.clear();
-    m_gameOver = false;
+    m_phase = GamePhase::DealAnimation;
     startNewGame();
 }
 
@@ -328,19 +276,22 @@ void BattleScreen::startGameWithFirst(bool playerAFirst)
 
 void BattleScreen::onDealAnimationFinished()
 {
-    m_dealAnimating = false;
+    m_dealAnimFinishCount++;
+    qDebug() << "[onDealAnimationFinished] count=" << m_dealAnimFinishCount
+             << "playerAIsFirst=" << m_playerAIsFirst
+             << "phase=" << static_cast<int>(m_phase);
     m_difficultyButton->setEnabled(true);
     m_newGameButton->setEnabled(true);
     m_buttonStack->setEnabled(true);
     m_buttonStack->setCurrentIndex(0);
 
     if (m_playerAIsFirst) {
-        m_waitingForAI = false;
+        m_phase = GamePhase::PlayerTurn;
         enableActionButtons();
     } else {
-        m_waitingForAI = true;
+        m_phase = GamePhase::AITurn;
         disableActionButtons();
-        QTimer::singleShot(300, this, &BattleScreen::doAITurn);
+        QTimer::singleShot(m_aiTurnDelayMs, this, &BattleScreen::doAITurn);
     }
     updateUI(false);
     layoutHandSlots(true, false);
@@ -364,133 +315,131 @@ void BattleScreen::onPickButtonClicked()
 
 void BattleScreen::doAITurn()
 {
-    m_waitingForAI = false;
-    if (m_gameOver) return;
+    if (m_phase == GamePhase::GameOver) return;
 
-    int tableScore = calculateScore(m_tableCards);
-    std::vector<Card> chosen;
-    if (m_isLevelMode) {
-        switch (m_currentLevel) {
-        case 1:
-            chosen = ai1_idiot_choose(m_playerB, m_playerA, m_lastPlay,
-                                      m_bossDeck, tableScore);
-            break;
-        case 2:
-            chosen = ai2_liar_choose(m_playerB, m_playerA, m_lastPlay,
-                                     m_bossDeck, tableScore);
-            break;
-        case 3:
-            chosen = ai1_idiot_choose(m_playerB, m_playerA, m_lastPlay,
-                                       m_bossDeck, tableScore);
-            break;
-        default:
-            if (m_levelAIEngine) {
-                m_levelAIEngine->setOpponentHand(m_playerA.hand);
-                chosen = m_levelAIEngine->choosePlay(
-                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
-            } else {
-                chosen = aiChoosePlay(
-                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore, m_tracker);
+    if (m_stressPlaying) {
+        auto sig = std::make_tuple(
+            (int)m_playerA.hand.size(),
+            (int)m_playerB.hand.size(),
+            (int)m_playerDeck.cards.size(),
+            (int)m_bossDeck.cards.size()
+        );
+
+        if (sig == m_lastTurnSignature) {
+            m_stressNoProgressCount++;
+            if (m_stressNoProgressCount >= m_stressNoProgressLimit) {
+                qWarning() << "[STRESS] GAME FAILED: no progress for"
+                           << m_stressNoProgressCount << "turns"
+                           << "A.hand=" << m_playerA.hand.size()
+                           << "B.hand=" << m_playerB.hand.size()
+                           << "A.deck=" << m_playerDeck.cards.size()
+                           << "B.deck=" << m_bossDeck.cards.size();
+                m_stressFailedGames++;
+                m_stressDoAICallCount = 0;
+                m_stressNoProgressCount = 0;
+                m_lastTurnSignature = {-1,-1,-1,-1};
+                m_phase = GamePhase::GameOver;
+                QTimer::singleShot(100, this, [this]() {
+                    autoPlayOneGame();
+                });
+                return;
             }
-            break;
+        } else {
+            m_stressNoProgressCount = 0;
+            m_lastTurnSignature = sig;
         }
-    } else {
-        switch (m_playerB.aiLevel) {
-            case AILevel::AI1_Simple:
-                chosen = ai1_idiot_choose(
-                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
-                break;
-            case AILevel::AI2_Rule:
-                chosen = ai2_liar_choose(
-                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
-                break;
-            case AILevel::AI3_Tracker:
-            case AILevel::AI4_Expert:
-            case AILevel::AI_Fair_Lv1:
-            case AILevel::AI_Fair_Lv2:
-            default:
-                chosen = ai1_idiot_choose(
-                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
-                break;
+
+        // 兜底：总调用硬上限
+        if (++m_stressDoAICallCount > 2000) {
+            qWarning() << "[STRESS] GAME FAILED: doAITurn called"
+                       << m_stressDoAICallCount << "times, hard limit";
+            m_stressFailedGames++;
+            m_stressDoAICallCount = 0;
+            m_stressNoProgressCount = 0;
+            m_lastTurnSignature = {-1,-1,-1,-1};
+            m_phase = GamePhase::GameOver;
+            QTimer::singleShot(100, this, [this]() {
+                autoPlayOneGame();
+            });
+            return;
         }
     }
 
-    if (chosen.empty()) {
-        appendLog("电脑 不要");
+    // Determine whose turn it is
+    Player* self;
+    Player* opp;
+    Deck* selfDeck;
+    Deck* oppDeck;
+    QString selfName;
+    QString oppName;
+    DeckSide selfSide;
+    QMediaPlayer* selfFinishSound;
 
-        if (m_playerA.hand.empty() && !m_playerDeck.cards.empty()) {
-            appendLog("玩家A 赢得本回合");
-            endRound(m_playerA);
-            refillBoth(m_playerA, m_playerB);
-            m_lastPlay.type = CardType::Invalid;
-            m_lastPlay.cards.clear();
-            m_lastPlay.keyPoint.clear();
-            m_lastPlayerName.clear();
-            if (!m_isLevelMode || m_playerAIsFirst) {
-                enableActionButtons();
-            } else {
-                m_waitingForAI = true;
-                QTimer::singleShot(700, this, &BattleScreen::doAITurn);
-            }
+    if (m_stressPlaying && m_isStressPlayerATurn) {
+        self = &m_playerA;  opp = &m_playerB;
+        selfDeck = &m_playerDeck;  oppDeck = &m_bossDeck;
+        selfName = "玩家A(AI)";  oppName = "电脑";
+        selfSide = DeckSide::PlayerA;
+        selfFinishSound = m_soundSuccess;
+    } else {
+        self = &m_playerB;  opp = &m_playerA;
+        selfDeck = &m_bossDeck;  oppDeck = &m_playerDeck;
+        selfName = "电脑";  oppName = "玩家A";
+        selfSide = DeckSide::Boss;
+        selfFinishSound = m_soundFailure;
+    }
+
+    std::vector<Card> chosen = dispatchAI(*self, *opp, *selfDeck);
+
+    if (chosen.empty()) {
+        appendLog(selfName + " 不要");
+
+        if (opp->hand.empty() && !oppDeck->cards.empty()) {
+            appendLog(oppName + " 赢得本回合");
+            endRound(*opp);
+            refillBoth(*opp, *self);
+            clearLastPlay();
+            startNextTurn();
             return;
         }
 
-        endRound(m_playerA);
+        endRound(*opp);
 
-        if (!m_playerDeck.cards.empty()) {
-            refillBoth(m_playerA, m_playerB);
+        if (!oppDeck->cards.empty()) {
+            refillBoth(*opp, *self);
         } else {
             updateUI();
         }
 
-        if (checkSpecialVictory(m_playerA)) {
-            appendLog("玩家A 达成七鬼523，直接获胜！");
-            playSound(m_soundSuccess);
-            m_pendingSpecialVictory = true;
-            showSpecialVictoryEffect("玩家A", "玩家A 达成七鬼523，直接获胜！");
-            return;
-        }
-        if (checkSpecialVictory(m_playerB)) {
-            appendLog("电脑 达成七鬼523，直接获胜！");
-            playSound(m_soundFailure);
-            showSpecialVictoryEffect("电脑", "电脑 达成七鬼523，直接获胜！");
-            return;
-        }
+        if (handleSpecialVictoryCheck()) return;
 
-        m_lastPlay.type = CardType::Invalid;
-    m_lastPlay.cards.clear();
-    m_lastPlay.keyPoint.clear();
-    m_lastPlayerName.clear();
-    if (!m_isLevelMode || m_playerAIsFirst) {
-        enableActionButtons();
-    } else {
-        m_waitingForAI = true;
-        QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+        clearLastPlay();
+        startNextTurn();
+        updateUI(false);
+        return;
     }
-    updateUI(false);
-    return;
-}
 
     for (const Card& c : chosen) {
-        auto it = std::find_if(m_playerB.hand.begin(), m_playerB.hand.end(),
+        auto it = std::find_if(self->hand.begin(), self->hand.end(),
             [&](const Card& h) {
                 return h.point == c.point && h.suit == c.suit;
             });
-        if (it != m_playerB.hand.end()) m_playerB.hand.erase(it);
+        if (it != self->hand.end()) self->hand.erase(it);
     }
+    m_handDirty = true;
     for (const Card& c : chosen) {
         m_tableCards.push_back(c);
     }
     CardTypeResult oldLastPlay = m_lastPlay;
     m_lastPlay = parseCardType(chosen);
-    m_lastPlayerName = "电脑";
+    m_lastPlayerName = selfName;
 
     if (m_lastPlay.type == CardType::Bomb || m_lastPlay.type == CardType::Rocket) {
         shakeWidget(m_tableFrame);
     }
 
-    if (m_levelAIEngine) m_levelAIEngine->recordPlayed(chosen, DeckSide::Boss);
-    m_tracker.recordPlayed(chosen, DeckSide::Boss);
+    if (m_levelAIEngine) m_levelAIEngine->recordPlayed(chosen, selfSide);
+    m_tracker.recordPlayed(chosen, selfSide);
 
     for (CardWidget* cw : m_tableCardWidgets) {
         cw->deleteLater();
@@ -499,9 +448,9 @@ void BattleScreen::doAITurn()
     flyAICardsToTable(chosen);
 
     if (m_lastPlay.type == CardType::Special523) {
-        appendLog("电脑 达成七鬼523，直接获胜！");
+        appendLog(selfName + " 达成七鬼523，直接获胜！");
         playSound(m_soundFailure);
-        showSpecialVictoryEffect("电脑", "电脑 达成七鬼523，直接获胜！");
+        showSpecialVictoryEffect(selfName, selfName + " 达成七鬼523，直接获胜！");
         return;
     }
 
@@ -511,7 +460,8 @@ void BattleScreen::doAITurn()
         m_tableBonus += bonus;
     }
     if (bonus > 0) showBonusFloat(bonus);
-    appendLog(QString("电脑 出牌: %1 (%2%3)")
+    appendLog(QString("%1 出牌: %2 (%3%4)")
+        .arg(selfName)
         .arg(cardsToString(chosen))
         .arg(cardTypeToQString(m_lastPlay.type))
         .arg(m_lastPlay.bonusScore > 0 ? QString(" 压分+%1").arg(m_lastPlay.bonusScore) : ""));
@@ -524,47 +474,104 @@ void BattleScreen::doAITurn()
 
     updateUI();
 
-    bool playerBFinished = m_playerB.hand.empty();
+    bool selfFinished = self->hand.empty();
 
-    if (playerBFinished && m_bossDeck.cards.empty()) {
-        endRound(m_playerB);
-        finalSettlement(m_playerB, m_playerA, m_tableCards);
-        compareAndAnnounce(m_playerA, m_playerB);
-
-        appendLog("========== 游戏结束 ==========");
-        appendLog("出完牌者: 电脑");
-        appendLog(QString("玩家A 总分: %1").arg(m_playerA.totalScore));
-        appendLog(QString("电脑 总分: %1").arg(m_playerB.totalScore));
-        QString w = (m_playerA.totalScore >= m_playerB.totalScore) ? "玩家A" : "电脑";
-        appendLog(QString("最终胜者: %1").arg(w));
-
-        playSound(m_soundFailure);
-        showGameOverDialog(QString("电脑 出完牌！\n玩家A: %1 分\n电脑: %2 分")
-            .arg(m_playerA.totalScore).arg(m_playerB.totalScore));
-        disableActionButtons();
+    if (selfFinished && selfDeck->cards.empty()) {
+        finishGame(*self, selfName, selfFinishSound);
         return;
     }
 
-    if (m_playerA.hand.empty() && !m_playerDeck.cards.empty()) {
-        appendLog("电脑 出牌回应，电脑 赢得本回合");
-        endRound(m_playerB);
-        refillBoth(m_playerB, m_playerA);
-        m_lastPlay.type = CardType::Invalid;
-        m_lastPlay.cards.clear();
-        m_lastPlay.keyPoint.clear();
-        m_lastPlayerName.clear();
-        m_waitingForAI = true;
-        QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+    if (opp->hand.empty() && !oppDeck->cards.empty()) {
+        appendLog(selfName + " 出牌回应，" + selfName + " 赢得本回合");
+        endRound(*self);
+        refillBoth(*self, *opp);
+        clearLastPlay();
+        m_phase = GamePhase::AITurn;
+        QTimer::singleShot(m_aiTurnDelayMs, this, &BattleScreen::doAITurn);
         return;
     }
 
-    if (!m_isLevelMode || m_playerAIsFirst) {
-        enableActionButtons();
-    } else {
-        m_waitingForAI = true;
-        QTimer::singleShot(700, this, &BattleScreen::doAITurn);
-    }
+    startNextTurn();
     updateUI();
+}
+
+// ============================================================
+// Round management helpers
+// ============================================================
+
+void BattleScreen::clearLastPlay()
+{
+    m_lastPlay.type = CardType::Invalid;
+    m_lastPlay.cards.clear();
+    m_lastPlay.keyPoint.clear();
+    m_lastPlayerName.clear();
+}
+
+bool BattleScreen::handleSpecialVictoryCheck()
+{
+    if (checkSpecialVictory(m_playerA)) {
+        appendLog("玩家A 达成七鬼523，直接获胜！");
+        playSound(m_soundSuccess);
+        m_pendingSpecialVictory = true;
+        showSpecialVictoryEffect("玩家A", "玩家A 达成七鬼523，直接获胜！");
+        return true;
+    }
+    if (checkSpecialVictory(m_playerB)) {
+        appendLog("电脑 达成七鬼523，直接获胜！");
+        playSound(m_soundFailure);
+        showSpecialVictoryEffect("电脑", "电脑 达成七鬼523，直接获胜！");
+        return true;
+    }
+    return false;
+}
+
+void BattleScreen::finishGame(Player& finisher, const QString& finisherName, QMediaPlayer* sound)
+{
+    Player& opponent = (&finisher == &m_playerA) ? m_playerB : m_playerA;
+    endRound(finisher);
+    finalSettlement(finisher, opponent, m_tableCards);
+    compareAndAnnounce(m_playerA, m_playerB);
+
+    appendLog("========== 游戏结束 ==========");
+    appendLog(QString("出完牌者: %1").arg(finisherName));
+    appendLog(QString("玩家A 总分: %1").arg(m_playerA.totalScore));
+    appendLog(QString("电脑 总分: %1").arg(m_playerB.totalScore));
+    QString w = (m_playerA.totalScore >= m_playerB.totalScore) ? "玩家A" : "电脑";
+    appendLog(QString("最终胜者: %1").arg(w));
+
+    playSound(sound);
+    showGameOverDialog(QString("%1 出完牌！\n玩家A: %2 分\n电脑: %3 分")
+        .arg(finisherName)
+        .arg(m_playerA.totalScore)
+        .arg(m_playerB.totalScore));
+    disableActionButtons();
+}
+
+std::vector<Card> BattleScreen::dispatchAI(Player& self, Player& opp, Deck& selfDeck)
+{
+    int tableScore = calculateScore(m_tableCards);
+
+    if (m_isLevelMode) {
+        if (m_currentLevel == 1) {
+            return ai1_idiot_choose(self, opp, m_lastPlay, selfDeck, tableScore);
+        }
+        if (m_currentLevel == 2) {
+            return ai2_liar_choose(self, opp, m_lastPlay, selfDeck, tableScore);
+        }
+        if (m_currentLevel == 3) {
+            return ai1_idiot_choose(self, opp, m_lastPlay, selfDeck, tableScore);
+        }
+        if (m_levelAIEngine) {
+            m_levelAIEngine->setOpponentHand(opp.hand);
+            return m_levelAIEngine->choosePlay(self, opp, m_lastPlay, selfDeck, tableScore);
+        }
+        return aiChoosePlay(self, opp, m_lastPlay, selfDeck, tableScore, m_tracker);
+    }
+
+    if (self.aiLevel == AILevel::AI2_Rule) {
+        return ai2_liar_choose(self, opp, m_lastPlay, selfDeck, tableScore);
+    }
+    return ai1_idiot_choose(self, opp, m_lastPlay, selfDeck, tableScore);
 }
 
 void BattleScreen::startNewGame()
@@ -594,9 +601,6 @@ void BattleScreen::startNewGame()
         for (QLabel* lbl : children) lbl->deleteLater();
     }
 
-    m_gameOver = false;
-    m_waitingForAI = true;
-    m_dealAnimating = false;
     m_pendingPick = true;
     m_lastPlay = CardTypeResult{};
     m_tableCards.clear();
@@ -739,10 +743,11 @@ void BattleScreen::startNewGame()
     updateUI();
 }
 
-void BattleScreen::updateUI(bool rebuildHand)
+void BattleScreen::updateUI(bool rebuildHand, bool hideNewWidgets)
 {
-    qDebug() << "[updateUI] rebuildHand=" << rebuildHand
-             << "m_dealAnimating=" << m_dealAnimating
+    qDebug() << "[updateUI] enter, rebuildHand=" << rebuildHand
+             << "hideNewWidgets=" << hideNewWidgets
+             << "phase=" << static_cast<int>(m_phase)
              << "playerA.hand=" << (int)m_playerA.hand.size()
              << "playerAWidgets=" << (int)m_playerACardWidgets.size()
              << "playerB.hand=" << (int)m_playerB.hand.size()
@@ -754,10 +759,10 @@ void BattleScreen::updateUI(bool rebuildHand)
 
     updateTableHint();
 
-    if (m_dealAnimating) return;
+    if (m_phase == GamePhase::DealAnimation || m_phase == GamePhase::RefillAnimation) return;
 
     if (rebuildHand) {
-        rebuildPlayerHands();
+        rebuildPlayerHands(hideNewWidgets);
     }
 
     updateButtonStates();
@@ -854,13 +859,33 @@ void BattleScreen::updateTableHint()
     }
 }
 
-void BattleScreen::rebuildPlayerHands()
+void BattleScreen::rebuildPlayerHands(bool hideNewWidgets)
 {
+    if (!m_handDirty && m_playerACardWidgets.size() == m_playerA.hand.size()) {
+        qDebug() << "[rebuildPlayerHands] skip (not dirty, sizes match)";
+        return;
+    }
+    qDebug() << "[rebuildPlayerHands] enter, hideNewWidgets=" << hideNewWidgets
+             << "phase=" << static_cast<int>(m_phase)
+             << "m_playerACardWidgets.size=" << (int)m_playerACardWidgets.size();
+    for (size_t i = 0; i < m_playerACardWidgets.size(); ++i) {
+        CardWidget* cw = m_playerACardWidgets[i];
+        qDebug() << "  [" << i << "] cw=" << static_cast<void*>(cw)
+                 << "parent=" << static_cast<void*>(cw ? cw->parentWidget() : nullptr)
+                 << "isHandWidget=" << (cw && cw->parentWidget() == m_playerAHandWidget)
+                 << "isThis=" << (cw && cw->parentWidget() == this);
+    }
     {
         std::map<int, CardWidget*> widgetBySeq;
         std::map<std::pair<std::string, std::string>, CardWidget*> widgetByFallback;
         for (CardWidget* cw : m_playerACardWidgets) {
             if (!cw) continue;
+            if (cw->parentWidget() != m_playerAHandWidget) {
+                qDebug() << "[rebuildPlayerHands] cw=" << static_cast<void*>(cw)
+                         << "parent NOT handWidget! parent="
+                         << static_cast<void*>(cw->parentWidget())
+                         << "isThis=" << (cw->parentWidget() == this);
+            }
             const Card& c = cw->getCard();
             if (c.seq > 0) {
                 widgetBySeq[c.seq] = cw;
@@ -892,7 +917,11 @@ void BattleScreen::rebuildPlayerHands()
             } else {
                 CardWidget* nw = new CardWidget(hc, m_playerAHandWidget);
                 connect(nw, &CardWidget::clicked, this, [this]() { update(); });
-                nw->show();
+                if (!hideNewWidgets) {
+                    nw->show();
+                } else {
+                    nw->setVisible(false);
+                }
                 newOrder.push_back(nw);
             }
         }
@@ -920,11 +949,17 @@ void BattleScreen::rebuildPlayerHands()
         while (m_playerBCardWidgets.size() < m_playerB.hand.size()) {
             QWidget* w = createCardBack();
             w->setParent(m_playerBHandWidget);
-            w->show();
+            if (!hideNewWidgets) {
+                w->show();
+            } else {
+                w->setVisible(false);
+            }
             m_playerBCardWidgets.push_back(w);
         }
         layoutHandSlots(false, false);
     }
+
+    m_handDirty = false;
 
     if (m_playerAHandWidget) m_playerAHandWidget->update();
     if (m_playerBHandWidget) m_playerBHandWidget->update();
@@ -932,13 +967,13 @@ void BattleScreen::rebuildPlayerHands()
 
 void BattleScreen::updateButtonStates()
 {
-    if (!m_gameOver) {
+    if (m_phase != GamePhase::GameOver) {
         if (m_pendingPick) {
             m_buttonStack->setCurrentIndex(1);
             m_playButton->setEnabled(false);
         } else {
             m_buttonStack->setCurrentIndex(0);
-            m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
+            m_playButton->setEnabled(m_phase == GamePhase::PlayerTurn && !m_playerA.hand.empty());
         }
         m_passButton->setEnabled(m_lastPlay.type != CardType::Invalid);
     }
@@ -1011,6 +1046,58 @@ appendLog(QString("--- 回合 %1 结束 ---").arg(m_roundCount));
     updateUI();
 }
 
+QParallelAnimationGroup* BattleScreen::animateNewCardsToHand(
+    const std::vector<QWidget*>& cards,
+    QWidget* deckSource,
+    QWidget* handWidget,
+    bool playerA)
+{
+    if (cards.empty() || !deckSource || !handWidget) {
+        layoutHandSlots(playerA, false);
+        return nullptr;
+    }
+
+    QPoint deckPos = deckSource->mapTo(this, QPoint(0, 0));
+    QPoint deckCenter(deckPos.x() + deckSource->width() / 2,
+                      deckPos.y() + deckSource->height() / 2);
+
+    auto* group = new QParallelAnimationGroup(this);
+
+    for (QWidget* w : cards) {
+        if (!w) continue;
+
+        QPoint finalPosInHand = w->pos();
+        QPoint startPos(deckCenter.x() - w->width() / 2,
+                        deckCenter.y() - w->height() / 2);
+        QPoint finalPosInThis = handWidget->mapTo(this, finalPosInHand);
+
+        w->setParent(this);
+        w->raise();
+        w->show();
+        w->move(startPos);
+
+        auto* anim = new QPropertyAnimation(w, "pos");
+        anim->setDuration(450);
+        anim->setEasingCurve(QEasingCurve::OutCubic);
+        anim->setStartValue(startPos);
+        anim->setEndValue(finalPosInThis);
+        group->addAnimation(anim);
+    }
+
+    connect(group, &QParallelAnimationGroup::finished, this,
+        [this, cards, handWidget, playerA]() {
+            for (QWidget* w : cards) {
+                if (!w) continue;
+                w->setParent(handWidget);
+                w->show();
+            }
+            layoutHandSlots(playerA, false);
+        });
+
+    group->start(QAbstractAnimation::DeleteWhenStopped);
+    return group;
+}
+
 void BattleScreen::refillBoth(Player& winner, Player& loser)
 {
     // 保存补牌前的手牌（用于识别新增牌）
@@ -1033,7 +1120,8 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
     int gotW = static_cast<int>(winner.hand.size()) - beforeW;
     int gotL = static_cast<int>(loser.hand.size()) - beforeL;
 
-    qDebug() << "[refillBoth] enter winner=" << QString::fromStdString(winner.name)
+    qDebug() << "[refillBoth-ENTER] phase=" << static_cast<int>(m_phase)
+             << " winner=" << QString::fromStdString(winner.name)
              << "loser=" << QString::fromStdString(loser.name)
              << "winnerIsPlayerA=" << winnerIsPlayerA
              << "beforeW=" << beforeW << "beforeL=" << beforeL
@@ -1045,8 +1133,16 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
 
     sortHandSmart(m_playerA.hand);
 
-    // updateUI(true) 先重建所有手牌 widget，让每张牌都在最终 layout 位置
-    updateUI(true);
+    qDebug() << "[refillBoth] after sort, playerA hand size=" << static_cast<int>(m_playerA.hand.size());
+    for (size_t i = 0; i < m_playerA.hand.size(); ++i) {
+        qDebug() << "  hand[" << i << "]=" << QString::fromStdString(m_playerA.hand[i].point)
+                 << QString::fromStdString(m_playerA.hand[i].suit)
+                 << "seq=" << m_playerA.hand[i].seq;
+    }
+
+    m_handDirty = true;
+    // updateUI(true, true) 重建手牌 widget，新牌隐藏（防止闪现）
+    updateUI(true, true);
 
     qDebug() << "[refillBoth] after updateUI, playerAWidgets="
              << (int)m_playerACardWidgets.size()
@@ -1055,7 +1151,6 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
     // 对玩家A的新增牌：找到 widget → 移到牌堆起点 → 动画飞回最终位置
     if (gotW > 0 && winnerIsPlayerA) {
         qDebug() << "[refillBoth] playerA-winner branch gotW=" << gotW;
-        // 识别新增牌（在 new hand 但不在 old hand 中）
         std::vector<int> newIndices;
         for (int i = 0; i < static_cast<int>(m_playerA.hand.size()); ++i) {
             const Card& c = m_playerA.hand[i];
@@ -1070,79 +1165,138 @@ void BattleScreen::refillBoth(Player& winner, Player& loser)
                 newIndices.push_back(i);
         }
 
-        // 计算牌堆起点位置
-        QWidget* deckSource = m_playerDeckWidget;
-        QPoint deckPos = deckSource->mapTo(this, QPoint(0, 0));
-        QPoint startPos(deckPos.x() + deckSource->width() / 2 - 48,
-                        deckPos.y() + deckSource->height() / 2 - 60);
-
+        std::vector<QWidget*> newWidgets;
         for (int idx : newIndices) {
-            if (idx < static_cast<int>(m_playerACardWidgets.size())) {
-                CardWidget* cw = m_playerACardWidgets[idx];
+            if (idx < static_cast<int>(m_playerACardWidgets.size()))
+                newWidgets.push_back(m_playerACardWidgets[idx]);
+        }
 
-                // finalPos 用 cw 在父控件里的当前位置（layoutHandSlots 刚设过）
-                QPoint finalPosInParent = cw->pos();
-
-                // startPos 从 BattleScreen 坐标转到父控件坐标
-                QPoint startPosInParent = m_playerAHandWidget->mapFrom(this, startPos);
-
-                // 先移到牌堆起点
-                cw->setDealAnimationEnabled(true);
-                cw->move(startPosInParent);
-                cw->raise();
-                cw->show();
-
-                // 飞回最终位置
-                auto* anim = new QPropertyAnimation(cw, "pos");
-                anim->setDuration(450);
-                anim->setEasingCurve(QEasingCurve::OutCubic);
-                anim->setStartValue(startPosInParent);
-                anim->setEndValue(finalPosInParent);
-                connect(anim, &QPropertyAnimation::finished, this,
-                    [this, cw]() {
-                        if (!cw) return;
-                        cw->setDealAnimationEnabled(false);
-                        layoutHandSlots(true, false);
-                    }, Qt::SingleShotConnection);
-                anim->start(QAbstractAnimation::DeleteWhenStopped);
-            }
+        if (!newWidgets.empty()) {
+            m_phase = GamePhase::RefillAnimation;
+            qDebug() << "[refillBoth] animateNewCardsToHand count=" << static_cast<int>(newWidgets.size());
+            animateNewCardsToHand(newWidgets, m_playerDeckWidget, m_playerAHandWidget, true);
         }
     } else if (gotW > 0 || gotL > 0) {
         qDebug() << "[refillBoth] else-if branch gotW=" << gotW << "gotL=" << gotL;
-        // 非玩家A的补牌：使用简化动画（临时 widget 飞入，完成后不重建手牌）
-        // 赢家
-        if (gotW > 0) {
-            int baseIdx = beforeW;
-            QWidget* targetHand = winnerIsPlayerA ? m_playerAHandWidget : m_playerBHandWidget;
-            if (targetHand) {
-                QPoint handPos = targetHand->mapTo(this, QPoint(0, 0));
-                for (int i = 0; i < gotW; ++i) {
-                    Card drawnCard = winner.hand[baseIdx + i];
-                    QPoint targetPos(handPos.x() + (baseIdx + i) * 90 + 20, handPos.y() + 10);
-                    QTimer::singleShot(i * 150, this,
-                        [this, winnerIsPlayerA, drawnCard, targetPos]() {
-                            playDrawAnimationSimple(winnerIsPlayerA, targetPos);
-                        });
+
+        // 玩家A侧新牌
+        std::vector<QWidget*> aNewWidgets;
+        if (gotL > 0 && loserIsPlayerA) {
+            for (int i = 0; i < static_cast<int>(m_playerA.hand.size()); ++i) {
+                const Card& c = m_playerA.hand[i];
+                bool found = false;
+                for (const Card& old : oldPlayerAHand) {
+                    if (c.point == old.point && c.suit == old.suit) {
+                        found = true;
+                        break;
+                    }
                 }
+                if (!found && i < static_cast<int>(m_playerACardWidgets.size()))
+                    aNewWidgets.push_back(m_playerACardWidgets[i]);
             }
         }
-        // 输家
-        if (gotL > 0) {
-            int baseIdx = beforeL;
-            QWidget* targetHand = loserIsPlayerA ? m_playerAHandWidget : m_playerBHandWidget;
-            if (targetHand) {
-                QPoint handPos = targetHand->mapTo(this, QPoint(0, 0));
-                for (int i = 0; i < gotL; ++i) {
-                    Card drawnCard = loser.hand[baseIdx + i];
-                    QPoint targetPos(handPos.x() + (baseIdx + i) * 90 + 20, handPos.y() + 10);
-                    QTimer::singleShot((gotW * 150) + i * 150, this,
-                        [this, loserIsPlayerA, drawnCard, targetPos]() {
-                            playDrawAnimationSimple(loserIsPlayerA, targetPos);
-                        });
-                }
+        if (!aNewWidgets.empty())
+            animateNewCardsToHand(aNewWidgets, m_playerDeckWidget, m_playerAHandWidget, true);
+
+        // Boss侧新牌
+        std::vector<QWidget*> bNewWidgets;
+        if (gotW > 0 && !winnerIsPlayerA) {
+            for (int i = 0; i < gotW; ++i) {
+                int idx = beforeW + i;
+                if (idx < static_cast<int>(m_playerBCardWidgets.size()))
+                    bNewWidgets.push_back(m_playerBCardWidgets[idx]);
             }
         }
+        if (!bNewWidgets.empty())
+            animateNewCardsToHand(bNewWidgets, m_bossDeckWidget, m_playerBHandWidget, false);
     }
+
+    qDebug() << "[refillBoth] exit, widgets=" << static_cast<int>(m_playerACardWidgets.size());
+
+    // Stress test: verify widgets after refill
+    if (m_stressPlaying) {
+        QTimer::singleShot(kRefillCheckStressMs, this, [this]() {
+            if (m_phase == GamePhase::RefillAnimation) return;
+            bool ok = true;
+            if (m_playerACardWidgets.size() != m_playerA.hand.size()) {
+                qDebug() << "[STRESS] REFILL FAIL: A widgets="
+                         << static_cast<int>(m_playerACardWidgets.size())
+                         << "hand=" << static_cast<int>(m_playerA.hand.size());
+                ok = false;
+            }
+            if (m_playerBCardWidgets.size() != m_playerB.hand.size()) {
+                qDebug() << "[STRESS] REFILL FAIL: B widgets="
+                         << static_cast<int>(m_playerBCardWidgets.size())
+                         << "hand=" << static_cast<int>(m_playerB.hand.size());
+                ok = false;
+            }
+            for (size_t i = 0; i < m_playerACardWidgets.size(); ++i) {
+                auto* cw = m_playerACardWidgets[i];
+                if (!cw || !cw->isVisible()
+                    || cw->parentWidget() != m_playerAHandWidget) {
+                    qDebug() << "[STRESS] REFILL FAIL: widget" << i
+                             << "invalid (vis=" << (cw ? cw->isVisible() : false)
+                             << "parentOK=" << (cw && cw->parentWidget() == m_playerAHandWidget)
+                             << ")";
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) {
+                qDebug() << "[STRESS] REFILL OK";
+            }
+        });
+    }
+}
+
+void BattleScreen::runAutoPlayTest(int totalGames)
+{
+    m_stressTotalGames = totalGames;
+    m_stressGamesLeft = totalGames;
+    m_stressSuccessGames = 0;
+    m_stressFailedGames = 0;
+    m_stressPlaying = true;
+    m_aiTurnDelayMs = kAITurnDelayStressMs;
+
+    qDebug() << "[STRESS] ============ START ============";
+    qDebug() << "[STRESS] total games=" << totalGames;
+
+    autoPlayOneGame();
+}
+
+void BattleScreen::autoPlayOneGame()
+{
+    if (m_stressGamesLeft <= 0) {
+        qDebug() << "[STRESS] ============ DONE ============";
+        qDebug() << "[STRESS] total=" << m_stressTotalGames
+                 << "success=" << m_stressSuccessGames
+                 << "failed=" << m_stressFailedGames;
+        m_stressPlaying = false;
+        emit autoPlayTestFinished();
+        return;
+    }
+
+    m_stressGamesLeft--;
+    m_stressDoAICallCount   = 0;
+    m_stressNoProgressCount = 0;
+    m_lastTurnSignature     = {-1,-1,-1,-1};
+
+    int gameNum = m_stressTotalGames - m_stressGamesLeft;
+
+    m_isLevelMode = false;
+    m_currentLevel = 0;
+    m_playerAIsFirst = false;
+    m_isStressPlayerATurn = false;
+
+    startNewGame();
+
+    m_playerA.isHuman = false;
+    m_playerA.aiLevel = AILevel::AI1_Simple;
+    m_playerB.aiLevel = AILevel::AI1_Simple;
+
+    qDebug() << "[STRESS] game" << gameNum << "dealing...";
+
+    startGameWithFirst(false);
 }
 
 bool BattleScreen::checkGameEnd(Player& finisher, Player& opponent)
@@ -1175,8 +1329,18 @@ bool BattleScreen::checkGameEnd(Player& finisher, Player& opponent)
 
 void BattleScreen::showGameOverDialog(const QString& message)
 {
-    m_gameOver = true;
+    qDebug() << "[showGameOverDialog] phase=" << static_cast<int>(m_phase);
+    m_phase = GamePhase::GameOver;
     disableActionButtons();
+
+    if (m_stressPlaying) {
+        qDebug() << "[STRESS] game finished, success";
+        m_stressSuccessGames++;
+        QTimer::singleShot(500, this, [this]() {
+            autoPlayOneGame();
+        });
+        return;
+    }
 
     if (m_isLevelMode) {
         RoundResult rr;
@@ -1297,8 +1461,25 @@ void BattleScreen::showGameOverDialog(const QString& message)
     int ret = dlg.exec();
 
     if (ret == QDialog::Accepted) {
-        m_gameOver = false;
+        m_phase = GamePhase::DealAnimation;
         onNewGameButtonClicked();
+    }
+}
+
+void BattleScreen::startNextTurn()
+{
+    if (m_stressPlaying) {
+        m_isStressPlayerATurn = !m_isStressPlayerATurn;
+        m_phase = GamePhase::AITurn;
+        QTimer::singleShot(m_aiTurnDelayMs, this, &BattleScreen::doAITurn);
+        return;
+    }
+    if (!m_isLevelMode || m_playerAIsFirst) {
+        m_phase = GamePhase::PlayerTurn;
+        enableActionButtons();
+    } else {
+        m_phase = GamePhase::AITurn;
+        QTimer::singleShot(m_aiTurnDelayMs, this, &BattleScreen::doAITurn);
     }
 }
 

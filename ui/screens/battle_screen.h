@@ -11,6 +11,9 @@
 #include <QPropertyAnimation>
 #include <QFrame>
 #include <QMainWindow>
+#include <tuple>
+
+class QParallelAnimationGroup;
 
 #include "core/card/card.h"
 #include "core/player.h"
@@ -32,6 +35,8 @@ public:
 
     void setLevelMode(bool isLevelMode, int startLevel);
     void startNewGame();
+    void runAutoPlayTest(int totalGames);
+    int  getStressTestDoAICallCount() const { return m_stressDoAICallCount; }
 
     // Cheat tools (called by cheat table lambdas)
     void cheat_loadVariantDeck();
@@ -43,6 +48,7 @@ signals:
     void gameEnded();
     void dealAnimationFinished();
     void gameStarted();
+    void autoPlayTestFinished();
 
 private slots:
     void onPlayButtonClicked();
@@ -56,6 +62,15 @@ private slots:
     void onRandomBtnClicked();
 
 private:
+    enum class GamePhase {
+        DealAnimation,
+        PlayerTurn,
+        AITurn,
+        RefillAnimation,
+        GameOver
+    };
+    GamePhase m_phase = GamePhase::DealAnimation;
+
     void createTopBar(QVBoxLayout* leftLay);
     void createOpponentArea(QVBoxLayout* leftLay);
     void createTableArea(QVBoxLayout* leftLay);
@@ -71,24 +86,31 @@ private:
     void onDealAnimationFinished();
     void onPlayerTurnTimeout();
     void appendLog(const QString& text);
-    void updateUI(bool rebuildHand = true);
+    void updateUI(bool rebuildHand = true, bool hideNewWidgets = false);
     void updateLabels();
     void updateTableHint();
-    void rebuildPlayerHands();
+    void rebuildPlayerHands(bool hideNewWidgets = false);
     void updateButtonStates();
     void enableActionButtons();
     void disableActionButtons();
+    void startNextTurn();
     void playDealAnimation();
     void refillBoth(Player& winner, Player& loser);
     void endRound(Player& finisher);
 
-    // AI / Level mode
+    // Round management helpers
+    void clearLastPlay();
+    bool handleSpecialVictoryCheck();
+    void finishGame(Player& finisher, const QString& finisherName, QMediaPlayer* sound);
+
+    // AI
     void doAITurn();
+    std::vector<Card> dispatchAI(Player& self, Player& opp, Deck& selfDeck);
 
     // Animation methods
     void flyCardsToTable(const std::vector<CardWidget*>& cards);
     void flyAICardsToTable(const std::vector<Card>& cards);
-    void playDrawAnimationSimple(bool forPlayerA, const QPoint& targetPos);
+    QParallelAnimationGroup* animateNewCardsToHand(const std::vector<QWidget*>& cards, QWidget* deckSource, QWidget* handWidget, bool playerA);
     void shakeWidget(QWidget* widget);
     void showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage);
     void showBonusFloat(int bonus);
@@ -107,15 +129,12 @@ private:
     // Level mode methods
     void handleLevelModeEnd(const LevelResult& lr);
     void executeCheats(CheatWhen when);
-    
+
+    // Stress test
+    void autoPlayOneGame();
+
     QString getLevelDisplayName(int level) const;
     void returnToMenu();
-
-    struct PlayerData {
-        Player player;
-        std::vector<CardWidget*> cardWidgets;
-        std::vector<CardWidget*> tableWidgets;
-    };
 
     // UI controls
     QLabel*   m_titleLabel        = nullptr;
@@ -161,9 +180,7 @@ private:
     int    m_tableBonus          = 0;
     int    m_roundCount          = 1;
     bool   m_playerAIsFirst      = true;
-    bool   m_gameOver            = false;
-    bool   m_waitingForAI        = false;
-    bool   m_dealAnimating       = false;
+    bool   m_handDirty           = true;
     bool   m_pendingPick         = true;
     bool   m_waitingForFirstChoice = false;
     bool   m_isLevelMode         = false;
@@ -175,6 +192,26 @@ private:
     bool   m_pendingSpecialVictory = false;
     QString m_lastPlayerName;
 
+    // Stress test
+    int  m_stressGamesLeft = 0;
+    int  m_stressTotalGames = 0;
+    int  m_stressSuccessGames = 0;
+    int  m_stressFailedGames = 0;
+    int  m_stressDoAICallCount = 0;
+    int  m_stressDoAICallLimit = 200;  // unused, kept for reference
+    int  m_stressNoProgressCount = 0;
+    int  m_stressNoProgressLimit = 20;
+    std::tuple<int,int,int,int> m_lastTurnSignature = {-1,-1,-1,-1};
+    int  m_dealAnimFinishCount = 0;
+    bool m_stressPlaying = false;
+    bool m_isStressPlayerATurn = false;
+
+    static constexpr int kAITurnDelayNormalMs = 500;
+    static constexpr int kAITurnDelayStressMs = 0;
+    static constexpr int kDealWaitStressMs    = 1500;
+    static constexpr int kRefillCheckStressMs = 800;
+    int m_aiTurnDelayMs = kAITurnDelayNormalMs;
+
     std::vector<CardWidget*> m_playerACardWidgets;
     std::vector<QWidget*> m_playerBCardWidgets;
     std::vector<CardWidget*> m_tableCardWidgets;
@@ -184,7 +221,7 @@ private:
     AIEngineConfig m_levelEngineConfig;
 
     // Audio members
-    QAudioOutput* m_audioOutput   = nullptr;
+    QAudioOutput* m_audioOutput   = nullptr;  // unused, kept for reference
     QAudioOutput* m_audioSuccess  = nullptr;
     QAudioOutput* m_audioFailure  = nullptr;
     QAudioOutput* m_audioCorrect  = nullptr;
@@ -192,11 +229,7 @@ private:
     QAudioOutput* m_audioClick    = nullptr;
     QAudioOutput* m_audioCasino   = nullptr;
     QAudioOutput* m_audioShine    = nullptr;
-    QMediaPlayer* m_soundPlay     = nullptr;
-    QMediaPlayer* m_soundPass     = nullptr;
-    QMediaPlayer* m_soundPick     = nullptr;
     QMediaPlayer* m_soundClick    = nullptr;
-    QMediaPlayer* m_soundDeal     = nullptr;
     QMediaPlayer* m_soundWrong    = nullptr;
     QMediaPlayer* m_soundSuccess  = nullptr;
     QMediaPlayer* m_soundFailure  = nullptr;

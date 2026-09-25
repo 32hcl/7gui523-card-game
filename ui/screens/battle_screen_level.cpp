@@ -13,7 +13,7 @@ namespace {
 
 void BattleScreen::handleLevelModeEnd(const LevelResult& lr)
 {
-    m_gameOver = true;
+    m_phase = GamePhase::GameOver;
     disableActionButtons();
 
     bool playerDead = m_campaign.isGameOver();
@@ -187,7 +187,7 @@ void BattleScreen::handleLevelModeEnd(const LevelResult& lr)
         int ret = dlg.exec();
         if (ret == QDialog::Accepted) {
             m_currentLevel++;
-            m_gameOver = false;
+            m_phase = GamePhase::DealAnimation;
             onNewGameButtonClicked();
         } else {
             returnToMenu();
@@ -214,7 +214,7 @@ void BattleScreen::handleLevelModeEnd(const LevelResult& lr)
 
         int ret = dlg.exec();
         if (ret == QDialog::Accepted) {
-            m_gameOver = false;
+            m_phase = GamePhase::DealAnimation;
             onNewGameButtonClicked();
         } else {
             returnToMenu();

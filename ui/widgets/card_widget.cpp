@@ -1,6 +1,7 @@
 #include "card_widget.h"
 #include <QPainter>
 #include <QPen>
+#include <QImage>
 #include <QFontMetrics>
 #include <QPropertyAnimation>
 #include <QCoreApplication>
@@ -130,10 +131,34 @@ void CardWidget::loadPixmap() {
     auto it = s_cache.constFind(fullPath);
     if (it != s_cache.constEnd()) {
         m_pixmap = it.value();
-    } else if (QFile::exists(fullPath)) {
-        m_pixmap = QPixmap(fullPath);
-        s_cache.insert(fullPath, m_pixmap);
+        return;
     }
+    if (!QFile::exists(fullPath)) return;
+
+    QImage img(fullPath);
+    if (img.isNull()) return;
+    img = img.convertToFormat(QImage::Format_ARGB32);
+
+    int minX = img.width(), minY = img.height(), maxX = -1, maxY = -1;
+    for (int y = 0; y < img.height(); ++y) {
+        const QRgb* row = reinterpret_cast<const QRgb*>(img.constScanLine(y));
+        for (int x = 0; x < img.width(); ++x) {
+            if (qAlpha(row[x]) > 16) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+
+    if (maxX >= 0) {
+        QImage trimmed = img.copy(minX, minY, maxX - minX + 1, maxY - minY + 1);
+        m_pixmap = QPixmap::fromImage(trimmed);
+    } else {
+        m_pixmap = QPixmap::fromImage(img);
+    }
+    s_cache.insert(fullPath, m_pixmap);
 }
 
 static const QPixmap& cardBackPixmap() {

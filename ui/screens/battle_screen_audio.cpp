@@ -31,6 +31,7 @@ void BattleScreen::initSounds()
 
 void BattleScreen::playSound(QMediaPlayer* player)
 {
+    if (m_stressPlaying) return;
     if (!player) return;
     if (player->source().isEmpty()) return;
     player->stop();

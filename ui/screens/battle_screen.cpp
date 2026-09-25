@@ -46,35 +46,10 @@ QString cardTypeToQString(CardType type) {
 }
 
 void sortHandSmart(std::vector<Card>& hand) {
-    std::map<std::string, int> countMap;
-    for (const Card& c : hand) countMap[c.point]++;
-
-    auto getRank = [&](const Card& c) -> int {
-        auto it = RANK_MAP.find(c.point);
-        return (it != RANK_MAP.end()) ? it->second : 0;
-    };
-
-    auto getTypePriority = [&](const Card& c) -> int {
-        int count = countMap[c.point];
-        if (c.point == "大鬼" || c.point == "小鬼") {
-            bool hasBig   = countMap.count("大鬼") > 0;
-            bool hasSmall = countMap.count("小鬼") > 0;
-            if (hasBig && hasSmall) return 100;
-            return 50;
-        }
-        if (count == 4) return 90;
-        if (count == 3) return 70;
-        if (count == 2) return 50;
-        return 30;
-    };
-
     std::sort(hand.begin(), hand.end(),
-        [&](const Card& a, const Card& b) {
-            int pa = getTypePriority(a);
-            int pb = getTypePriority(b);
-            if (pa != pb) return pa > pb;
-            int ra = getRank(a);
-            int rb = getRank(b);
+        [](const Card& a, const Card& b) {
+            int ra = RANK_MAP.at(a.point);
+            int rb = RANK_MAP.at(b.point);
             if (ra != rb) return ra > rb;
             return a.suit < b.suit;
         });
@@ -185,9 +160,9 @@ void BattleScreen::disableActionButtons()
 
 void BattleScreen::enableActionButtons()
 {
-    if (m_gameOver) return;
-    m_playButton->setEnabled(!m_waitingForAI && !m_playerA.hand.empty());
-    m_passButton->setEnabled(!m_waitingForAI && m_lastPlay.type != CardType::Invalid);
+    if (m_phase == GamePhase::GameOver) return;
+    m_playButton->setEnabled(m_phase == GamePhase::PlayerTurn && !m_playerA.hand.empty());
+    m_passButton->setEnabled(m_phase == GamePhase::PlayerTurn && m_lastPlay.type != CardType::Invalid);
 }
 
 void BattleScreen::appendLog(const QString& text)

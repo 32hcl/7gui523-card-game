@@ -23,7 +23,7 @@ void BattleScreen::playDealAnimation()
         emit dealAnimationFinished();
         return;
     }
-    m_dealAnimating = true;
+    m_phase = GamePhase::DealAnimation;
 
     // 1) 清空旧手牌 widget
     for (CardWidget* cw : m_playerACardWidgets) { cw->deleteLater(); }
@@ -276,46 +276,9 @@ void BattleScreen::shakeWidget(QWidget* widget)
     timer->start(30);
 }
 
-void BattleScreen::playDrawAnimationSimple(bool forPlayerA, const QPoint& targetPos)
-{
-    // 从对应牌堆位置开始动画（简化版：只用 QLabel 卡背，不重建手牌）
-    QWidget* deckSource = forPlayerA ? m_playerDeckWidget : m_bossDeckWidget;
-    if (!deckSource) return;
-
-    QPoint deckPos = deckSource->mapTo(this, QPoint(0, 0));
-    QPoint startPos(deckPos.x() + deckSource->width() / 2 - 48,
-                    deckPos.y() + deckSource->height() / 2 - 60);
-
-    const int cw = 96, ch = 120;
-    QWidget* flyingCard = new QLabel(this);
-    flyingCard->setFixedSize(cw, ch);
-    flyingCard->setAttribute(Qt::WA_TransparentForMouseEvents);
-
-    QString backPath = QCoreApplication::applicationDirPath() + "/cards/card_back.png";
-    static QPixmap cachedBack;
-    if (cachedBack.isNull())
-        cachedBack.load(backPath);
-    static_cast<QLabel*>(flyingCard)->setPixmap(cachedBack.scaled(cw, ch, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    static_cast<QLabel*>(flyingCard)->setScaledContents(true);
-
-    flyingCard->move(startPos);
-    flyingCard->show();
-    flyingCard->raise();
-
-    auto* posAnim = new QPropertyAnimation(flyingCard, "pos");
-    posAnim->setDuration(450);
-    posAnim->setEasingCurve(QEasingCurve::OutCubic);
-    posAnim->setStartValue(startPos);
-    posAnim->setEndValue(targetPos);
-    connect(posAnim, &QPropertyAnimation::finished, this, [flyingCard]() {
-        flyingCard->deleteLater();
-    });
-    posAnim->start(QAbstractAnimation::DeleteWhenStopped);
-}
-
 void BattleScreen::showSpecialVictoryEffect(const QString& winnerName, const QString& endMessage)
 {
-    m_gameOver = true;
+    m_phase = GamePhase::GameOver;
     disableActionButtons();
 
     QWidget* glow = new QWidget(this);

@@ -3,7 +3,9 @@
 #include <QFile>
 #include <QTextStream>
 #include <QCoreApplication>
+#include <QTimer>
 #include "ui/main/mainwindow.h"
+#include "ui/screens/battle_screen.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -35,6 +37,23 @@ int main(int argc, char* argv[])
 #endif
     QApplication app(argc, argv);
     app.setApplicationName("7鬼523斗地主变体");
+
+    if (argc >= 3 && QString(argv[1]) == "--stress-test") {
+        int n = QString(argv[2]).toInt();
+        if (n <= 0) n = 100;
+
+        BattleScreen* screen = new BattleScreen();
+        screen->show();
+
+        QTimer::singleShot(2000, screen, [screen, n]() {
+            screen->runAutoPlayTest(n);
+        });
+
+        QObject::connect(screen, &BattleScreen::autoPlayTestFinished,
+                         &app, &QApplication::quit);
+
+        return app.exec();
+    }
 
     MainWindow window;
     window.show();
