@@ -158,9 +158,14 @@ void BattleScreen::onPlayButtonClicked()
         m_lastPlay.type = CardType::Invalid;
         m_lastPlay.cards.clear();
         m_lastPlay.keyPoint.clear();
-        m_lastPlayerName.clear();
+    m_lastPlayerName.clear();
+    if (!m_isLevelMode || m_playerAIsFirst) {
         enableActionButtons();
-        return;
+    } else {
+        m_waitingForAI = true;
+        QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+    }
+    return;
     }
 
     m_waitingForAI = true;
@@ -254,19 +259,15 @@ void BattleScreen::onDifficultyButtonClicked()
     switch (m_aiLevel) {
         case AILevel::AI1_Simple:
             m_aiLevel = AILevel::AI2_Rule;
-            m_difficultyButton->setText("难度: 电脑2");
+            m_difficultyButton->setText("难度: 电脑2 骗子");
             break;
         case AILevel::AI2_Rule:
             m_aiLevel = AILevel::AI3_Tracker;
-            m_difficultyButton->setText("难度: 电脑3");
+            m_difficultyButton->setText("难度: 电脑3 急性子");
             break;
         case AILevel::AI3_Tracker:
-            m_aiLevel = AILevel::AI4_Expert;
-            m_difficultyButton->setText("难度: 电脑4");
-            break;
-        case AILevel::AI4_Expert:
             m_aiLevel = AILevel::AI1_Simple;
-            m_difficultyButton->setText("难度: 电脑1");
+            m_difficultyButton->setText("难度: 电脑1 傻子");
             break;
     }
     appendLog(QString("电脑难度切换为: %1").arg(m_difficultyButton->text()));
@@ -378,6 +379,10 @@ void BattleScreen::doAITurn()
             chosen = ai2_liar_choose(m_playerB, m_playerA, m_lastPlay,
                                      m_bossDeck, tableScore);
             break;
+        case 3:
+            chosen = ai1_idiot_choose(m_playerB, m_playerA, m_lastPlay,
+                                       m_bossDeck, tableScore);
+            break;
         default:
             if (m_levelAIEngine) {
                 m_levelAIEngine->setOpponentHand(m_playerA.hand);
@@ -390,8 +395,24 @@ void BattleScreen::doAITurn()
             break;
         }
     } else {
-        chosen = aiChoosePlay(
-            m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore, m_tracker);
+        switch (m_playerB.aiLevel) {
+            case AILevel::AI1_Simple:
+                chosen = ai1_idiot_choose(
+                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
+                break;
+            case AILevel::AI2_Rule:
+                chosen = ai2_liar_choose(
+                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
+                break;
+            case AILevel::AI3_Tracker:
+            case AILevel::AI4_Expert:
+            case AILevel::AI_Fair_Lv1:
+            case AILevel::AI_Fair_Lv2:
+            default:
+                chosen = ai1_idiot_choose(
+                    m_playerB, m_playerA, m_lastPlay, m_bossDeck, tableScore);
+                break;
+        }
     }
 
     if (chosen.empty()) {
@@ -405,7 +426,12 @@ void BattleScreen::doAITurn()
             m_lastPlay.cards.clear();
             m_lastPlay.keyPoint.clear();
             m_lastPlayerName.clear();
-            enableActionButtons();
+            if (!m_isLevelMode || m_playerAIsFirst) {
+                enableActionButtons();
+            } else {
+                m_waitingForAI = true;
+                QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+            }
             return;
         }
 
@@ -435,7 +461,12 @@ void BattleScreen::doAITurn()
     m_lastPlay.cards.clear();
     m_lastPlay.keyPoint.clear();
     m_lastPlayerName.clear();
-    enableActionButtons();
+    if (!m_isLevelMode || m_playerAIsFirst) {
+        enableActionButtons();
+    } else {
+        m_waitingForAI = true;
+        QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+    }
     updateUI(false);
     return;
 }
@@ -527,7 +558,12 @@ void BattleScreen::doAITurn()
         return;
     }
 
-    enableActionButtons();
+    if (!m_isLevelMode || m_playerAIsFirst) {
+        enableActionButtons();
+    } else {
+        m_waitingForAI = true;
+        QTimer::singleShot(700, this, &BattleScreen::doAITurn);
+    }
     updateUI();
 }
 
@@ -636,13 +672,13 @@ void BattleScreen::startNewGame()
             m_bossDeck.cards = drawRandom(bossCards, 27);
         }
 
-        if (m_currentLevel == 2) {
-            ai2_variant_deck(m_bossDeck.cards);
-        }
+        executeCheats(CheatWhen::BeforeDeal);
 
         dealCards(m_playerA, m_playerDeck, kMaxHandSize);
         sortHandSmart(m_playerA.hand);
         dealCards(m_playerB, m_bossDeck, kMaxHandSize);
+
+        executeCheats(CheatWhen::AfterDeal);
 
         appendLog(QString("玩家A 手牌: %1").arg(cardsToString(m_playerA.hand)));
         appendLog(QString("电脑 手牌: %1").arg(cardsToString(m_playerB.hand)));
@@ -951,7 +987,8 @@ void BattleScreen::endRound(Player& winner)
     m_lastPlay.cards.clear();
     m_lastPlay.keyPoint.clear();
     ++m_roundCount;
-    appendLog(QString("--- 回合 %1 结束 ---").arg(m_roundCount));
+executeCheats(CheatWhen::RoundStart);
+appendLog(QString("--- 回合 %1 结束 ---").arg(m_roundCount));
 
     playSound(m_soundShine);
 
@@ -1262,5 +1299,33 @@ void BattleScreen::showGameOverDialog(const QString& message)
     if (ret == QDialog::Accepted) {
         m_gameOver = false;
         onNewGameButtonClicked();
+    }
+}
+
+void BattleScreen::cheat_loadVariantDeck()
+{
+    ai2_variant_deck(m_bossDeck.cards);
+}
+
+void BattleScreen::cheat_forceFirstHand(bool playerAIsFirst)
+{
+    m_playerAIsFirst = playerAIsFirst;
+}
+
+void BattleScreen::cheat_setHandLimit(int /*limit*/)
+{
+}
+
+void BattleScreen::cheat_banCard(const std::string& /*point*/)
+{
+}
+
+void BattleScreen::executeCheats(CheatWhen when)
+{
+    const auto& table = getCheatTable();
+    auto it = table.find(m_currentLevel);
+    if (it == table.end()) return;
+    for (const auto& entry : it->second) {
+        if (entry.when == when) entry.action(this);
     }
 }

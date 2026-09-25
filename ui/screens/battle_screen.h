@@ -19,6 +19,7 @@
 #include "ai/engine/ai_levels.h"
 #include "core/tracker/cardtracker.h"
 #include "game/campaign.h"
+#include "ui/cheats/level_cheats.h"
 
 class CardWidget;
 class QMediaPlayer;
@@ -31,6 +32,12 @@ public:
 
     void setLevelMode(bool isLevelMode, int startLevel);
     void startNewGame();
+
+    // Cheat tools (called by cheat table lambdas)
+    void cheat_loadVariantDeck();
+    void cheat_forceFirstHand(bool playerAIsFirst);
+    void cheat_setHandLimit(int limit);
+    void cheat_banCard(const std::string& point);
 
 signals:
     void gameEnded();
@@ -99,6 +106,7 @@ private:
 
     // Level mode methods
     void handleLevelModeEnd(const LevelResult& lr);
+    void executeCheats(CheatWhen when);
     
     QString getLevelDisplayName(int level) const;
     void returnToMenu();
