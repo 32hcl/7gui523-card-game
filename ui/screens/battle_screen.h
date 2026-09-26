@@ -189,6 +189,7 @@ private:
     bool   m_opponentLastRound   = false;
     bool   m_pendingLevelRestart = false;
     bool   m_shaking             = false;
+    std::vector<QParallelAnimationGroup*> m_activeRefillGroups;
     bool   m_pendingSpecialVictory = false;
     QString m_lastPlayerName;
 
@@ -209,7 +210,6 @@ private:
     static constexpr int kAITurnDelayNormalMs = 500;
     static constexpr int kAITurnDelayStressMs = 0;
     static constexpr int kDealWaitStressMs    = 1500;
-    static constexpr int kRefillCheckStressMs = 800;
     int m_aiTurnDelayMs = kAITurnDelayNormalMs;
 
     std::vector<CardWidget*> m_playerACardWidgets;
