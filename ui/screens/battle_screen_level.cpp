@@ -84,12 +84,9 @@ void BattleScreen::handleLevelModeEnd(const LevelResult& lr)
     scoreInfo->setAlignment(Qt::AlignCenter);
     layout->addWidget(scoreInfo);
 
-    // --- HP 变化 ---
-    QString hpDeltaStr = QString("Boss 血量: %1 %2  |  玩家血量: %3 %4")
-        .arg(m_campaign.bossHp() - lr.bossHpDelta)
-        .arg(lr.bossHpDelta <= 0 ? QString("%1").arg(lr.bossHpDelta) : QString("+%1").arg(lr.bossHpDelta))
-        .arg(m_campaign.playerHp() - lr.playerHpDelta)
-        .arg(lr.playerHpDelta >= 0 ? QString("+%1").arg(lr.playerHpDelta) : QString("%1").arg(lr.playerHpDelta));
+    // --- HP 变化（已合并到血量行显示，此处仅保留逻辑副作用） ---
+    (void)(m_campaign.bossHp() - lr.bossHpDelta);
+    (void)(m_campaign.playerHp() - lr.playerHpDelta);
 
     auto* hpInfo = new QLabel(QString("血量: 玩家 %1/%2  |  Boss %3/%4")
         .arg(m_campaign.playerHp())

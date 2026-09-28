@@ -15,10 +15,10 @@ std::vector<Card> canonical(const std::vector<Card>& cards){std::vector<Card> ou
 std::vector<Card> materialize(const std::vector<Card>& action,const std::vector<Card>& hand){auto pool=hand;std::vector<Card> out;for(const auto& c:action){auto it=std::find_if(pool.begin(),pool.end(),[&](const Card& h){return h.point==c.point;});if(it==pool.end())throw std::logic_error("Unheld rank");out.push_back(*it);pool.erase(it);}return out;}
 std::string actionKey(const std::vector<Card>& a){std::array<int,15> n{};for(const auto& c:a)++n[index(c.point)];std::string key;for(int x:n)key+=static_cast<char>('0'+x);return key;}
 std::vector<std::vector<Card>> moves(const SearchState& s){std::vector<std::vector<Card>> out;std::set<std::string> seen;for(const auto& a:genLegalMoves(s))if(seen.insert(actionKey(a)).second)out.push_back(a);return out;}
-std::string publicKey(const SearchState& s){return actionKey(s.myHand)+":"+std::to_string(s.oppHand.size())+":"+std::to_string(s.deckCards.size())+":"+std::to_string(s.myScore)+":"+std::to_string(s.oppScore)+":"+std::to_string(s.tableScore)+":"+std::to_string(s.tableBonus)+":"+std::to_string(static_cast<int>(s.lastPlay.type))+s.lastPlay.keyPoint+":"+std::to_string(s.myTurn)+std::to_string(s.finalPhase)+std::to_string(s.firstEmpty);}
+std::string publicKey(const SearchState& s){return actionKey(s.myHand)+":"+std::to_string(s.oppHand.size())+":"+std::to_string(s.deckCards.size())+":"+std::to_string(s.myScore)+":"+std::to_string(s.oppScore)+":"+std::to_string(s.tableScore)+":"+std::to_string(s.tableBonus)+":"+std::to_string(static_cast<int>(s.lastPlay.type))+s.lastPlay.keyPoint+":"+std::to_string(s.myTurn)+std::to_string(s.myFinalPhase)+std::to_string(s.oppFinalPhase)+std::to_string(s.firstEmpty);}
 SearchState sampleWorld(const Observation& o,std::mt19937& rng){
  SearchState s;s.myHand=canonical(o.hand);s.myScore=o.myScore;s.oppScore=o.opponentScore;s.tableScore=o.tableScore;s.tableBonus=o.tableBonus;
- s.lastPlay=o.previous;s.lastPlay.cards=canonical(o.previous.cards);s.finalPhase=o.finalPhase;s.firstEmpty=o.firstEmpty;
+ s.lastPlay=o.previous;s.lastPlay.cards=canonical(o.previous.cards);s.myFinalPhase=s.oppFinalPhase=o.finalPhase;s.firstEmpty=o.firstEmpty;
  std::array<int,15> available{};for(int i=0;i<15;++i)available[i]=(i==12||i==13?1:4)-o.played[i];
  for(const auto& c:s.myHand)--available[index(c.point)];std::vector<Card> pool;
  for(int i=0;i<15;++i){if(available[i]<0)throw std::invalid_argument("Invalid public counts");for(int n=0;n<available[i];++n)pool.push_back(card(i));}

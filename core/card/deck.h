@@ -10,6 +10,8 @@ struct Player;
 // Deck 结构体
 struct Deck {
     std::vector<Card> cards;
+    int myRemaining = 0;
+    int oppRemaining = 0;
 };
 
 // 创建一副标准 54 张牌（含大鬼、小鬼）

@@ -63,7 +63,7 @@ void test_searchFinalSettlement() {
         for (int otherScore : {40, 50, 60}) {
             SearchState state;
             state.myTurn = myTurn;
-            state.finalPhase = true;
+            state.myFinalPhase = true;
             auto& finisher = myTurn ? state.myHand : state.oppHand;
             auto& other = myTurn ? state.oppHand : state.myHand;
             finisher = {{"5", "黑桃", 5}};

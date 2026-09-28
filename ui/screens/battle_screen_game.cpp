@@ -91,6 +91,7 @@ void BattleScreen::onDealAnimationFinished()
 void BattleScreen::startNewGame()
 {
     VariantRegistry::clear();
+    m_handDirty = true;
 
     for (auto* g : m_activeRefillGroups) {
         g->stop();
@@ -135,9 +136,11 @@ void BattleScreen::startNewGame()
     m_playerA.isHuman = true;
 
     if (m_isLevelMode) {
-        m_levelEngineConfig = buildAIEngineConfig(m_currentLevel);
-        m_levelAIEngine = std::make_unique<AIEngine>(m_levelEngineConfig);
-        m_levelAIEngine->setOpponentHand(m_playerA.hand);
+        if (m_currentLevel >= 3) {
+            m_levelEngineConfig = buildAIEngineConfig(m_currentLevel);
+            m_levelAIEngine = std::make_unique<AIEngine>(m_levelEngineConfig);
+            m_levelAIEngine->setOpponentHand(m_playerA.hand);
+        }
         m_playerB.aiLevel = AILevel::AI4_Expert;
         m_tracker.reset();
         m_roundCount = 1;

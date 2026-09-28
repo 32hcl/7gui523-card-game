@@ -61,7 +61,10 @@ std::vector<Card> searchBestPlaySampled(
 {
     SearchState state;
     state.myHand = me.hand;
-    state.finalPhase = deck.cards.empty();
+    state.myDeckRemaining = deck.myRemaining;
+    state.oppDeckRemaining = deck.oppRemaining;
+    state.myFinalPhase = (deck.myRemaining == 0);
+    state.oppFinalPhase = (deck.oppRemaining == 0);
     // Hidden hands and draw order are supplied only by sampled hypotheses.
     state.lastPlay = previous;
     state.myTurn = true;

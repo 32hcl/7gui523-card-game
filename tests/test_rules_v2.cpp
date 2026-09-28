@@ -8,17 +8,16 @@ void test_rulesV2() {
     assert(bomb.type == CardType::Bomb);
     auto single=parseCardType({five}); assert(calculatePressureBonus(single,single)==5);
     SearchState s; s.myHand={five}; s.oppHand={king}; s.lastPlay=single;
-    s.tableScore=5; s.tableBonus=10; s.finalPhase=true; s.oppScore=80;
+    s.tableScore=5; s.tableBonus=10; s.myFinalPhase=true; s.oppFinalPhase=true; s.oppScore=80;
     auto end=applyMove(s,{five}); assert(end.terminal && end.myScore==45 && end.winner==-1);
     // Deck exhaustion is only acted on at a boundary until finalPhase.
     s=SearchState{}; s.myHand={four}; s.oppHand={seven};
-    auto a=applyMove(s,{four}); assert(!a.terminal && a.firstEmpty==1);
-    auto b=applyMove(a,{seven}); assert(!b.terminal && b.firstEmpty==1);
-    auto c=applyMove(b,{}); assert(c.terminal && c.winner==0);
+    s.myDeckRemaining = 0; s.oppDeckRemaining = 0;
+    auto a=applyMove(s,{four}); assert(a.terminal && a.firstEmpty==1 && a.winner==0);
     // Opponent wins round and receives last cards first; empty loser finishes.
     s=SearchState{}; s.myHand={}; s.oppHand={seven}; s.myTurn=true;
     s.lastPlay=parseCardType({king}); s.tableScore=20; s.firstEmpty=1;
-    s.deckCards={five,king}; auto d=applyMove(s,{});
+    s.deckCards={five,king}; s.myDeckRemaining=0; s.oppDeckRemaining=2; auto d=applyMove(s,{});
     assert(d.terminal && d.oppScore==20 && d.myScore==25 && d.winner==1);
     // Holding Special523 does not finish, but playing it does.
     s=SearchState{}; s.myHand={{"7","",0},{"大鬼","",0},five,{"2","",0},{"3","",0}};

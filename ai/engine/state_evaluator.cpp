@@ -23,8 +23,12 @@ int SimpleStateEvaluator::evaluate(const GamePosition& state) const {
     }
     score += myHandValue - oppHandValue;
 
-    score += (5 - (int)my.size()) * 20;
-    score -= (5 - (int)opp.size()) * 20;
+    if (state.myFinalPhase) {
+        score += (5 - (int)my.size()) * 20;
+    }
+    if (state.oppFinalPhase) {
+        score -= (5 - (int)opp.size()) * 20;
+    }
 
     return score;
 }

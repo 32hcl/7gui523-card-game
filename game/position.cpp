@@ -12,8 +12,10 @@ void finish(GamePosition& s, bool me) {
     s.terminal = true;
     s.winner = s.myScore > s.oppScore ? 1 : s.myScore < s.oppScore ? -1 : 0;
 }
-void refill(std::vector<Card>& hand, std::vector<Card>& deck) {
-    while (hand.size() < 5 && !deck.empty()) { hand.push_back(deck.back()); deck.pop_back(); }
+void refill(std::vector<Card>& hand, std::vector<Card>& deck, int& remaining) {
+    while (hand.size() < 5 && !deck.empty() && remaining > 0) {
+        hand.push_back(deck.back()); deck.pop_back(); remaining--;
+    }
 }
 }
 GamePosition advancePosition(const GamePosition& s, const std::vector<Card>& move) {
@@ -27,14 +29,18 @@ GamePosition advancePosition(const GamePosition& s, const std::vector<Card>& mov
         const bool winnerMe = !n.myTurn;
         (winnerMe ? n.myScore : n.oppScore) += n.tableScore + n.tableBonus;
         n.tableScore = n.tableBonus = 0; n.lastPlay = CardTypeResult{};
-        // An empty deck is noticed at a round boundary; not in mid-round.
-        if (n.deckCards.empty()) n.finalPhase = true;
-        auto& winner = winnerMe ? n.myHand : n.oppHand;
-        auto& loser = winnerMe ? n.oppHand : n.myHand;
-        if (!n.finalPhase) { refill(winner,n.deckCards); refill(loser,n.deckCards); }
-        if (n.deckCards.empty() && (n.myHand.empty() || n.oppHand.empty())) {
-            bool finisherMe = n.myHand.empty();
-            if (n.myHand.empty() && n.oppHand.empty()) finisherMe = n.firstEmpty != -1;
+        if (n.myDeckRemaining == 0) n.myFinalPhase = true;
+        if (n.oppDeckRemaining == 0) n.oppFinalPhase = true;
+        auto& winnerHand = winnerMe ? n.myHand : n.oppHand;
+        auto& loserHand  = winnerMe ? n.oppHand : n.myHand;
+        int& winnerRemaining = winnerMe ? n.myDeckRemaining : n.oppDeckRemaining;
+        int& loserRemaining  = winnerMe ? n.oppDeckRemaining : n.myDeckRemaining;
+        if (!n.myFinalPhase) { refill(n.myHand, n.deckCards, n.myDeckRemaining); }
+        if (!n.oppFinalPhase) { refill(n.oppHand, n.deckCards, n.oppDeckRemaining); }
+        if (n.myHand.empty() && n.myDeckRemaining == 0) { finish(n, true); return n; }
+        if (n.oppHand.empty() && n.oppDeckRemaining == 0) { finish(n, false); return n; }
+        if (n.myHand.empty() && n.oppHand.empty() && n.myDeckRemaining == 0 && n.oppDeckRemaining == 0) {
+            bool finisherMe = n.firstEmpty != -1;
             finish(n, finisherMe); return n;
         }
         n.firstEmpty = 0; n.myTurn = winnerMe;
@@ -53,7 +59,10 @@ GamePosition advancePosition(const GamePosition& s, const std::vector<Card>& mov
     n.tableScore += calculateScore(move); n.lastPlay=parsed;
     if (hand.empty()) {
         if (!n.firstEmpty) n.firstEmpty=n.myTurn?1:-1;
-        if (n.finalPhase && n.deckCards.empty()) { finish(n,n.myTurn); return n; }
+        auto& playerRemaining = n.myTurn ? n.myDeckRemaining : n.oppDeckRemaining;
+        auto& playerPhase     = n.myTurn ? n.myFinalPhase : n.oppFinalPhase;
+        if (playerRemaining == 0) playerPhase = true;
+        if (playerPhase && playerRemaining == 0) { finish(n, n.myTurn); return n; }
     }
     n.myTurn=!n.myTurn; return n;
 }

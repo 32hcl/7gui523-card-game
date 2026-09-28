@@ -37,8 +37,15 @@ target_include_directories(core_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 add_library(game_obj OBJECT ${GAME_SOURCES})
 target_include_directories(game_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
+file(GLOB_RECURSE AI_SOURCES "ai/*.cpp")
+list(FILTER AI_SOURCES EXCLUDE REGEX ".*/ai/cfr/.*")
 add_library(ai_obj OBJECT ${AI_SOURCES})
 target_include_directories(ai_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+file(GLOB_RECURSE CFR_SOURCES "ai/cfr/*.cpp")
+list(FILTER CFR_SOURCES EXCLUDE REGEX ".*/tests/.*")
+add_library(cfr_obj OBJECT ${CFR_SOURCES})
+target_include_directories(cfr_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(BUILD_GUI)
     add_executable(game
@@ -211,7 +218,7 @@ target_include_directories(acceptance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 add_executable(fair_benchmark $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/fair_benchmark.cpp)
 target_include_directories(fair_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(all_vs_all $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/all_vs_all.cpp)
+add_executable(all_vs_all $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> $<TARGET_OBJECTS:cfr_obj> tests/all_vs_all.cpp)
 target_include_directories(all_vs_all PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(debug_l6 $<TARGET_OBJECTS:core_obj> $<TARGET_OBJECTS:game_obj> $<TARGET_OBJECTS:ai_obj> tests/debug_l6.cpp)
@@ -230,3 +237,35 @@ add_executable(sim_campaign
     tests/sim_campaign.cpp
 )
 target_include_directories(sim_campaign PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(test_cfr
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
+    $<TARGET_OBJECTS:cfr_obj>
+    ai/cfr/tests/test_cfr.cpp
+)
+target_include_directories(test_cfr PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+if(MSVC)
+    target_compile_options(test_cfr PRIVATE /UNDEBUG)
+else()
+    target_compile_options(test_cfr PRIVATE -UNDEBUG)
+endif()
+
+add_executable(cfr_train
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
+    $<TARGET_OBJECTS:cfr_obj>
+    ai/cfr/tests/cfr_train_main.cpp
+)
+target_include_directories(cfr_train PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(cfr_battle
+    $<TARGET_OBJECTS:core_obj>
+    $<TARGET_OBJECTS:game_obj>
+    $<TARGET_OBJECTS:ai_obj>
+    $<TARGET_OBJECTS:cfr_obj>
+    ai/cfr/tests/cfr_battle.cpp
+)
+target_include_directories(cfr_battle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

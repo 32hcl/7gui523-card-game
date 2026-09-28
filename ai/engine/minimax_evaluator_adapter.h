@@ -16,8 +16,12 @@ static inline int evaluateLeafWithStateEvaluator(const GamePosition& state, cons
         for (const Card& c : my) myHandValue += c.score * 3;
         for (const Card& c : opp) oppHandValue += c.score * 3;
         score += myHandValue - oppHandValue;
-        score += (5 - (int)my.size()) * 20;
-        score -= (5 - (int)opp.size()) * 20;
+        if (state.myFinalPhase) {
+            score += (5 - (int)my.size()) * 20;
+        }
+        if (state.oppFinalPhase) {
+            score -= (5 - (int)opp.size()) * 20;
+        }
         return score;
     }
     return evaluator->evaluate(state);

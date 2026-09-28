@@ -87,7 +87,10 @@ std::vector<Card> MinimaxSearcher::search(const Player& player,
     state.myHand = player.hand;
     state.oppHand = opponent.hand;
     state.deckCards = deck.cards;
-    state.finalPhase = deck.cards.empty();
+    state.myFinalPhase = (deck.myRemaining == 0);
+    state.oppFinalPhase = (deck.oppRemaining == 0);
+    state.myDeckRemaining = deck.myRemaining;
+    state.oppDeckRemaining = deck.oppRemaining;
     state.lastPlay = previous;
     state.myTurn = true;
     state.tableScore = tableScore;

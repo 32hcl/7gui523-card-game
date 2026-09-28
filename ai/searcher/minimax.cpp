@@ -78,8 +78,12 @@ static int evaluateLeaf(const SearchState& state, const SearchParams& p) {
     }
     score += myHandValue - oppHandValue;
 
-    score += (5 - (int)my.size()) * p.handSizeWeight;
-    score -= (5 - (int)opp.size()) * p.handSizeWeight;
+    if (state.myFinalPhase) {
+        score += (5 - (int)my.size()) * p.handSizeWeight;
+    }
+    if (state.oppFinalPhase) {
+        score -= (5 - (int)opp.size()) * p.handSizeWeight;
+    }
 
     return score;
 }
@@ -136,7 +140,10 @@ std::vector<Card> searchBestPlayCheat(
     state.myHand = me.hand;
     state.oppHand = opp.hand;
     state.deckCards = deck.cards;
-    state.finalPhase = deck.cards.empty();
+    state.myFinalPhase = (deck.myRemaining == 0);
+    state.oppFinalPhase = (deck.oppRemaining == 0);
+    state.myDeckRemaining = deck.myRemaining;
+    state.oppDeckRemaining = deck.oppRemaining;
     state.lastPlay = previous;
     state.myTurn = true;
     state.tableScore = tableScore;

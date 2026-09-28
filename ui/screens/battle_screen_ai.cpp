@@ -202,9 +202,6 @@ std::vector<Card> BattleScreen::dispatchAI(Player& self, Player& opp, Deck& self
         if (m_currentLevel == 2) {
             return ai2_liar_choose(self, opp, m_lastPlay, selfDeck, tableScore);
         }
-        if (m_currentLevel == 3) {
-            return ai1_idiot_choose(self, opp, m_lastPlay, selfDeck, tableScore);
-        }
         if (m_levelAIEngine) {
             m_levelAIEngine->setOpponentHand(opp.hand);
             return m_levelAIEngine->choosePlay(self, opp, m_lastPlay, selfDeck, tableScore);
