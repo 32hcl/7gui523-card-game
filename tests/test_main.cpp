@@ -1,4 +1,3 @@
-void test_fairAI();
 #include <iostream>
 #include <cassert>
 
@@ -25,7 +24,6 @@ void test_campaignGameOver();
 void test_sampledWorldConservation();
 void test_searchFinalSettlement();
 void test_searchTerminalUtility();
-void test_rulesV2();
 void test_trackerDualSide();
 void test_variantRegistry();
 
@@ -113,8 +111,6 @@ int main()
     TEST(sampledWorldConservation);
     TEST(searchFinalSettlement);
     TEST(searchTerminalUtility);
-    TEST(rulesV2);
-    TEST(fairAI);
 
     GROUP("tracker: dual side")
     TEST(trackerDualSide);

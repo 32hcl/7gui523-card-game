@@ -2,6 +2,7 @@
 #include "core/rule/score.h"
 #include "core/card/cardtype.h"
 #include "ai/ai.h"
+#include "ai/plugins/cardtracker.h"
 #include "core/rule/special.h"
 #include "game/event.h"
 #include <iostream>

@@ -8,9 +8,9 @@
 #include "core/card/cardtype.h"
 #include "core/card/deck.h"
 #include "evaluator.h"
-#include "searcher.h"
-#include "sampler.h"
-#include "tracker.h"
+#include "../plugins/searcher.h"
+#include "../plugins/sampler.h"
+#include "../plugins/tracker.h"
 #include "policy.h"
 #include "state_evaluator.h"
 

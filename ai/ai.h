@@ -5,13 +5,8 @@
 #include "core/player.h"
 #include "core/card/cardtype.h"
 #include "core/card/deck.h"
-#include "core/tracker/cardtracker.h"
+#include "plugins/cardtracker.h"
 #include "ai_types.h"
-
-struct AIParams;
-extern AIParams g_ai4Params;
-void setAI4Params(const AIParams& p);
-AIParams getAI4Params();
 
 struct DecisionBreakdown {
     int base = 0;
@@ -66,15 +61,3 @@ int evaluatePlayWithBreakdown(const std::vector<Card>& play,
                               int tableScore,
                               const CardTracker* tracker,
                               DecisionBreakdown* out);
-
-std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,
-                                            const Player& opponent,
-                                            const CardTypeResult& previous,
-                                            const Deck& deck,
-                                            int tableScore,
-                                            const CardTracker& tracker,
-                                            DecisionBreakdown* outBd);
-// Fair levels require an explicit public observation and persistent engine.
-class FairEngine;
-struct Observation;
-std::vector<Card> aiChooseFairPlay(FairEngine&, const Observation&, AILevel);

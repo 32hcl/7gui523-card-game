@@ -3,7 +3,7 @@
 #include "ui/dialogs/card_picker.h"
 #include "ui/router/screen_router.h"
 #include "ai/ai.h"
-#include "ai/engine/ai_levels.h"
+#include "ai/ai_levels.h"
 #include "core/card/cardtype.h"
 #include "core/rule/score.h"
 #include "core/rule/special.h"
@@ -143,7 +143,7 @@ void BattleScreen::setLevelMode(bool isLevelMode, int startLevel)
 
 QString BattleScreen::getLevelDisplayName(int level) const
 {
-    return QString::fromLatin1(getAILevelName(level));
+    return QString::fromLatin1(getBossName(level));
 }
 
 void BattleScreen::onReturnMenuClicked()

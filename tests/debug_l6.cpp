@@ -7,9 +7,9 @@
 #include "core/card/cardtype.h"
 #include "core/rule/score.h"
 #include "core/rule/special.h"
-#include "core/tracker/cardtracker.h"
+#include "ai/plugins/cardtracker.h"
 #include "ai/engine/ai_engine.h"
-#include "ai/engine/ai_levels.h"
+#include "ai/ai_levels.h"
 
 int main() {
     int seed = 109;

@@ -1,7 +1,7 @@
-#include "ai/searcher/minimax.h"
-#include "ai/searcher/sample_search.h"
-#include "ai/sampler/uniform_sampler.h"
-#include "ai/sampler/bayesian_sampler.h"
+#include "ai/plugins/minimax.h"
+#include "ai/plugins/sample_search.h"
+#include "ai/plugins/uniform_sampler.h"
+#include "ai/plugins/bayesian_sampler.h"
 #include <cassert>
 #include <climits>
 #include <map>

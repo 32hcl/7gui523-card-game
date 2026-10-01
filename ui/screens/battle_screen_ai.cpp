@@ -3,8 +3,9 @@
 #include "ai/ai.h"
 #include "ai/players/ai1_idiot.h"
 #include "ai/players/ai2_liar.h"
-#include "ai/engine/ai_levels.h"
+#include "ai/ai_levels.h"
 #include "core/card/cardtype.h"
+#include "core/card/rank.h"
 #include "core/rule/score.h"
 #include "core/rule/special.h"
 #include <QDebug>
@@ -87,6 +88,32 @@ void BattleScreen::doAITurn()
 
     std::vector<Card> chosen = dispatchAI(*self, *opp, *selfDeck);
 
+    // Boss特殊能力：Pass前尝试非压制性出牌
+    if (chosen.empty() && m_isLevelMode && m_lastPlay.type != CardType::Invalid &&
+        m_lastPlayerName != selfName) {
+        // 不识数 (level 6): 50%概率挑任意单张强行出
+        if (m_currentLevel == 6 && m_lastPlay.type == CardType::Single &&
+            QRandomGenerator::global()->bounded(2) == 0) {
+            auto sorted = self->hand;
+            std::sort(sorted.begin(), sorted.end(), [](const Card& a, const Card& b) {
+                return getCardRank(a.point) < getCardRank(b.point);
+            });
+            chosen = {sorted[0]};
+            appendLog(QString("不识数：牌型一致，蒙混过关！（电脑）"));
+        }
+        // 赖账鬼 (level 5): 上家单张<J时，Boss出同花色单张
+        if (m_currentLevel == 5 && m_lastPlay.type == CardType::Single &&
+            !m_lastPlay.cards.empty() &&
+            getCardRank(m_lastPlay.cards[0].point) < getCardRank("J")) {
+            auto it = std::find_if(self->hand.begin(), self->hand.end(),
+                [&](const Card& c) { return c.suit == m_lastPlay.cards[0].suit; });
+            if (it != self->hand.end()) {
+                chosen = {*it};
+                appendLog(QString("赖账鬼：同花色单张压！（电脑）"));
+            }
+        }
+    }
+
     if (chosen.empty()) {
         appendLog(selfName + " 不要");
 
@@ -166,6 +193,13 @@ void BattleScreen::doAITurn()
         playSound(m_soundCasino);
     } else {
         playSound(m_soundCorrect);
+    }
+
+    if (m_isLevelMode && m_currentLevel == 4) {
+        int dogDamage = (int)chosen.size() * 3;
+        m_campaign.applyRoundDamage(0, dogDamage);
+        showHpDamageFloat(dogDamage, false);
+        appendLog(QString("疯狗造成 %1 点伤害！（出牌 %2 张 × 3）").arg(dogDamage).arg((int)chosen.size()));
     }
 
     updateUI();

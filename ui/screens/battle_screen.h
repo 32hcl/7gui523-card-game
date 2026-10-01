@@ -19,8 +19,8 @@ class QParallelAnimationGroup;
 #include "core/player.h"
 #include "core/card/deck.h"
 #include "ai/engine/ai_engine.h"
-#include "ai/engine/ai_levels.h"
-#include "core/tracker/cardtracker.h"
+#include "ai/ai_levels.h"
+#include "ai/plugins/cardtracker.h"
 #include "game/campaign.h"
 #include "ui/cheats/level_cheats.h"
 

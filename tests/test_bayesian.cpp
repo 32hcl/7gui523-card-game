@@ -1,4 +1,4 @@
-#include "ai/sampler/bayesian_sampler.h"
+#include "ai/plugins/bayesian_sampler.h"
 #include "core/card/deck.h"
 #include "core/player.h"
 #include <iostream>

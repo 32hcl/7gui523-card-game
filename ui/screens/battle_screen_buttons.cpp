@@ -33,8 +33,16 @@ void BattleScreen::onPlayButtonClicked()
         return;
     }
 
-    if (m_lastPlay.type != CardType::Invalid && !canBeat(result, m_lastPlay)) {
+    bool canPass = canBeat(result, m_lastPlay);
+
+    if (m_lastPlay.type != CardType::Invalid && !canPass) {
         QMessageBox::warning(this, "无法压过", "你选的牌无法压过上一手");
+        playSound(m_soundWrong);
+        return;
+    }
+
+    if (m_isLevelMode && m_currentLevel == 5 && result.keyPoint == m_lastPlay.keyPoint) {
+        QMessageBox::warning(this, "无法压过", "赖账鬼不让你用一样的点数压！");
         playSound(m_soundWrong);
         return;
     }
@@ -192,15 +200,15 @@ void BattleScreen::onDifficultyButtonClicked()
     switch (m_aiLevel) {
         case AILevel::AI1_Simple:
             m_aiLevel = AILevel::AI2_Rule;
-            m_difficultyButton->setText("难度: 电脑2 骗子");
+            m_difficultyButton->setText("难度: 贪心");
             break;
         case AILevel::AI2_Rule:
-            m_aiLevel = AILevel::AI3_Tracker;
-            m_difficultyButton->setText("难度: 电脑3 急性子");
+            m_aiLevel = AILevel::AI4_Expert;
+            m_difficultyButton->setText("难度: 搜索");
             break;
-        case AILevel::AI3_Tracker:
+        case AILevel::AI4_Expert:
             m_aiLevel = AILevel::AI1_Simple;
-            m_difficultyButton->setText("难度: 电脑1 傻子");
+            m_difficultyButton->setText("难度: 保守");
             break;
     }
     appendLog(QString("电脑难度切换为: %1").arg(m_difficultyButton->text()));

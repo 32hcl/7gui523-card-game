@@ -108,6 +108,10 @@ CardTypeResult parseCardType(const std::vector<Card>& cards) {
             if (hasTriple(cards, triplePoint)) {
                 result.type = CardType::TripleWithOne;
                 result.keyPoint = triplePoint;
+                // 找带的单张的点数作为kicker
+                for (const auto& c : cards) {
+                    if (c.point != triplePoint) { result.kicker = c.point; break; }
+                }
             }
         }
     } else if (size >= 5) {
@@ -126,6 +130,7 @@ CardTypeResult parseCardType(const std::vector<Card>& cards) {
             if (hasTriple(cards, triplePoint) && hasPair(cards, pairPoint, triplePoint)) {
                 result.type = CardType::TripleWithTwo;
                 result.keyPoint = triplePoint;
+                result.kicker = pairPoint;  // 带的对子的点数
             }
         }
     }
@@ -157,7 +162,19 @@ bool canBeat(const CardTypeResult& candidate, const CardTypeResult& previous) {
     if (previous.type == CardType::Bomb) return false;
 
     if (candidate.type != previous.type) return false;
-    return getCardRank(candidate.keyPoint) >= getCardRank(previous.keyPoint);
+
+    // 基础比较：比keyPoint
+    int cmpKey = getCardRank(candidate.keyPoint) - getCardRank(previous.keyPoint);
+    if (cmpKey > 0) return true;
+    if (cmpKey < 0) return false;
+
+    // keyPoint相同：三带一 / 三带二 比带的牌（kicker）
+    if ((candidate.type == CardType::TripleWithOne || candidate.type == CardType::TripleWithTwo)
+        && !candidate.kicker.empty() && !previous.kicker.empty()) {
+        return getCardRank(candidate.kicker) >= getCardRank(previous.kicker);
+    }
+
+    return true;  // keyPoint相同且无kicker → 可压
 }
 
 int calculatePressureBonus(const CardTypeResult& candidate,

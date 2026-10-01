@@ -221,7 +221,7 @@ QWidget* BattleScreen::createBottomBar()
     m_playButton    = new QPushButton("出牌");
     m_passButton    = new QPushButton("不要");
     m_pickButton    = new QPushButton("选卡");
-    m_difficultyButton = new QPushButton("难度: 电脑1 傻子");
+    m_difficultyButton = new QPushButton("难度: 电脑1 新手");
     m_newGameButton = new QPushButton("重新开始");
 
     m_playButton->setMinimumHeight(34);

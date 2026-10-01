@@ -1,25 +1,18 @@
 {
   "configurations": [
     {
-      "name": "Qt-MinGW",
+      "name": "w64devkit",
       "includePath": [
-        "${workspaceFolder}/**",
-        "D:/app/qt-c++/6.11.2/mingw_64/include/**",
-        "D:/app/qt-c++/6.11.2/mingw_64/include/QtCore",
-        "D:/app/qt-c++/6.11.2/mingw_64/include/QtGui",
-        "D:/app/qt-c++/6.11.2/mingw_64/include/QtWidgets",
-        "D:/app/qt-c++/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include",
-        "D:/app/qt-c++/Tools/mingw1310_64/include",
-        "D:/app/qt-c++/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++"
+        "D:/code/c++/.vscode/7gui523",
+        "D:/code/w64devkit/lib/gcc/i686-w64-mingw32/16.2.0/include/c++",
+        "D:/code/w64devkit/lib/gcc/i686-w64-mingw32/16.2.0/include/c++/i686-w64-mingw32",
+        "D:/code/w64devkit/lib/gcc/i686-w64-mingw32/16.2.0/include/c++/backward",
+        "D:/code/w64devkit/lib/gcc/i686-w64-mingw32/16.2.0/include",
+        "D:/code/w64devkit/lib/gcc/i686-w64-mingw32/16.2.0/include-fixed",
+        "D:/code/w64devkit/include"
       ],
-      "defines": [
-        "UNICODE",
-        "_UNICODE",
-        "QT_WIDGETS_LIB",
-        "QT_GUI_LIB",
-        "QT_CORE_LIB"
-      ],
-      "compilerPath": "D:/app/qt-c++/Tools/mingw1310_64/bin/g++.exe",
+      "defines": [],
+      "compilerPath": "D:/code/w64devkit/bin/g++.exe",
       "cStandard": "c17",
       "cppStandard": "c++17",
       "intelliSenseMode": "windows-gcc-x64"

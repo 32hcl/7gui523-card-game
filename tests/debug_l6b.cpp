@@ -6,7 +6,7 @@
 #include "core/player.h"
 #include "core/card/deck.h"
 #include "ai/engine/ai_engine.h"
-#include "ai/engine/ai_levels.h"
+#include "ai/ai_levels.h"
 
 int main() {
     for (int depth = 6; depth >= 1; depth--) {

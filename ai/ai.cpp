@@ -1,11 +1,9 @@
 #include "ai_types.h"
 #include "core/card/rank.h"
 #include "ai.h"
-#include "fair_engine.h"
 #include "engine/play_selector.h"
-#include "engine/counter_risk.h"
-#include <stdexcept>
-#include "searcher/minimax.h"
+#include "plugins/counter_risk.h"
+#include "plugins/minimax.h"
 #include "core/card/cardtype.h"
 #include "core/player.h"
 #include <sstream>
@@ -15,9 +13,7 @@
 #include <set>
 #include <climits>
 
-AIParams g_ai4Params;
-void setAI4Params(const AIParams& p) { g_ai4Params = p; }
-AIParams getAI4Params() { return g_ai4Params; }
+
 
 std::vector<std::vector<Card>> enumerateLegalPlays(const Player& player) {
     std::vector<std::vector<Card>> result;
@@ -155,96 +151,6 @@ static int playGain(const std::vector<Card>& play,
     return gain;
 }
 
-static int playGainAI4(const std::vector<Card>& play,
-                       const Player& player,
-                       const Player& opponent,
-                       const Deck& deck,
-                       const CardTypeResult& previous,
-                       int tableScore,
-                       const CardTracker* tracker) {
-    const AIParams& P = g_ai4Params;
-    int gain = 0;
-    gain += tableScore * P.tableScoreWeight;
-    gain += (int)play.size() * P.cardCountWeight;
-    if (play.size() == player.hand.size()) gain += P.finishBonus;
-
-    for (const Card& c : play) {
-        int rank = getCardRank(c.point);
-        if (rank >= 13) gain -= P.earlyBigPenalty;
-        else if (rank >= 10) gain -= P.earlyMidPenalty;
-        else gain -= rank;
-    }
-
-    for (const Card& c : play) {
-        if (c.score > 0 && tableScore == 0) gain -= P.midScorePenalty;
-    }
-
-    if (tableScore >= P.stealThreshold) {
-        for (const Card& c : play) {
-            if (c.score > 0) gain += c.score * P.stealMultiplier;
-        }
-    } else {
-        for (const Card& c : play) {
-            if (c.score > 0) gain -= tableScore * P.noConfidencePenalty;
-        }
-    }
-
-    if (tracker) {
-        for (const Card& c : play) {
-            if (tracker->isExhausted(c.point)) gain += P.deckTopBonus;
-        }
-    }
-
-    {
-        const std::set<std::string> specialPoints = {"7", "大鬼", "小鬼", "5", "2", "3"};
-        int handSpecialCount = 0;
-        for (const Card& c : player.hand)
-            if (specialPoints.count(c.point)) handSpecialCount++;
-        if (handSpecialCount >= 3) {
-            for (const Card& c : play) {
-                if (specialPoints.count(c.point))
-                    gain -= P.specialKeepBonus;
-            }
-        }
-    }
-
-    {
-        std::set<std::string> deduped;
-        for (const Card& c : play) {
-            if (deduped.count(c.point)) continue;
-            deduped.insert(c.point);
-            int inHand = 0;
-            for (const Card& h : player.hand)
-                if (h.point == c.point) inHand++;
-            int inPlay = 0;
-            for (const Card& pc : play)
-                if (pc.point == c.point) inPlay++;
-            if (inHand >= 2 && inPlay == 1)
-                gain -= P.splitPairPenalty;
-        }
-    }
-
-    {
-        auto parsed = parseCardType(play);
-        if (parsed.type == CardType::Bomb) gain -= P.bombKeepPenalty;
-        else if (parsed.type == CardType::Rocket) gain -= P.rocketKeepPenalty;
-    }
-
-    if ((int)opponent.hand.size() <= 2) {
-        auto parsed = parseCardType(play);
-        if (parsed.type == CardType::Bomb) gain += P.endgameBombBonus;
-        else if (parsed.type == CardType::Rocket) gain += P.endgameRocketBonus;
-    }
-
-    if (tracker) {
-        auto parsedRisk = parseCardType(play);
-        int risk = estimateCounterRisk(play, player, opponent, tracker, parsedRisk, tableScore, deck);
-        gain -= risk * kCounterRiskWeight;
-    }
-
-    return gain;
-}
-
 int evaluatePlayWithBreakdown(const std::vector<Card>& play,
                               const Player& player,
                               const Player& opponent,
@@ -349,45 +255,6 @@ std::vector<Card> aiChoosePlayAI4(const Player& player,
     return searchBestPlayCheat(player, opponent, previous, deck, tableScore, g_searchBestPlayCheatDepth);
 }
 
-std::vector<Card> aiChoosePlayWithBreakdown(const Player& player,
-                                            const Player& opponent,
-                                            const CardTypeResult& previous,
-                                            const Deck& deck,
-                                            int tableScore,
-                                            const CardTracker& tracker,
-                                            DecisionBreakdown* outBd) {
-    if (player.aiLevel == AILevel::AI1_Simple) {
-        if (outBd) *outBd = DecisionBreakdown{};
-        return aiChoosePlayAI1(player, previous);
-    }
-
-    auto allPlays = enumerateLegalPlays(player);
-    if (allPlays.empty()) return {};
-
-    auto finish = tryFinishPlay(player, allPlays, previous);
-    if (!finish.empty()) { if (outBd) *outBd = DecisionBreakdown{}; return finish; }
-
-    auto intercept = tryEndgameIntercept(player, allPlays, previous, (int)opponent.hand.size());
-    if (!intercept.empty()) { if (outBd) *outBd = DecisionBreakdown{}; return intercept; }
-
-    const CardTracker* trackerPtr = (player.aiLevel == AILevel::AI3_Tracker) ? &tracker : nullptr;
-    std::vector<Card> best;
-    int bestGain = INT_MIN;
-    DecisionBreakdown bestBd;
-    for (const auto& play : allPlays) {
-        auto parsed = parseCardType(play);
-        if (!previous.cards.empty() && !canBeat(parsed, previous)) continue;
-        DecisionBreakdown bd;
-        int gain = evaluatePlayWithBreakdown(play, player, opponent, deck, previous, tableScore, trackerPtr, &bd);
-        if (gain > bestGain) { bestGain = gain; best = play; bestBd = bd; }
-    }
-    if (!best.empty()) {
-        if (outBd) *outBd = bestBd;
-        return best;
-    }
-    return {};
-}
-
 int g_searchBestPlayCheatDepth = 6;
 
 std::vector<Card> aiChoosePlay(const Player& player,
@@ -404,15 +271,9 @@ std::vector<Card> aiChoosePlay(const Player& player,
         case AILevel::AI2_Rule:
             play = aiChoosePlayAI2(player, opponent, previous, deck, tableScore);
             break;
-        case AILevel::AI3_Tracker:
-            play = aiChoosePlayAI3(player, opponent, previous, deck, tableScore, tracker);
-            break;
         case AILevel::AI4_Expert:
             play = aiChoosePlayAI4(player, opponent, previous, deck, tableScore, tracker);
             break;
-        case AILevel::AI_Fair_Lv1:
-        case AILevel::AI_Fair_Lv2:
-            throw std::invalid_argument("Use aiChooseFairPlay with public Observation");
         default:
             play = aiChoosePlayAI1(player, previous);
             break;
@@ -467,8 +328,4 @@ std::vector<Card> humanChoosePlay(const Player& player, const CardTypeResult& pr
         return {};
     }
     return chosen;
-}
-std::vector<Card> aiChooseFairPlay(FairEngine& engine,const Observation& obs,AILevel level){
- if(level!=AILevel::AI_Fair_Lv1&&level!=AILevel::AI_Fair_Lv2)throw std::invalid_argument("Not a fair level");
- return engine.choosePlay(obs,level==AILevel::AI_Fair_Lv1?1:2);
 }

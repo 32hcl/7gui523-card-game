@@ -6,7 +6,7 @@
 #include "core/card/deck.h"
 #include "core/player.h"
 #include "ai/engine/ai_engine.h"
-#include "ai/engine/ai_levels.h"
+#include "ai/ai_levels.h"
 
 int main() {
     Deck deck;

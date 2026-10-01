@@ -1,6 +1,6 @@
 #include "evaluator.h"
 #include "core/card/rank.h"
-#include "counter_risk.h"
+#include "../plugins/counter_risk.h"
 #include <set>
 
 int SimpleEvaluator::evaluate(const std::vector<Card>& play,

@@ -62,6 +62,7 @@ void test_parseCardType()
         });
         assert(r.type == CardType::TripleWithOne);
         assert(r.keyPoint == "7");
+        assert(r.kicker == "3");
     }
 
     {
@@ -71,6 +72,7 @@ void test_parseCardType()
         });
         assert(r.type == CardType::TripleWithTwo);
         assert(r.keyPoint == "7");
+        assert(r.kicker == "5");
     }
 
     {
@@ -259,5 +261,63 @@ void test_canBeat()
         });
         assert(canBeat(special, bomb5));
         assert(!canBeat(bomb5, special));
+    }
+
+    // 三带一 kicker比较：555 A 压 555 K（A=9 > K=8）
+    {
+        auto tripleWithOne_555K = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"),
+            makeCard("K")
+        });
+        auto tripleWithOne_555A = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"),
+            makeCard("A")
+        });
+        assert(tripleWithOne_555K.kicker == "K");
+        assert(tripleWithOne_555A.kicker == "A");
+        assert(canBeat(tripleWithOne_555A, tripleWithOne_555K));  // 555A 压 555K
+        assert(!canBeat(tripleWithOne_555K, tripleWithOne_555A)); // 555K 不能压 555A
+    }
+
+    // 三带一：三条不同直接比三条（2 rank=11 > 3 rank=10）
+    {
+        auto tripleWithOne_222A = parseCardType({
+            makeCard("2"), makeCard("2"), makeCard("2"),
+            makeCard("A")
+        });
+        auto tripleWithOne_333K = parseCardType({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("K")
+        });
+        assert(canBeat(tripleWithOne_222A, tripleWithOne_333K));  // 222 > 333
+    }
+
+    // 三带一：三条相同kicker相同 → 可压
+    {
+        auto t1 = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("4")
+        });
+        auto t2 = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("4")
+        });
+        assert(canBeat(t1, t2));  // 完全相同可压
+    }
+
+    // 三带二 kicker比较：888 A 压 888 K（A=9 > K=8）
+    {
+        auto tripleWithTwo_888K = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("K"), makeCard("K")
+        });
+        auto tripleWithTwo_888A = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("A"), makeCard("A")
+        });
+        assert(tripleWithTwo_888K.kicker == "K");
+        assert(tripleWithTwo_888A.kicker == "A");
+        assert(canBeat(tripleWithTwo_888A, tripleWithTwo_888K));  // 888A 压 888K
+        assert(!canBeat(tripleWithTwo_888K, tripleWithTwo_888A)); // 888K 不能压 888A
     }
 }

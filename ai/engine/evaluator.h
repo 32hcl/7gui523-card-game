@@ -5,7 +5,7 @@
 #include "core/player.h"
 #include "core/card/cardtype.h"
 #include "core/card/deck.h"
-#include "core/tracker/cardtracker.h"
+#include "../plugins/cardtracker.h"
 #include "ai/ai_types.h"
 
 class Evaluator {

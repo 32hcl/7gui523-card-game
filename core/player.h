@@ -9,12 +9,9 @@ constexpr int kMaxHandSize = 5;
 struct Deck;
 
 enum class AILevel {
-    AI1_Simple,
-    AI2_Rule,
-    AI3_Tracker,
-    AI4_Expert,
-    AI_Fair_Lv1,
-    AI_Fair_Lv2
+    AI1_Simple,  // 保守
+    AI2_Rule,    // 贪心
+    AI4_Expert   // 搜索
 };
 
 struct Player {

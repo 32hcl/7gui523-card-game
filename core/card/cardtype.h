@@ -8,6 +8,7 @@
 struct CardTypeResult {
     CardType type = CardType::Invalid;
     std::string keyPoint;
+    std::string kicker;       // 三带一/三带二的带的牌点数（用于同三条比大小）
     std::vector<Card> cards;
     int bonusScore = 0;
     int count = 0;

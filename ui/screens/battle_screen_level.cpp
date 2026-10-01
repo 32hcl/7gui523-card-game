@@ -1,5 +1,5 @@
 #include "battle_screen.h"
-#include "ai/engine/ai_levels.h"
+#include "ai/ai_levels.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>

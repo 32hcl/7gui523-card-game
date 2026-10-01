@@ -1,6 +1,6 @@
 #include "ai_engine.h"
 #include "play_selector.h"
-#include "particle_sampler.h"
+#include "../plugins/particle_sampler.h"
 #include "ai/ai.h"
 #include <utility>
 

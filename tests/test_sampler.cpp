@@ -1,11 +1,11 @@
-#include "ai/sampler/uniform_sampler.h"
-#include "ai/searcher/sample_search.h"
-#include "ai/searcher/minimax.h"
-#include "ai/searcher/search_params.h"
-#include "ai/searcher/search_state.h"
+#include "ai/plugins/uniform_sampler.h"
+#include "ai/plugins/sample_search.h"
+#include "ai/plugins/minimax.h"
+#include "ai/plugins/search_params.h"
+#include "ai/plugins/search_state.h"
 #include "core/card/deck.h"
 #include "core/player.h"
-#include "core/tracker/cardtracker.h"
+#include "ai/plugins/cardtracker.h"
 #include <iostream>
 #include <fstream>
 #include <chrono>

@@ -1,4 +1,4 @@
-#include "core/tracker/cardtracker.h"
+#include "ai/plugins/cardtracker.h"
 #include "core/card/card.h"
 #include <iostream>
 #include <cassert>

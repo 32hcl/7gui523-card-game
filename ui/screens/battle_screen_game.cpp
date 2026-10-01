@@ -4,7 +4,7 @@
 #include <map>
 #include <QRandomGenerator>
 #include "core/variant/variant_registry.h"
-#include "ai/engine/ai_levels.h"
+#include "ai/ai_levels.h"
 #include "core/card/cardtype.h"
 #include "ai/players/ai2_liar.h"
 #include "core/rule/score.h"
