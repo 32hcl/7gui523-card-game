@@ -1,0 +1,24 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Qt6 MinGW",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-mingw64",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "D:/app/qt-c++/6.11.2/mingw_64",
+        "CMAKE_CXX_COMPILER": "D:/app/qt-c++/Tools/mingw1310_64/bin/g++.exe"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "default",
+      "displayName": "Qt6 MinGW Debug",
+      "binaryDir": "${sourceDir}/build-mingw64-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ]
+}

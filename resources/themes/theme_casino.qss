@@ -1,0 +1,764 @@
+/* ============================================================
+   七鬼523 · 国潮赌场风 主题样式
+   Theme: Casino Chinese Style
+   ============================================================ */
+
+/* ---------- 颜色变量说明 ----------
+   背景色:
+     --bg-deep:    #0a0608   最深背景
+     --bg-page:    #1a0f0a   页面背景
+     --bg-panel:   #2a1a14   面板背景
+     --bg-card:    #3a2418   卡片背景
+
+   金色系:
+     --gold-light:  #fff3a0  亮金
+     --gold:        #ffd700  金色
+     --gold-dark:   #b8860b  暗金
+     --gold-deep:   #8b6508  深金
+
+   红色系:
+     --red-light:   #e63946  亮红
+     --red:         #c41e3a  朱红
+     --red-dark:    #7f1d1d  深红
+     --red-deep:    #450a0a  酒红
+
+   赌桌绿:
+     --green-light: #1a8f42  亮绿
+     --green:       #0d5c2a  赌桌绿
+     --green-dark:  #0a2915  深绿
+
+   筹码色:
+     --chip-red:    #e63946  红筹码 1
+     --chip-blue:   #3b82f6  蓝筹码 5
+     --chip-green:  #22c55e  绿筹码 10
+     --chip-black:  #1f2937  黑筹码 50
+
+   文字色:
+     --text-primary:   #fff8e7  主文字
+     --text-secondary: #c9b896  次文字
+     --text-muted:     #8b7355  辅助文字
+*/
+
+/* ============================================================
+   全局基础
+   ============================================================ */
+
+* {
+    font-family: "Microsoft YaHei", "PingFang SC", "SimHei", sans-serif;
+}
+
+QWidget {
+    color: #fff8e7;
+    background-color: #1a0f0a;
+}
+
+QLabel {
+    color: #fff8e7;
+    background-color: transparent;
+}
+
+/* ============================================================
+   主窗口 / 根背景
+   ============================================================ */
+
+QMainWindow {
+    background-color: #0a0608;
+}
+
+#centralWidget,
+QStackedWidget {
+    background-color: #0a0608;
+    border: none;
+}
+
+/* ============================================================
+   按钮 - 通用赌场风格
+   ============================================================ */
+
+QPushButton {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #e63946, stop:0.5 #c41e3a, stop:1 #9b1521);
+    color: #fff8e7;
+    border: 2px solid #ffd700;
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: bold;
+    min-width: 72px;
+    min-height: 36px;
+}
+
+QPushButton:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f04a57, stop:0.5 #d6273f, stop:1 #a81824);
+    border: 2px solid #ffe66d;
+}
+
+QPushButton:pressed {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #9b1521, stop:0.5 #7f1d1d, stop:1 #5c0e14);
+    border: 2px solid #b8860b;
+    padding-top: 10px;
+    padding-bottom: 6px;
+}
+
+QPushButton:disabled {
+    background-color: #3a2418;
+    color: #8b7355;
+    border: 2px solid #5a4030;
+}
+
+/* 次级按钮（暗底金边） */
+QPushButton[casinoStyle="secondary"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #3c1e14, stop:1 #1e0f0a);
+    color: #ffe66d;
+    border: 2px solid rgba(255,215,0,0.5);
+}
+
+QPushButton[casinoStyle="secondary"]:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #502819, stop:1 #28150d);
+    border: 2px solid #ffd700;
+}
+
+/* 金色按钮（商店/特殊） */
+QPushButton[casinoStyle="gold"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #ffd700, stop:0.5 #daa520, stop:1 #b8860b);
+    color: #1a0f0a;
+    border: 2px solid #fff3a0;
+}
+
+QPushButton[casinoStyle="gold"]:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #ffe66d, stop:0.5 #ffd700, stop:1 #daa520);
+}
+
+/* ============================================================
+   面板 / 卡片容器
+   ============================================================ */
+
+QFrame[casinoStyle="panel"] {
+    background-color: rgba(42, 26, 20, 0.9);
+    border: 1px solid rgba(255,215,0,0.25);
+    border-radius: 12px;
+}
+
+QFrame[casinoStyle="panel-gold"] {
+    background-color: rgba(42, 26, 20, 0.95);
+    border: 2px solid;
+    border-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #8b6508, stop:0.5 #ffd700, stop:1 #8b6508);
+    border-radius: 12px;
+}
+
+/* ============================================================
+   标题文字
+   ============================================================ */
+
+QLabel[casinoStyle="title-gold"] {
+    color: #ffd700;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+QLabel[casinoStyle="title-big"] {
+    color: #ffd700;
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: 3px;
+}
+
+QLabel[casinoStyle="subtitle"] {
+    color: #c9b896;
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+
+QLabel[casinoStyle="muted"] {
+    color: #8b7355;
+    font-size: 12px;
+}
+
+/* ============================================================
+   分数 / 数值 标签
+   ============================================================ */
+
+QLabel[casinoStyle="score"] {
+    color: #ffd700;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QLabel[casinoStyle="hp-good"] {
+    color: #22c55e;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+QLabel[casinoStyle="hp-bad"] {
+    color: #e63946;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+QLabel[casinoStyle="chip"] {
+    color: #ffe66d;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* ============================================================
+   文本编辑 / 日志区
+   ============================================================ */
+
+QTextEdit,
+QPlainTextEdit {
+    background-color: #120a08;
+    color: #c9b896;
+    border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 13px;
+}
+
+QTextEdit:focus,
+QPlainTextEdit:focus {
+    border: 1px solid rgba(255,215,0,0.4);
+}
+
+/* ============================================================
+   滚动条
+   ============================================================ */
+
+QScrollBar:vertical {
+    background-color: transparent;
+    width: 8px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: rgba(255,215,0,0.25);
+    border-radius: 4px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: rgba(255,215,0,0.45);
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QScrollBar:horizontal {
+    background-color: transparent;
+    height: 8px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: rgba(255,215,0,0.25);
+    border-radius: 4px;
+    min-width: 30px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: rgba(255,215,0,0.45);
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* ============================================================
+   菜单 / 弹出框
+   ============================================================ */
+
+QMenu {
+    background-color: #1a0f0a;
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 8px 24px;
+    border-radius: 6px;
+    color: #c9b896;
+}
+
+QMenu::item:selected {
+    background-color: rgba(255,215,0,0.15);
+    color: #ffe66d;
+}
+
+QMenu::separator {
+    height: 1px;
+    background-color: rgba(255,215,0,0.15);
+    margin: 4px 8px;
+}
+
+/* ============================================================
+   对话框
+   ============================================================ */
+
+QDialog {
+    background-color: #1a0f0a;
+    border: 2px solid #8b6508;
+    border-radius: 12px;
+}
+
+/* ============================================================
+   进度条 / HP条
+   ============================================================ */
+
+QProgressBar {
+    background-color: #120a08;
+    border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 6px;
+    text-align: center;
+    color: transparent;
+    height: 12px;
+}
+
+QProgressBar::chunk {
+    border-radius: 5px;
+}
+
+QProgressBar[casinoStyle="hp-player"]::chunk {
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #15803d, stop:1 #22c55e);
+}
+
+QProgressBar[casinoStyle="hp-boss"]::chunk {
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #7f1d1d, stop:1 #e63946);
+}
+
+/* ============================================================
+   分隔线
+   ============================================================ */
+
+QFrame[casinoStyle="h-line"] {
+    background-color: transparent;
+    border: none;
+    border-top: 1px solid rgba(255,215,0,0.2);
+    max-height: 1px;
+}
+
+QFrame[casinoStyle="v-line"] {
+    background-color: transparent;
+    border: none;
+    border-left: 1px solid rgba(255,215,0,0.2);
+    max-width: 1px;
+}
+
+/* ============================================================
+   工具提示
+   ============================================================ */
+
+QToolTip {
+    background-color: #2a1a14;
+    color: #fff8e7;
+    border: 1px solid #ffd700;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+/* ============================================================
+   组合框 / 下拉框
+   ============================================================ */
+
+QComboBox {
+    background-color: #2a1a14;
+    color: #fff8e7;
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    min-height: 20px;
+}
+
+QComboBox:hover {
+    border: 1px solid rgba(255,215,0,0.5);
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #ffd700;
+    width: 0;
+    height: 0;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #1a0f0a;
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 8px;
+    color: #c9b896;
+    padding: 4px;
+    selection-background-color: rgba(255,215,0,0.15);
+    selection-color: #ffe66d;
+    outline: 0;
+}
+
+/* ============================================================
+   复选框 / 单选框
+   ============================================================ */
+
+QCheckBox,
+QRadioButton {
+    color: #c9b896;
+    font-size: 13px;
+    spacing: 8px;
+}
+
+QCheckBox::indicator,
+QRadioButton::indicator {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,215,0,0.4);
+    border-radius: 4px;
+    background-color: #1a0f0a;
+}
+
+QRadioButton::indicator {
+    border-radius: 9px;
+}
+
+QCheckBox::indicator:hover,
+QRadioButton::indicator:hover {
+    border: 2px solid #ffd700;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #ffd700;
+    border: 2px solid #ffd700;
+    image: none;
+}
+
+QRadioButton::indicator:checked {
+    background-color: #ffd700;
+    border: 2px solid #ffd700;
+}
+
+/* ============================================================
+   滑块
+   ============================================================ */
+
+QSlider::groove:horizontal {
+    height: 6px;
+    background: #2a1a14;
+    border-radius: 3px;
+}
+
+QSlider::sub-page:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #b8860b, stop:1 #ffd700);
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    background: #ffd700;
+    border: 2px solid #fff3a0;
+    width: 16px;
+    height: 16px;
+    margin: -6px 0;
+    border-radius: 9px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #ffe66d;
+    border: 2px solid #ffffff;
+}
+
+/* ============================================================
+   输入框
+   ============================================================ */
+
+QLineEdit {
+    background-color: #120a08;
+    color: #fff8e7;
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    selection-background-color: rgba(255,215,0,0.3);
+}
+
+QLineEdit:focus {
+    border: 1px solid #ffd700;
+}
+
+QLineEdit:disabled {
+    color: #8b7355;
+    border-color: #3a2418;
+}
+
+/* ============================================================
+   旋转框 / 数字调节
+   ============================================================ */
+
+QSpinBox,
+QDoubleSpinBox {
+    background-color: #120a08;
+    color: #fff8e7;
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 13px;
+    min-height: 24px;
+}
+
+QSpinBox:hover,
+QDoubleSpinBox:hover {
+    border: 1px solid rgba(255,215,0,0.5);
+}
+
+QSpinBox::up-button,
+QSpinBox::down-button,
+QDoubleSpinBox::up-button,
+QDoubleSpinBox::down-button {
+    width: 20px;
+    border: none;
+    background-color: transparent;
+}
+
+QSpinBox::up-arrow,
+QDoubleSpinBox::up-arrow {
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 6px solid #ffd700;
+    width: 0;
+    height: 0;
+}
+
+QSpinBox::down-arrow,
+QDoubleSpinBox::down-arrow {
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #ffd700;
+    width: 0;
+    height: 0;
+}
+
+/* ============================================================
+   标签页 / Tab
+   ============================================================ */
+
+QTabWidget::pane {
+    border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 8px;
+    background-color: #1a0f0a;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background-color: #2a1a14;
+    color: #8b7355;
+    border: 1px solid rgba(255,215,0,0.15);
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: bold;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #1a0f0a;
+    color: #ffd700;
+    border: 1px solid rgba(255,215,0,0.3);
+    border-bottom: 1px solid #1a0f0a;
+}
+
+QTabBar::tab:hover:!selected {
+    color: #c9b896;
+    background-color: #3a2418;
+}
+
+/* ============================================================
+   状态栏
+   ============================================================ */
+
+QStatusBar {
+    background-color: #120a08;
+    color: #8b7355;
+    border-top: 1px solid rgba(255,215,0,0.15);
+    font-size: 12px;
+}
+
+QStatusBar::item {
+    border: none;
+}
+
+/* ============================================================
+   列表 / 表格
+   ============================================================ */
+
+QListWidget,
+QTreeWidget,
+QTableWidget {
+    background-color: #120a08;
+    color: #c9b896;
+    border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 8px;
+    padding: 4px;
+    gridline-color: rgba(255,215,0,0.08);
+}
+
+QListWidget::item,
+QTreeWidget::item,
+QTableWidget::item {
+    padding: 6px;
+    border-radius: 4px;
+}
+
+QListWidget::item:selected,
+QTreeWidget::item:selected,
+QTableWidget::item:selected {
+    background-color: rgba(255,215,0,0.15);
+    color: #ffe66d;
+}
+
+QHeaderView::section {
+    background-color: #2a1a14;
+    color: #ffd700;
+    border: none;
+    border-bottom: 1px solid rgba(255,215,0,0.2);
+    padding: 8px;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+/* ============================================================
+   MainMenu 专用
+   ============================================================ */
+
+#MainMenuScreen {
+    background-color: #0a0608;
+}
+
+QLabel[menuStyle="gameTitle"] {
+    color: #ffd700;
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: 4px;
+}
+
+QLabel[menuStyle="gameSubtitle"] {
+    color: #c9b896;
+    font-size: 16px;
+    letter-spacing: 2px;
+}
+
+QPushButton[menuStyle="primary"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #e63946, stop:0.5 #c41e3a, stop:1 #9b1521);
+    color: #fff8e7;
+    border: 2px solid #ffd700;
+    border-radius: 14px;
+    padding: 16px 40px;
+    font-size: 20px;
+    font-weight: bold;
+    min-width: 280px;
+    letter-spacing: 2px;
+}
+
+QPushButton[menuStyle="primary"]:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f04a57, stop:0.5 #d6273f, stop:1 #a81824);
+    border: 2px solid #ffe66d;
+}
+
+QPushButton[menuStyle="secondary"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #3c1e14, stop:1 #1e0f0a);
+    color: #ffe66d;
+    border: 2px solid rgba(255,215,0,0.5);
+    border-radius: 14px;
+    padding: 14px 40px;
+    font-size: 18px;
+    font-weight: bold;
+    min-width: 280px;
+    letter-spacing: 2px;
+}
+
+QPushButton[menuStyle="secondary"]:hover {
+    border: 2px solid #ffd700;
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #502819, stop:1 #28150d);
+}
+
+/* ============================================================
+   BattleScreen 专用
+   ============================================================ */
+
+#BattleScreen {
+    background-color: #0a0608;
+}
+
+/* 顶部信息栏 */
+QFrame[battleStyle="topBar"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(42,20,10,0.95), stop:1 rgba(26,15,10,0.9));
+    border-bottom: 1px solid rgba(255,215,0,0.2);
+}
+
+/* 赌桌区域 */
+QFrame[battleStyle="table"] {
+    background-color: qradialgradient(cx:0.5, cy:0.5, radius:0.6, fx:0.5, fy:0.5,
+        stop:0 rgba(26,143,66,0.5), stop:0.5 rgba(13,92,42,0.4), stop:1 rgba(10,41,21,0.3));
+    border: 3px solid;
+    border-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #8b6508, stop:0.5 #ffd700, stop:1 #8b6508);
+    border-radius: 14px;
+}
+
+/* 手牌区 */
+QFrame[battleStyle="handArea"] {
+    background-color: rgba(42, 20, 10, 0.6);
+    border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 10px;
+}
+
+QFrame[battleStyle="handArea-player"] {
+    background-color: rgba(42, 20, 10, 0.7);
+    border: 1px solid rgba(255,215,0,0.35);
+    border-radius: 10px;
+}
+
+QFrame[battleStyle="handArea-opponent"] {
+    background-color: rgba(42, 15, 20, 0.6);
+    border: 1px solid rgba(196,30,58,0.3);
+    border-radius: 10px;
+}
+
+/* 右侧面板 */
+QFrame[battleStyle="sidePanel"] {
+    background-color: rgba(26, 15, 10, 0.85);
+    border: 1px solid rgba(255,215,0,0.15);
+    border-radius: 10px;
+}
+
+/* ============================================================
+   结束
+   ============================================================ */

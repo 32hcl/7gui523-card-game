@@ -1,0 +1,11 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/themes">
+        <file>themes/theme_casino.qss</file>
+    </qresource>
+    <qresource prefix="/svg">
+        <file>svg/xiangyun_gold.svg</file>
+        <file>svg/corner_gold.svg</file>
+        <file>svg/lantern_red.svg</file>
+    </qresource>
+</RCC>

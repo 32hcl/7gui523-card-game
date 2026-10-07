@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60" viewBox="0 0 40 60">
+  <!-- 红灯笼 - 国潮风格 -->
+  <defs>
+    <radialGradient id="lanternGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#ff6b6b"/>
+      <stop offset="60%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#7f1d1d"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 顶部挂绳 -->
+  <line x1="20" y1="0" x2="20" y2="6" stroke="#ffd700" stroke-width="1.5"/>
+
+  <!-- 顶部金色盖子 -->
+  <rect x="12" y="6" width="16" height="5" rx="1" fill="#b8860b"/>
+  <rect x="14" y="7" width="12" height="2" fill="#ffd700" opacity="0.5"/>
+
+  <!-- 灯笼主体 -->
+  <ellipse cx="20" cy="30" rx="16" ry="20" fill="url(#lanternGrad)"/>
+
+  <!-- 灯笼竖向纹理 -->
+  <path d="M20 10 Q14 30 20 50" stroke="#7f1d1d" stroke-width="0.8" fill="none" opacity="0.5"/>
+  <path d="M20 10 Q26 30 20 50" stroke="#7f1d1d" stroke-width="0.8" fill="none" opacity="0.5"/>
+  <path d="M20 10 Q8 30 20 50" stroke="#7f1d1d" stroke-width="0.5" fill="none" opacity="0.3"/>
+  <path d="M20 10 Q32 30 20 50" stroke="#7f1d1d" stroke-width="0.5" fill="none" opacity="0.3"/>
+
+  <!-- 金色"福"字位置（简化为菱形） -->
+  <rect x="16" y="26" width="8" height="8" transform="rotate(45 20 30)" fill="#ffd700" opacity="0.8"/>
+
+  <!-- 底部金色底座 -->
+  <rect x="12" y="49" width="16" height="5" rx="1" fill="#b8860b"/>
+
+  <!-- 底部流苏 -->
+  <line x1="20" y1="54" x2="20" y2="60" stroke="#ffd700" stroke-width="1.5"/>
+  <line x1="16" y1="54" x2="15" y2="59" stroke="#ffd700" stroke-width="1" opacity="0.7"/>
+  <line x1="24" y1="54" x2="25" y2="59" stroke="#ffd700" stroke-width="1" opacity="0.7"/>
+</svg>

@@ -1,0 +1,323 @@
+#include <cassert>
+#include "core/card/cardtype.h"
+
+static Card makeCard(const std::string& point, const std::string& suit = "")
+{
+    Card c;
+    c.point = point;
+    c.suit = suit;
+    if (point == "5")       c.score = 5;
+    else if (point == "10") c.score = 10;
+    else if (point == "K")  c.score = 20;
+    else                    c.score = 0;
+    return c;
+}
+
+void test_parseCardType()
+{
+    {
+        CardType type = parseCardType({makeCard("大鬼")}).type;
+        assert(type == CardType::Single);
+    }
+    {
+        CardType type = parseCardType({makeCard("K")}).type;
+        assert(type == CardType::Single);
+    }
+
+    {
+        CardType result = parseCardType({makeCard("5"), makeCard("5")}).type;
+        assert(result == CardType::Pair);
+    }
+    {
+        CardType result = parseCardType({makeCard("K"), makeCard("K")}).type;
+        assert(result == CardType::Pair);
+    }
+
+    {
+        CardType result = parseCardType({makeCard("5"), makeCard("6")}).type;
+        assert(result == CardType::Invalid);
+    }
+
+    {
+        CardType result = parseCardType({makeCard("大鬼"), makeCard("小鬼")}).type;
+        assert(result == CardType::Rocket);
+    }
+
+    {
+        CardType result = parseCardType({makeCard("大鬼"), makeCard("大鬼")}).type;
+        assert(result == CardType::Invalid);
+    }
+
+    {
+        CardType result = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7")
+        }).type;
+        assert(result == CardType::Triple);
+    }
+
+    {
+        auto r = parseCardType({
+            makeCard("7", "黑桃"), makeCard("7", "红桃"), makeCard("7", "梅花"),
+            makeCard("3")
+        });
+        assert(r.type == CardType::TripleWithOne);
+        assert(r.keyPoint == "7");
+        assert(r.kicker == "3");
+    }
+
+    {
+        auto r = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"),
+            makeCard("5"), makeCard("5")
+        });
+        assert(r.type == CardType::TripleWithTwo);
+        assert(r.keyPoint == "7");
+        assert(r.kicker == "5");
+    }
+
+    {
+        CardType t = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"),
+            makeCard("5"), makeCard("6")
+        }).type;
+        assert(t == CardType::Invalid);
+    }
+
+    {
+        CardType t = parseCardType({
+            makeCard("7"), makeCard("7"),
+            makeCard("5"), makeCard("5"),
+            makeCard("3")
+        }).type;
+        assert(t == CardType::Invalid);
+    }
+
+    {
+        CardType t = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"), makeCard("7"),
+            makeCard("3")
+        }).type;
+        assert(t == CardType::Invalid);
+    }
+
+    {
+        CardType t = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"), makeCard("7")
+        }).type;
+        assert(t == CardType::Bomb);
+    }
+
+    {
+        auto r = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"), makeCard("7")
+        });
+        assert(r.type == CardType::Bomb);
+        assert(r.count == 4);
+    }
+    {
+        auto r = parseFiveOfAKind({
+            makeCard("7"), makeCard("7"), makeCard("7"),
+            makeCard("7"), makeCard("7")
+        });
+        assert(r.type == CardType::FiveOfAKind);
+        assert(r.count == 5);
+    }
+    {
+        auto r = parseFiveOfAKind({
+            makeCard("7"), makeCard("7"), makeCard("7"),
+            makeCard("7"), makeCard("7"), makeCard("7")
+        });
+        assert(r.type == CardType::FiveOfAKind);
+        assert(r.count == 6);
+    }
+    {
+        auto r = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7")
+        });
+        assert(r.type == CardType::Triple);
+        assert(r.count == 0);
+    }
+
+    {
+        CardType t = parseCardType({makeCard("大鬼"), makeCard("小鬼")}).type;
+        assert(t == CardType::Rocket);
+    }
+}
+
+void test_canBeat()
+{
+    {
+        auto single7 = parseCardType({makeCard("7")});
+        auto single5 = parseCardType({makeCard("5")});
+        assert(canBeat(single7, single5));
+        assert(!canBeat(single5, single7));
+    }
+
+    {
+        auto prev = parseCardType({makeCard("7")});
+        assert(canBeat(prev, prev));
+    }
+
+    {
+        auto bigJoker  = parseCardType({makeCard("大鬼")});
+        auto smallJoker = parseCardType({makeCard("小鬼")});
+        assert(canBeat(bigJoker, smallJoker));
+        assert(!canBeat(smallJoker, bigJoker));
+    }
+
+    {
+        auto pair = parseCardType({makeCard("7"), makeCard("7")});
+        auto single5 = parseCardType({makeCard("5")});
+        assert(!canBeat(pair, single5));
+    }
+
+    {
+        auto bomb = parseCardType({
+            makeCard("4"), makeCard("4"), makeCard("4"), makeCard("4")
+        });
+        assert(canBeat(bomb, parseCardType({makeCard("7")})));
+        assert(canBeat(bomb, parseCardType({makeCard("7"), makeCard("7")})));
+        assert(canBeat(bomb, parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7")
+        })));
+    }
+
+    {
+        auto rocket = parseCardType({makeCard("大鬼"), makeCard("小鬼")});
+        auto bomb7 = parseCardType({
+            makeCard("7"), makeCard("7"), makeCard("7"), makeCard("7")
+        });
+        assert(canBeat(rocket, bomb7));
+        assert(!canBeat(bomb7, rocket));
+    }
+
+    {
+        auto rocket = parseCardType({makeCard("大鬼"), makeCard("小鬼")});
+        assert(!canBeat(rocket, rocket));
+    }
+
+    {
+        auto tripleWithTwo = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("4"), makeCard("4")
+        });
+        auto bomb = parseCardType({
+            makeCard("3"), makeCard("3"), makeCard("3"), makeCard("3")
+        });
+        assert(canBeat(bomb, tripleWithTwo));
+    }
+
+    {
+        auto bomb5 = parseFiveOfAKind({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("3"), makeCard("3")
+        });
+        auto rocket = parseCardType({makeCard("大鬼"), makeCard("小鬼")});
+        assert(canBeat(bomb5, rocket));
+        assert(!canBeat(rocket, bomb5));
+    }
+
+    {
+        auto bomb4x5 = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"), makeCard("5")
+        });
+        auto rocket = parseCardType({makeCard("大鬼"), makeCard("小鬼")});
+        assert(canBeat(rocket, bomb4x5));
+    }
+
+    {
+        auto bomb5x3 = parseFiveOfAKind({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("3"), makeCard("3")
+        });
+        auto bomb4x5 = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"), makeCard("5")
+        });
+        assert(canBeat(bomb5x3, bomb4x5));
+        assert(!canBeat(bomb4x5, bomb5x3));
+    }
+
+    {
+        auto bomb5x5 = parseFiveOfAKind({
+            makeCard("5"), makeCard("5"), makeCard("5"),
+            makeCard("5"), makeCard("5")
+        });
+        auto bomb5x3 = parseFiveOfAKind({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("3"), makeCard("3")
+        });
+        assert(canBeat(bomb5x5, bomb5x3));
+        assert(!canBeat(bomb5x3, bomb5x5));
+    }
+
+    {
+        auto special = parseCardType({
+            makeCard("7"), makeCard("大鬼"),
+            makeCard("5"), makeCard("2"), makeCard("3")
+        });
+        auto bomb5 = parseFiveOfAKind({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("3"), makeCard("3")
+        });
+        assert(canBeat(special, bomb5));
+        assert(!canBeat(bomb5, special));
+    }
+
+    // 三带一 kicker比较：555 A 压 555 K（A=9 > K=8）
+    {
+        auto tripleWithOne_555K = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"),
+            makeCard("K")
+        });
+        auto tripleWithOne_555A = parseCardType({
+            makeCard("5"), makeCard("5"), makeCard("5"),
+            makeCard("A")
+        });
+        assert(tripleWithOne_555K.kicker == "K");
+        assert(tripleWithOne_555A.kicker == "A");
+        assert(canBeat(tripleWithOne_555A, tripleWithOne_555K));  // 555A 压 555K
+        assert(!canBeat(tripleWithOne_555K, tripleWithOne_555A)); // 555K 不能压 555A
+    }
+
+    // 三带一：三条不同直接比三条（2 rank=11 > 3 rank=10）
+    {
+        auto tripleWithOne_222A = parseCardType({
+            makeCard("2"), makeCard("2"), makeCard("2"),
+            makeCard("A")
+        });
+        auto tripleWithOne_333K = parseCardType({
+            makeCard("3"), makeCard("3"), makeCard("3"),
+            makeCard("K")
+        });
+        assert(canBeat(tripleWithOne_222A, tripleWithOne_333K));  // 222 > 333
+    }
+
+    // 三带一：三条相同kicker相同 → 可压
+    {
+        auto t1 = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("4")
+        });
+        auto t2 = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("4")
+        });
+        assert(canBeat(t1, t2));  // 完全相同可压
+    }
+
+    // 三带二 kicker比较：888 A 压 888 K（A=9 > K=8）
+    {
+        auto tripleWithTwo_888K = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("K"), makeCard("K")
+        });
+        auto tripleWithTwo_888A = parseCardType({
+            makeCard("8"), makeCard("8"), makeCard("8"),
+            makeCard("A"), makeCard("A")
+        });
+        assert(tripleWithTwo_888K.kicker == "K");
+        assert(tripleWithTwo_888A.kicker == "A");
+        assert(canBeat(tripleWithTwo_888A, tripleWithTwo_888K));  // 888A 压 888K
+        assert(!canBeat(tripleWithTwo_888K, tripleWithTwo_888A)); // 888K 不能压 888A
+    }
+}

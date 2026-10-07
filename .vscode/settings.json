@@ -1,0 +1,7 @@
+{
+  "cmake.sourceDirectory": "D:/code/c++/.vscode/7gui523",
+  "cmake.cmakePath": "D:/app/qt-c++/Tools/CMake_64/bin/cmake.exe",
+  "cmake.configureArgs": [
+    "-DCMAKE_PREFIX_PATH=D:/app/qt-c++/6.11.2/mingw_64"
+  ]
+}
