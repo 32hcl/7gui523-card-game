@@ -49,21 +49,26 @@ d:\code\c++\.vscode\7gui523\build-mingw64\game.exe         # GUI 游戏（运行
 | **三带二** TripleWithTwo | 3张同点 + 2张任意 | 三条点数更大 |
 | **炸弹** Bomb | 4张同点 | 可压任何非炸弹牌型 |
 | **五同点** FiveOfAKind | 5张同点（换牌虫作弊产物） | 可压炸弹 |
-| **王炸** Rocket | 大鬼+小鬼 | 最大，可压一切 |
-| **Special523** | 7+鬼+5+2+3（五张全套） | 无敌牌型 |
+| **王炸** Rocket | 大鬼+小鬼 | 可压炸弹及以下 |
+| **7gui523** | 7+鬼+5+2+3（五张全套） | 无敌牌型，压一切 |
 
 ### 分值牌
-- **5**、**10**、**K** 为分值牌，每张计10分
+- **5**、**10**、**K** 为分值牌：**5 计5分**、**10 计10分**、**K 计20分**
 - 回合结束时，桌面上的分值牌归最后出牌方所有
 
 ### 特殊胜利
-打出 `7 + 鬼(大/小) + 5 + 2 + 3` 五张关键牌（牌型 Special523）时，**立即获胜**（必须打出，仅持有不生效）。
+打出 `7 + 鬼(大/小) + 5 + 2 + 3` 五张关键牌（牌型 7gui523）时，**立即获胜**（必须打出，仅持有不生效）。
 
 ### 牌堆机制（双牌堆模式）
 - 双方各有独立牌堆（27张），开局各摸5张
 - 每轮打完后从己方牌堆补至满手（最多5张）
 - 先把手牌+牌堆全部出完的一方获胜
 - 另一方手牌中分值牌归胜方
+
+### 关卡模式概览
+- 共 9 关，每关 Boss 拥有特殊能力（AI 强度递增、出牌限制、额外伤害等）
+- **第 9 关（赌场老板）为不可通关的最终挑战**：Boss 不掉 HP、禁止玩家打出 7gui523。玩家无法真正获胜，存活到终局即为挑战结束，显示"最终挑战结束"而非"全部通关"
+- 入园需花费 500 万金币购买筹码，一次入园可连续挑战至通关或战死
 
 ---
 
@@ -78,14 +83,18 @@ d:\code\c++\.vscode\7gui523\build-mingw64\game.exe         # GUI 游戏（运行
 | - | 疯狗 | 4 | 出牌数×3伤害 | 否 | 赌场打手 |
 | - | 赖账鬼 | 5 | 禁用同点压牌 + 同花单张压制 | 否 | 高利贷主 |
 | - | 不识数 | 6 | 50%牌型相同即可压 | 否 | 赌场荷官 |
-| - | 黑老大 | 7 | (预留) | - | 赌场头目 |
-| - | 千里眼 | 8 | (预留) | - | 赌场监察 |
-| - | 赌场老板 | 9 | (预留) | - | 幕后老板 |
+| - | 黑老大 | 7 | ai3_search (深度8) | 否 | 赌场头目 |
+| - | 千里眼 | 8 | ai4_search (深度可调) | 否 | 赌场监察 |
+| - | 赌场老板 | 9 | ai4_search + 不可通关 | 否 | 幕后老板 |
+
+> **⚠️ 第 9 关特殊规则**：不可通关的最终挑战。Boss 不掉 HP（无伤害结算）、禁止玩家打出 7gui523。玩家无法获胜，只能尽力存活更久。战役结束后无论胜负均显示"最终挑战结束"。
 
 ### Boss特殊能力（仅对Boss生效）
 - **疯狗**: Boss每出一张牌咬玩家3血(对子6血,三条9血…)，轮末结算扣玩家HP
 - **赖账鬼**: 玩家不能用相同点数压Boss的牌；上家单张<J时Boss可用同花色任意单张压（无视点数）
 - **不识数**: Boss Pass前50%概率强行出同牌型最小牌；压牌时50%概率牌型相同即可压
+
+**第 9 关（不可通关）**：Boss HP 不受伤害（无结算扣血）、禁止玩家打出 7gui523。玩家无法真正获胜，存活到终局即为挑战结束。Campaign::isVictory() 在此关永远为 false，改用 `isCampaignFinished()` 判定终局，结果显示"最终挑战结束"而非"全部通关"。
 
 ### 关卡HP机制
 - 玩家初始HP=140，上限210；Boss HP=110
@@ -129,7 +138,7 @@ AI3/AI4为 minimax 作弊搜索AI（searchBestPlayCheat，AI3深度8 / AI4默认
 | **CardTypeResult** | core/card/cardtype.h | type(牌型), keyPoint(主点数), kicker(带的牌), cards, count |
 | **Player** | core/player.h | name, hand(<=5张), totalScore, collected, isHuman, aiLevel |
 | **Deck** | core/card/deck.h | cards(牌堆), 洗牌/发牌/分牌 |
-| **RoundResult** | game/game.h | winnerName, tableCards, specialVictory, handEmptied |
+| **RoundResult** | game/game.h | winnerName, tableCards, playerSpecialVictory, bossSpecialVictory, handEmptied |
 | **GamePosition** | game/position.h | 双方手牌/牌堆/最后出牌/回合/分数(搜索用快照) |
 | **DecisionBreakdown** | ai/ai.h | 评分明细: base/scoreCard/special/endgame/comboBreak/defensive/tracker |
 | **AIParams** | ai/ai_types.h | 18个AI参数向量（评分权重） |
@@ -216,7 +225,7 @@ AI3/AI4为 minimax 作弊搜索AI（searchBestPlayCheat，AI3深度8 / AI4默认
 │   │   ├── battle_screen_anim.cpp    # 动画：flyCardsToTable/refillAnim/dealAnim
 │   │   ├── battle_screen_audio.cpp   # 音效：initSounds/playSound
 │   │   ├── battle_screen_ui.cpp      # UI重建+布局创建：顶栏/桌面/手牌区/右侧面板
-│   │   ├── main_menu_screen.h / .cpp # 主菜单：国潮赌场风（红灯笼+筹码+金边按钮）
+│   │   ├── main_menu_screen.h / .cpp # 主菜单：国潮赌场风（红灯笼+金币余额+金边按钮）
 │   │   └── level_select_screen.h / .cpp # 关卡选择：9层楼纵向排列+Boss卡片
 │   ├── widgets/
 │   │   ├── card_widget.h / .cpp      # 卡牌控件：渲染/翻转/高亮（国潮风无图模式）
@@ -224,7 +233,7 @@ AI3/AI4为 minimax 作弊搜索AI（searchBestPlayCheat，AI3深度8 / AI4默认
 │   │   ├── chip_widget.h / .cpp      # 筹码堆叠可视化组件（四色面额）
 │   │   ├── chip_badge.h / .cpp       # 筹码余额徽章（带数值+标签）
 │   │   ├── boss_avatar.h / .cpp      # Boss风格化头像（9关独特配色+符号）
-│   │   ├── play_effect_overlay.h / .cpp # 出牌特效层（炸弹/王炸/Special523）
+│   │   ├── play_effect_overlay.h / .cpp # 出牌特效层（炸弹/王炸/7gui523）
 │   │   └── dialogue_overlay.h / .cpp # 对话覆盖层（旁白+Boss气泡+打字机）
 │   ├── dialogs/
 │   │   ├── card_picker.h / .cpp      # 选牌对话框（换牌虫关卡使用）
@@ -344,7 +353,7 @@ Step B: 判定出牌结果
 │   └─ AI: 交换current/opponent → 回到Step A
 │   └─ UI: 弹窗提示 → 回到Step A
 │
-├─ 🏆 Special523:
+├─ 🏆 7gui523:
 │   └─ ➡️ 游戏结束！打出者直接获胜
 │
 └─ ✅ 合法出牌:
@@ -398,7 +407,7 @@ Step B: 判定出牌结果
 
 触发条件（任一满足）:
 ├─ 某方手牌+牌堆全部出完 → finishGame(该方)
-├─ 打出Special523 → 打出者直接获胜
+├─ 打出7gui523 → 打出者直接获胜
 └─ 双方牌堆都空 + 某回合结束 → finalSettlement(终局结算)
 
 终局结算规则:
@@ -443,7 +452,7 @@ Step B: 判定出牌结果
 ```
 玩家出牌后(onPlayButtonClicked)的流程:
 ├─ 1. 合法性+压牌判定
-├─ 2. Special523检查
+├─ 2. 7gui523检查
 ├─ 3. 移除手牌、更新UI
 ├─ 4. 检查: 玩家手牌空? + 玩家牌堆空? → finishGame() ✅ 结束
 ├─ 5. 检查: 玩家手牌空? + 玩家牌堆有? → refillToFive(玩家,玩家牌堆) 📦 只补自己
@@ -460,7 +469,7 @@ AI出牌后(doAITurn)的流程:
 │        ├─ settleScoreCards
 │        ├─ refillBoth(opp=赢家, self=输家)
 │        └─ startNextTurn()
-├─ 3. Special523检查 → 立即获胜
+├─ 3. 7gui523检查 → 立即获胜
 ├─ 4. 移除手牌、更新UI
 ├─ 5. 检查: AI手牌空? + AI牌堆空? → finishGame() ✅ 结束
 ├─ 6. ❌ 已移除: Boss 手牌空时不单独补牌，等回合结束统一 refillBoth
@@ -504,7 +513,7 @@ void BattleScreen::startNextTurn() {
 | **玩家无法出牌** | startNextTurn()未正确判断先手 | 基于m_playerWonLastRound决定先手 |
 | **补牌后牌数不对** | Boss回合内单独补牌 | Boss手牌空不等回合结束补，等统一refillBoth |
 | **分值结算错误** | 结算时机不对 | 仅Pass时settleScoreCards() |
-| **七鬼523集齐误判胜** | handleSpecialVictoryCheck检查手牌是否包含 | 已删除，只保留打出时判定 |
+| **七鬼523集齐误判胜** | handleSpecialVictoryCheck检查手牌是否包含 | 已删除，只保留打出时通过 parseCardType 判定；RoundResult 拆分为 playerSpecialVictory / bossSpecialVictory<br>★ `all_vs_all` / `ai_vs_ai` 出牌后立刻调用 parseCardType，不检查剩余手牌 |
 | **Boss炸弹对话后跳轮** | onDialogueFinished(BossSpecial)调用startNextTurn | 改为m_phase=PlayerTurn，回合还给玩家 |
 | **五同点被误杀** | parseCardType对5张同点返回Invalid，canBeat(Invalid)恒false | 统一用parseAnyCardType（标准解析失败回退parseFiveOfAKind），ai.cpp/ai_engine/position/minimax/UI校验全线替换 |
 | **AI3/AI4终局判断恒真** | UI/round路径从不维护Deck.myRemaining/oppRemaining（恒0），搜索模型认为双方牌堆已空 | doAITurn/round循环在调用aiChoosePlay前刷新 selfDeck->myRemaining、oppDeck->oppRemaining |
@@ -570,11 +579,11 @@ aiChoosePlay(player, opponent, previous, deck, tableScore, tracker)
 - [x] MainWindow启动时自动应用Casino主题
 
 ### 阶段二：核心界面重绘 ✅ 已完成
-- [x] **主菜单** — 红灯笼装饰 + 鸿运赌场名号 + 筹码徽章 + 金边渐变按钮
+- [x] **主菜单** — 红灯笼装饰 + 鸿运赌场名号 + 金币余额（💰，同步存档）+ 金边渐变按钮
 - [x] **战斗界面** — 绿色赌桌桌面(径向渐变+金边) + 深红金顶栏 + 手牌区金边边框 + 右侧面板赌场风
 - [x] **卡牌（无图模式）** — 象牙白渐变底色 + 金色边框 + 内层金边装饰
 - [x] "游戏日志" → "牌局记录" 命名赌场化
-- [ ] 关卡选择界面（当前无独立界面，直接进入关卡模式）
+- [x] 关卡选择界面（LevelSelectScreen，已实现；已入园玩家可通过 Alt+点击「闯关模式」进入选关，日常流程按序推进关卡）
 
 ### 阶段三：筹码系统融入 ✅ 已完成
 - [x] ChipWidget 筹码可视化组件（四色面额：黑50/绿10/蓝5/红1）
@@ -585,16 +594,15 @@ aiChoosePlay(player, opponent, previous, deck, tableScore, tracker)
 - [x] 结算对话框：筹码结算信息显示
 - [x] 关卡模式底部筹码余额实时显示
 - [x] Campaign::LevelResult 增加 chipsDelta / chipsAfter 字段
-- [ ] 主菜单筹码余额（待接入存档系统）
+- [x] 筹码不足时无法进入关卡的拦截（battle_screen_level 入口检查）
 - [ ] 筹码增减动画特效
-- [ ] 筹码不足时无法进入关卡的拦截
 
 ### 阶段四：细节与打磨 🎨 已完成
 - [x] **Boss头像组件** — BossAvatar 风格化圆形头像（每关独特配色+符号+光晕）
 - [x] **Boss区头像接入** — 战斗界面对手区左侧显示Boss头像+名称
 - [x] **炸弹特效** — 💥 橙红光晕+冲击波+震屏
 - [x] **王炸特效** — 👑 金紫渐变+多道冲击波+描边文字
-- [x] **Special523特效** — ✨ 七彩旋转光芒+彩虹文字
+- [x] **7gui523特效** — ✨ 七彩旋转光芒+彩虹文字
 - [x] **结算对话框重绘** — 国潮赌场风深红金渐变+金边卡片比分面板+VS布局
 - [x] **卡牌选中发光** — 8层金色外发光效果+高亮边框
 
@@ -602,21 +610,21 @@ aiChoosePlay(player, opponent, previous, deck, tableScore, tracker)
 - [x] **AudioManager音效管理器** — 单例模式，BGM循环+淡入淡出，SFX音效池，独立音量控制
 - [x] **AudioGenerator程序化生成** — 纯代码合成WAV文件（无需外部音频资源）
 - [x] **4首BGM** — 主菜单(爵士赌场风) / 战斗(小调紧张感) / 胜利(上升琶音) / 失败(下行音阶)
-- [x] **14个SFX音效** — 点击/出牌/Pass/炸弹/王炸/Special523/胜/负/筹码增/减/选中/取消/伤害/恢复
+- [x] **14个SFX音效** — 点击/出牌/Pass/炸弹/王炸/7gui523/胜/负/筹码增/减/选中/取消/伤害/恢复
 - [x] **战斗界面接入** — 开局BGM+出牌音效+炸弹/王炸音效+胜负BGM切换+返回停止
 - [x] **主菜单接入** — 主菜单BGM+按钮点击音效
 - [x] **首次启动自动生成** — 检测到audio目录为空时自动生成所有音效文件
 
 ### 阶段六：关卡选择 & Boss剧情 📖 已完成
 - [x] **9关Boss命名统一** — 以ai_levels.h中getBossName()为准：新手/换牌虫/急眼雀/疯狗/赖账鬼/不识数/黑老大/千里眼/赌场老板
-- [x] **对话引擎实装** — DialogueEngine单例，8种触发时机（战前/胜利/失败/首炸弹/首王炸/Special523/玩家Pass/BossPass）
+- [x] **对话引擎实装** — DialogueEngine单例，8种触发时机（战前/胜利/失败/首炸弹/首王炸/7gui523/玩家Pass/BossPass）
 - [x] **9关Boss完整剧情** — 每关战前4-5句+胜利/失败对话，贯穿「鸿运赌场」主线叙事
 - [x] **关卡选择界面** — LevelSelectScreen 9层楼纵向排列，Boss头像+称号+简介+入场/奖励筹码
 - [x] **DialogueOverlay对话覆盖层** — 旁白模式（居中黑底）+ Boss对话模式（头像+气泡）+ 打字机效果 + 点击继续
 - [x] **战前对话** — 关卡开局先播Boss登场对话，结束后进入猜牌
 - [x] **战斗中特殊事件对话** — 双方第一次出炸弹/王炸时触发Boss反应对话（暂停流程）
 - [x] **胜负结算对话** — 游戏结束播胜利/失败对话，结束后显示结算对话框
-- [x] **路由集成** — 主菜单→关卡选择→战斗界面三级路由
-- [ ] 关卡进度保存与读取
-- [ ] 筹码不足拦截
-- [ ] 7-9关Boss AI能力实装（当前用ai1_idiot占位）
+- [x] **路由集成** — 主菜单 → 关卡选择 → 战斗界面三级路由（已实现；Alt+点击「闯关模式」→ 选关 → 战斗，日常流程：主菜单 → 直接进入战斗）
+- [x] 关卡进度保存与读取（clearedLevel、hasPurchasedEntry 存档）
+- [x] 筹码不足拦截（battle_screen_level 入口检查）
+- [x] 7-9关Boss AI能力实装（Boss 7=AI3_Search、Boss 8=AI4_Search、Boss 9=AI4_Search + 不可通关规则）
