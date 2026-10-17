@@ -5,6 +5,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   export-windows:
     name: Windows (.exe)
@@ -72,13 +77,16 @@ jobs:
           name: 7gui523-web
           path: 7gui523-web.zip
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-pages
+          path: build/7gui523-web
+
   release:
     name: Create Release
     needs: [export-windows, export-web]
     if: always() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -102,3 +110,24 @@ jobs:
             artifacts/**/*.zip
           draft: false
           prerelease: false
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: export-web
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-pages
+          path: site
+
+      - name: Deploy
+        id: deploy
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
