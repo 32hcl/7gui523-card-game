@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="130" viewBox="0 0 80 130">
+  <defs>
+    <!-- 灯笼主体渐变：中心亮边缘暗，模拟内部发光 -->
+    <radialGradient id="lanternBody" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#ff8a8a"/>
+      <stop offset="30%" stop-color="#ff4d4d"/>
+      <stop offset="65%" stop-color="#d62828"/>
+      <stop offset="100%" stop-color="#8b0000"/>
+    </radialGradient>
+
+    <!-- 内部光晕 -->
+    <radialGradient id="innerGlow" cx="50%" cy="40%" r="40%">
+      <stop offset="0%" stop-color="#fff5cc" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#ffd700" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffd700" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 金盖渐变 -->
+    <linearGradient id="goldCap" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="30%" stop-color="#ffd700"/>
+      <stop offset="70%" stop-color="#daa520"/>
+      <stop offset="100%" stop-color="#8b6914"/>
+    </linearGradient>
+
+    <!-- 金盖侧面 -->
+    <linearGradient id="goldCapSide" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#b8860b"/>
+      <stop offset="50%" stop-color="#8b6914"/>
+      <stop offset="100%" stop-color="#5c4408"/>
+    </linearGradient>
+
+    <!-- 流苏渐变 -->
+    <linearGradient id="tasselGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="60%" stop-color="#ffae00"/>
+      <stop offset="100%" stop-color="#cc8400"/>
+    </linearGradient>
+
+    <!-- 外发光滤镜 -->
+    <filter id="outerGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- 顶部挂绳 -->
+  <line x1="40" y1="0" x2="40" y2="10" stroke="#8b6914" stroke-width="2"/>
+  <line x1="40" y1="2" x2="40" y2="9" stroke="#ffd700" stroke-width="1"/>
+
+  <!-- 顶部金盖上表面 -->
+  <ellipse cx="40" cy="12" rx="18" ry="4" fill="url(#goldCap)"/>
+  <!-- 顶部金盖侧面 -->
+  <rect x="22" y="12" width="36" height="7" fill="url(#goldCapSide)"/>
+  <rect x="24" y="13" width="32" height="2" fill="#ffd700" opacity="0.3"/>
+  <!-- 金盖底部边缘 -->
+  <ellipse cx="40" cy="19" rx="18" ry="3" fill="#5c4408"/>
+
+  <!-- 灯笼主体 -->
+  <ellipse cx="40" cy="58" rx="32" ry="40" fill="url(#lanternBody)"/>
+
+  <!-- 内部光晕效果 -->
+  <ellipse cx="40" cy="52" rx="24" ry="30" fill="url(#innerGlow)"/>
+
+  <!-- 竖向骨架线（凸起的棱） -->
+  <path d="M40 18 Q28 58 40 98" stroke="#8b0000" stroke-width="1.5" fill="none" opacity="0.6"/>
+  <path d="M40 18 Q52 58 40 98" stroke="#8b0000" stroke-width="1.5" fill="none" opacity="0.6"/>
+  <path d="M40 18 Q18 58 40 98" stroke="#8b0000" stroke-width="1" fill="none" opacity="0.4"/>
+  <path d="M40 18 Q62 58 40 98" stroke="#8b0000" stroke-width="1" fill="none" opacity="0.4"/>
+  <path d="M40 18 Q10 58 40 98" stroke="#8b0000" stroke-width="0.6" fill="none" opacity="0.25"/>
+  <path d="M40 18 Q70 58 40 98" stroke="#8b0000" stroke-width="0.6" fill="none" opacity="0.25"/>
+
+  <!-- 横向金线装饰（上下各一圈） -->
+  <ellipse cx="40" cy="26" rx="28" ry="5" fill="none" stroke="#ffd700" stroke-width="1.2" opacity="0.7"/>
+  <ellipse cx="40" cy="90" rx="28" ry="5" fill="none" stroke="#ffd700" stroke-width="1.2" opacity="0.7"/>
+
+  <!-- 中央福字底（金色菱形） -->
+  <g transform="translate(40, 58)">
+    <!-- 外发光 -->
+    <rect x="-12" y="-12" width="24" height="24" transform="rotate(45)"
+          fill="#ffd700" opacity="0.3" filter="url(#outerGlow)"/>
+    <!-- 金色菱形背景 -->
+    <rect x="-10" y="-10" width="20" height="20" transform="rotate(45)"
+          fill="url(#goldCap)" stroke="#b8860b" stroke-width="0.8"/>
+    <!-- 福字（用简化的"福"字形图案） -->
+    <text x="0" y="4" text-anchor="middle"
+          font-family="KaiTi, STKaiti, serif" font-size="14" font-weight="bold"
+          fill="#8b0000">福</text>
+  </g>
+
+  <!-- 灯笼底部金盖上表面 -->
+  <ellipse cx="40" cy="97" rx="16" ry="3.5" fill="url(#goldCap)"/>
+  <!-- 底部金盖侧面 -->
+  <rect x="24" y="97" width="32" height="6" fill="url(#goldCapSide)"/>
+  <rect x="26" y="98" width="28" height="1.5" fill="#ffd700" opacity="0.3"/>
+  <!-- 金盖底部边缘 -->
+  <ellipse cx="40" cy="103" rx="16" ry="2.5" fill="#5c4408"/>
+
+  <!-- 底部连接扣 -->
+  <rect x="37" y="103" width="6" height="4" fill="#8b6914"/>
+  <ellipse cx="40" cy="107" rx="5" ry="2" fill="#b8860b"/>
+
+  <!-- 流苏束 -->
+  <g>
+    <!-- 中心长流苏 -->
+    <path d="M40 109 Q38 118 40 128" stroke="url(#tasselGrad)" stroke-width="2.5" fill="none"/>
+    <path d="M40 109 Q42 118 40 128" stroke="#ffd700" stroke-width="1" fill="none" opacity="0.5"/>
+
+    <!-- 左侧流苏群 -->
+    <path d="M36 108 Q32 118 30 126" stroke="url(#tasselGrad)" stroke-width="1.8" fill="none"/>
+    <path d="M34 108 Q29 117 26 124" stroke="url(#tasselGrad)" stroke-width="1.4" fill="none" opacity="0.85"/>
+    <path d="M38 108 Q35 118 33 125" stroke="#ffd700" stroke-width="1" fill="none" opacity="0.4"/>
+
+    <!-- 右侧流苏群 -->
+    <path d="M44 108 Q48 118 50 126" stroke="url(#tasselGrad)" stroke-width="1.8" fill="none"/>
+    <path d="M46 108 Q51 117 54 124" stroke="url(#tasselGrad)" stroke-width="1.4" fill="none" opacity="0.85"/>
+    <path d="M42 108 Q45 118 47 125" stroke="#ffd700" stroke-width="1" fill="none" opacity="0.4"/>
+
+    <!-- 流苏底部小金珠 -->
+    <circle cx="40" cy="128" r="2" fill="#ffd700"/>
+    <circle cx="30" cy="126" r="1.5" fill="#ffd700" opacity="0.8"/>
+    <circle cx="50" cy="126" r="1.5" fill="#ffd700" opacity="0.8"/>
+    <circle cx="26" cy="124" r="1.2" fill="#daa520" opacity="0.7"/>
+    <circle cx="54" cy="124" r="1.2" fill="#daa520" opacity="0.7"/>
+  </g>
+
+  <!-- 整体外发光（灯笼发光效果） -->
+  <ellipse cx="40" cy="58" rx="34" ry="42" fill="none"
+           stroke="#ff6b6b" stroke-width="2" opacity="0.2" filter="url(#outerGlow)"/>
+</svg>

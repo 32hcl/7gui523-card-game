@@ -1,0 +1,11 @@
+[gd_resource type="GradientTexture1D" format=3 uid="uid://djfhb650ekhj4"]
+
+[sub_resource type="Gradient" id="Gradient_klyrs"]
+interpolation_mode = 2
+interpolation_color_space = 1
+offsets = PackedFloat32Array(0, 0.2, 0.3, 0.5, 0.7, 0.8, 1)
+colors = PackedColorArray(1, 0.7506667, 0.120000005, 0.8, 1, 0.81149995, 0.13, 0.9019608, 1, 0.86833334, 0.20999998, 0.9490196, 1, 0.90833336, 0.45, 0.95686275, 1, 0.8666667, 0.19999999, 0.9490196, 1, 0.81149995, 0.13, 0.9019608, 1, 0.7506667, 0.120000005, 0.8)
+metadata/_snap_enabled = true
+
+[resource]
+gradient = SubResource("Gradient_klyrs")

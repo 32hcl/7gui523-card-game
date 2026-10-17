@@ -1,0 +1,136 @@
+[gd_scene format=3 uid="uid://dshop0001"]
+
+[node name="ShopPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Overlay" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.6)
+mouse_filter = 2
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(560, 480)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_right = 20
+
+[node name="TopBar" type="HBoxContainer" parent="Center/Panel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="Center/Panel/VBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "🏪 关末商店"
+
+[node name="ChipsLabel" type="Label" parent="Center/Panel/VBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 15
+text = "💰 0"
+horizontal_alignment = 2
+
+[node name="CloseBtn" type="Button" parent="Center/Panel/VBox/TopBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+text = "✕"
+
+[node name="Scroll" type="ScrollContainer" parent="Center/Panel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ScrollVBox" type="VBoxContainer" parent="Center/Panel/VBox/Scroll"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="FixedHeader" type="Label" parent="Center/Panel/VBox/Scroll/ScrollVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "🎁 不可刷新区（关末自动补货）"
+theme_override_font_sizes/font_size = 13
+
+[node name="FixedItems" type="VBoxContainer" parent="Center/Panel/VBox/Scroll/ScrollVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="RefreshSep" type="Label" parent="Center/Panel/VBox/Scroll/ScrollVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "— 可刷新 —"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+
+[node name="RefreshRow" type="HBoxContainer" parent="Center/Panel/VBox/Scroll/ScrollVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RefreshCostLabel" type="Label" parent="Center/Panel/VBox/Scroll/ScrollVBox/RefreshRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "刷新费用 30 筹码"
+
+[node name="RefreshBtn" type="Button" parent="Center/Panel/VBox/Scroll/ScrollVBox/RefreshRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "刷新"
+
+[node name="RefreshItems" type="VBoxContainer" parent="Center/Panel/VBox/Scroll/ScrollVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="EnchantHeader" type="Label" parent="Center/Panel/VBox/Scroll/ScrollVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "✨ 二级附魔商店（本关消费 ≥32 解锁）"
+theme_override_font_sizes/font_size = 13
+
+[node name="EnchantItems" type="VBoxContainer" parent="Center/Panel/VBox/Scroll/ScrollVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BottomRow" type="HBoxContainer" parent="Center/Panel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CloseBottomBtn" type="Button" parent="Center/Panel/VBox/BottomRow"]
+layout_mode = 2
+text = "关闭"
+
+[node name="NextLevelBtn" type="Button" parent="Center/Panel/VBox/BottomRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "进入下一关 →"

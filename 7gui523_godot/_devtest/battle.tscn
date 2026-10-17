@@ -1,0 +1,138 @@
+[gd_scene format=3 uid="uid://d3cj80gb314wt"]
+
+[ext_resource type="Script" uid="uid://b57fgbkihbkd1" path="res://_devtest/battle.gd" id="1_battle"]
+
+[node name="Battle" type="Control" unique_id=1349091590]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_battle")
+
+[node name="Background" type="ColorRect" parent="." unique_id=392126030]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.11, 0.14, 0.21, 1)
+
+[node name="Title" type="Label" parent="." unique_id=490835687]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 10.0
+offset_right = 1000.0
+offset_bottom = 42.0
+theme_override_font_sizes/font_size = 20
+text = "七鬼523 · 阶段 B — 完全顺序牌堆循环 & 手牌区"
+
+[node name="Main" type="VBoxContainer" parent="." unique_id=284253693]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 48.0
+offset_right = 1100.0
+offset_bottom = 740.0
+theme_override_constants/separation = 10
+
+[node name="DeckPane" type="VBoxContainer" parent="Main" unique_id=716189133]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ActiveCount" type="Label" parent="Main/DeckPane" unique_id=1891648724]
+layout_mode = 2
+text = "游戏牌堆 32 张"
+
+[node name="VSplit" type="VBoxContainer" parent="Main/DeckPane" unique_id=988064040]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ActiveScroll" type="ScrollContainer" parent="Main/DeckPane/VSplit" unique_id=2070881402]
+custom_minimum_size = Vector2(0, 108)
+layout_mode = 2
+
+[node name="Box" type="MarginContainer" parent="Main/DeckPane/VSplit/ActiveScroll" unique_id=1988495482]
+layout_mode = 2
+
+[node name="ActiveRow" type="HBoxContainer" parent="Main/DeckPane/VSplit/ActiveScroll/Box" unique_id=1964123731]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HiddenScroll" type="ScrollContainer" parent="Main/DeckPane/VSplit" unique_id=1313590295]
+custom_minimum_size = Vector2(0, 108)
+layout_mode = 2
+
+[node name="Box" type="MarginContainer" parent="Main/DeckPane/VSplit/HiddenScroll" unique_id=2059357853]
+layout_mode = 2
+
+[node name="HiddenRow" type="HBoxContainer" parent="Main/DeckPane/VSplit/HiddenScroll/Box" unique_id=1750795973]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HandPane" type="VBoxContainer" parent="Main" unique_id=1085325168]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HandTitle" type="Label" parent="Main/HandPane" unique_id=2145683710]
+layout_mode = 2
+text = "玩家手牌:"
+
+[node name="HandRow" type="HBoxContainer" parent="Main/HandPane" unique_id=2119845475]
+layout_mode = 2
+size_flags_vertical = 2
+theme_override_constants/separation = 8
+
+[node name="Controls" type="HBoxContainer" parent="Main" unique_id=829514642]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ResetBtn" type="Button" parent="Main/Controls" unique_id=639106351]
+custom_minimum_size = Vector2(100, 36)
+layout_mode = 2
+text = "重置"
+
+[node name="DrawBtn" type="Button" parent="Main/Controls" unique_id=1021658785]
+custom_minimum_size = Vector2(110, 36)
+layout_mode = 2
+text = "抽牌 (LIFO)"
+
+[node name="PlayBtn" type="Button" parent="Main/Controls" unique_id=1872061897]
+custom_minimum_size = Vector2(110, 36)
+layout_mode = 2
+text = "出牌 (回收)"
+
+[node name="RefillBtn" type="Button" parent="Main/Controls" unique_id=979062368]
+custom_minimum_size = Vector2(130, 36)
+layout_mode = 2
+text = "补牌 (分界右移)"
+
+[node name="ShopBtn" type="Button" parent="Main/Controls" unique_id=382207249]
+custom_minimum_size = Vector2(120, 36)
+layout_mode = 2
+text = "商店 (抽7毁1)"
+
+[node name="Status" type="Label" parent="Main" unique_id=1922950796]
+layout_mode = 2
+text = "手牌 0/5 张"
+
+[node name="LogPane" type="VBoxContainer" parent="Main" unique_id=339363528]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LogTitle" type="Label" parent="Main/LogPane" unique_id=157848514]
+layout_mode = 2
+text = "操作日志:"
+
+[node name="LogText" type="RichTextLabel" parent="Main/LogPane" unique_id=289312913]
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_following = true
+
+[connection signal="pressed" from="Main/Controls/ResetBtn" to="." method="_on_reset_pressed"]
+[connection signal="pressed" from="Main/Controls/DrawBtn" to="." method="_on_draw_pressed"]
+[connection signal="pressed" from="Main/Controls/PlayBtn" to="." method="_on_play_pressed"]
+[connection signal="pressed" from="Main/Controls/RefillBtn" to="." method="_on_refill_pressed"]
+[connection signal="pressed" from="Main/Controls/ShopBtn" to="." method="_on_shop_pressed"]

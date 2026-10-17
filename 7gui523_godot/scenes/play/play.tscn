@@ -1,0 +1,254 @@
+[gd_scene format=3 uid="uid://cmmeujv52mks7"]
+
+[ext_resource type="Script" uid="uid://bdxwhw28uft5g" path="res://scripts/ui/play.gd" id="1_play"]
+
+[node name="Play" type="Control" unique_id=1442392507]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_play")
+
+[node name="Background" type="ColorRect" parent="." unique_id=740532890]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.06, 0.04, 1)
+
+[node name="MainLayout" type="HBoxContainer" parent="." unique_id=1045394925]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 4.0
+offset_right = -8.0
+offset_bottom = -4.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout" unique_id=224245125]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="TopBar" type="HBoxContainer" parent="MainLayout/LeftPanel" unique_id=916508759]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="MainLayout/LeftPanel/TopBar" unique_id=1673856923]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "七鬼523"
+
+[node name="DeckCountLabel" type="Label" parent="MainLayout/LeftPanel/TopBar" unique_id=1448244983]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+text = "牌堆"
+horizontal_alignment = 2
+
+[node name="RoundLabel" type="Label" parent="MainLayout/LeftPanel/TopBar" unique_id=906467064]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "回合: 1"
+horizontal_alignment = 2
+
+[node name="BossZone" type="PanelContainer" parent="MainLayout/LeftPanel" unique_id=1074275040]
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+
+[node name="BossRow" type="HBoxContainer" parent="MainLayout/LeftPanel/BossZone" unique_id=1605942087]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BossAvatarArea" type="Control" parent="MainLayout/LeftPanel/BossZone/BossRow" unique_id=1399433044]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BossHand" type="Control" parent="MainLayout/LeftPanel/BossZone/BossRow" unique_id=258029176]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="BossDeck" type="Control" parent="MainLayout/LeftPanel/BossZone/BossRow" unique_id=1804155609]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TableZone" type="PanelContainer" parent="MainLayout/LeftPanel" unique_id=558354267]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TableVBox" type="VBoxContainer" parent="MainLayout/LeftPanel/TableZone" unique_id=1576972157]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TableCards" type="HBoxContainer" parent="MainLayout/LeftPanel/TableZone/TableVBox" unique_id=236757742]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="TableInfo" type="HBoxContainer" parent="MainLayout/LeftPanel/TableZone/TableVBox" unique_id=806298821]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HandTypeLabel" type="Label" parent="MainLayout/LeftPanel/TableZone/TableVBox/TableInfo" unique_id=1801717884]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "上一手牌型: 无"
+
+[node name="TableScoreLabel" type="Label" parent="MainLayout/LeftPanel/TableZone/TableVBox/TableInfo" unique_id=98549836]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 11
+text = "原始分: 0 分 | 合计: 0 分"
+horizontal_alignment = 2
+
+[node name="PlayerZone" type="PanelContainer" parent="MainLayout/LeftPanel" unique_id=1801830330]
+custom_minimum_size = Vector2(0, 190)
+layout_mode = 2
+
+[node name="PlayerRow" type="HBoxContainer" parent="MainLayout/LeftPanel/PlayerZone" unique_id=159783076]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PlayerHand" type="Control" parent="MainLayout/LeftPanel/PlayerZone/PlayerRow" unique_id=100587047]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="PlayerDeck" type="Control" parent="MainLayout/LeftPanel/PlayerZone/PlayerRow" unique_id=923303169]
+custom_minimum_size = Vector2(112, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="RightPanel" type="PanelContainer" parent="MainLayout" unique_id=737001439]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+
+[node name="RightVBox" type="VBoxContainer" parent="MainLayout/RightPanel" unique_id=1145441367]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LogTitle" type="Label" parent="MainLayout/RightPanel/RightVBox" unique_id=1114031601]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "牌局记录"
+
+[node name="LogScroll" type="ScrollContainer" parent="MainLayout/RightPanel/RightVBox" unique_id=229906150]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LogText" type="RichTextLabel" parent="MainLayout/RightPanel/RightVBox/LogScroll" unique_id=258145908]
+layout_mode = 2
+size_flags_horizontal = 3
+bbcode_enabled = true
+fit_content = true
+
+[node name="HPLabel" type="Label" parent="MainLayout/RightPanel/RightVBox" unique_id=1793864938]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+
+[node name="ButtonGrid" type="GridContainer" parent="MainLayout/RightPanel/RightVBox" unique_id=738502447]
+layout_mode = 2
+theme_override_constants/h_separation = 14
+theme_override_constants/v_separation = 14
+columns = 3
+
+[node name="PlayBtn" type="Button" parent="MainLayout/RightPanel/RightVBox/ButtonGrid" unique_id=42092687]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "出牌"
+
+[node name="HpSwapBtn" type="Button" parent="MainLayout/RightPanel/RightVBox/ButtonGrid" unique_id=1038524426]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "扣血换牌"
+
+[node name="PassBtn" type="Button" parent="MainLayout/RightPanel/RightVBox/ButtonGrid" unique_id=836861368]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "不要"
+
+[node name="NewGameBtn" type="Button" parent="MainLayout/RightPanel/RightVBox/ButtonGrid" unique_id=31780996]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "重新开始"
+
+[node name="ShopBtn" type="Button" parent="MainLayout/RightPanel/RightVBox/ButtonGrid" unique_id=261705502]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "商店"
+
+[node name="ReturnBtn" type="Button" parent="MainLayout/RightPanel/RightVBox/ButtonGrid" unique_id=612813182]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "返回菜单"
+
+[node name="GameOver" type="Control" parent="." unique_id=1590701725]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="GameOver" unique_id=1975344052]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.55)
+
+[node name="Center" type="CenterContainer" parent="GameOver" unique_id=1299057448]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Box" type="PanelContainer" parent="GameOver/Center" unique_id=179353928]
+custom_minimum_size = Vector2(380, 0)
+layout_mode = 2
+
+[node name="V" type="VBoxContainer" parent="GameOver/Center/Box" unique_id=717359719]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="GameOver/Center/Box/V" unique_id=1741756571]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "对局结束"
+horizontal_alignment = 1
+
+[node name="Message" type="Label" parent="GameOver/Center/Box/V" unique_id=1348319722]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="AgainBtn" type="Button" parent="GameOver/Center/Box/V" unique_id=34451005]
+custom_minimum_size = Vector2(180, 44)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "再来一局"
+
+[connection signal="pressed" from="MainLayout/RightPanel/RightVBox/ButtonGrid/PlayBtn" to="." method="_on_play_pressed"]
+[connection signal="pressed" from="MainLayout/RightPanel/RightVBox/ButtonGrid/PassBtn" to="." method="_on_pass_pressed"]
+[connection signal="pressed" from="MainLayout/RightPanel/RightVBox/ButtonGrid/NewGameBtn" to="." method="_on_reset_pressed"]
+[connection signal="pressed" from="GameOver/Center/Box/V/AgainBtn" to="." method="_on_reset_pressed"]

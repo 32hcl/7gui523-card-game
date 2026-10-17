@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://m50cdge8gond"]
+
+[ext_resource type="Script" uid="uid://bw8aashjiooju" path="res://_devtest/card_lab.gd" id="1_lab"]
+
+[node name="CardLab" type="Control" unique_id=725378305]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_lab")
+
+[node name="Background" type="ColorRect" parent="." unique_id=586508617]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.13, 0.16, 0.24, 1)
+
+[node name="Title" type="Label" parent="." unique_id=1935427046]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 600.0
+offset_bottom = 44.0
+theme_override_font_sizes/font_size = 20
+text = "七鬼523 · 资源画廊 (阶段 A) — 54 张卡牌"
+
+[node name="Scroll" type="ScrollContainer" parent="." unique_id=1385493462]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 48.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Scroll" unique_id=1566354126]
+layout_mode = 2
+
+[node name="CardGrid" type="GridContainer" parent="Scroll/VBox" unique_id=2013853809]
+layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 14
+columns = 13
+
+[node name="AuxGrid" type="GridContainer" parent="Scroll/VBox" unique_id=2079199949]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+columns = 6
