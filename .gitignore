@@ -8,6 +8,9 @@ release/
 resources/
 *.bat
 *.ps1
+
+# Demo projects
+Godot4-Fake3D-Card-Game-UI-Demo-main/
 campaign_log.txt
 common/
 tests/

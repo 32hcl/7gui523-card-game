@@ -36,6 +36,7 @@ func _ready() -> void:
 	_refresh_btn.pressed.connect(func(): refresh_requested.emit())
 	_next_btn.pressed.connect(func(): next_level_requested.emit())
 	_apply_theme()
+	_adjust_for_mobile()
 
 
 func _apply_theme() -> void:
@@ -59,6 +60,17 @@ func _apply_theme() -> void:
 
 	_chips_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
 	_refresh_cost_lbl.add_theme_color_override("font_color", Color(0.75, 0.7, 0.6))
+
+
+func _adjust_for_mobile() -> void:
+	var vs := get_viewport().get_visible_rect().size
+	if vs.x >= 768:
+		return
+	_panel_bg.custom_minimum_size = Vector2(vs.x * 0.92, vs.y * 0.82)
+	%TitleLabel.add_theme_font_size_override("font_size", 15)
+	_chips_lbl.add_theme_font_size_override("font_size", 13)
+	for lbl in [_enchant_header, %FixedHeader]:
+		lbl.add_theme_font_size_override("font_size", 11)
 
 
 ## ═══════════════════════════════════════════════════════════════

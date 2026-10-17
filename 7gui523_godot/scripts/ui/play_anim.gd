@@ -146,12 +146,34 @@ func _refresh_boss_hand_with_animation(animate: bool) -> void:
 	for child in _boss_hand.get_children():
 		if child is CardVisual and not child.is_queued_for_deletion():
 			exist.append(child)
+
+	if _is_mobile:
+		_refresh_boss_hand_mobile(n, m, total, exist, animate)
+		return
+
+	_refresh_boss_hand_desktop(n, m, total, exist, animate)
+
+
+func _refresh_boss_hand_desktop(n: int, m: int, total: int, exist: Array, animate: bool) -> void:
+	var card_w := BOSS_CARD_W
+	var card_h := BOSS_CARD_H
+	var gap := BOSS_GAP
+	var igap := BOSS_INSTANT_GAP
+	_refresh_boss_hand_impl(n, m, total, exist, animate, card_w, card_h, gap, igap)
+
+
+func _refresh_boss_hand_mobile(n: int, m: int, total: int, exist: Array, animate: bool) -> void:
+	_refresh_boss_hand_impl(n, m, total, exist, animate, _mobile_boss_w, _mobile_boss_h, _mobile_boss_gap, 10.0)
+
+
+func _refresh_boss_hand_impl(n: int, m: int, total: int, exist: Array, animate: bool,
+		card_w: float, card_h: float, gap: float, igap: float) -> void:
 	## 差异回收：多出的牌背释放
 	while exist.size() > total:
 		exist.pop_back().queue_free()
 	## 差异补建：缺少的牌背新加（牌背相同，无前后衔接）
 	while exist.size() < total:
-		var cv := CardVisual.new(Vector2(BOSS_CARD_W, BOSS_CARD_H))
+		var cv := CardVisual.new(Vector2(card_w, card_h))
 		cv.show_back()
 		cv.enable_fake3d(false)
 		cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -162,13 +184,11 @@ func _refresh_boss_hand_with_animation(animate: bool) -> void:
 
 	## 布局：普通区(5)与立刻补区(2)同高排列
 	var container_w := _boss_hand.size.x
-	var card_w := BOSS_CARD_W
-	var gap := BOSS_GAP
 	var normal_w := float(n) * card_w + float(maxi(n - 1, 0)) * gap
 	var instant_w := float(m) * card_w + float(maxi(m - 1, 0)) * gap
-	var all_w := normal_w + (BOSS_INSTANT_GAP if m > 0 else 0.0) + instant_w
+	var all_w := normal_w + (igap if m > 0 else 0.0) + instant_w
 	var start_x: float = (container_w - all_w) * 0.5 if container_w > all_w else 0.0
-	var instant_x := start_x + normal_w + (BOSS_INSTANT_GAP if (m > 0 and n > 0) else 0.0)
+	var instant_x := start_x + normal_w + (igap if (m > 0 and n > 0) else 0.0)
 
 	## 抽卡起点：从 BOSS 牌堆中心飞入手牌区
 	var deal_from: Vector2 = _boss_hand.get_global_transform_with_canvas().affine_inverse() \
@@ -241,7 +261,9 @@ func _run_table_anim() -> void:
 	if not is_instance_valid(self) or not _table_anim_running:
 		return
 
-	var half := Vector2(CARD_W, CARD_H) * 0.5
+	var cw := _mobile_card_w if _is_mobile else CARD_W
+	var ch := _mobile_card_h if _is_mobile else CARD_H
+	var half := Vector2(cw, ch) * 0.5
 	var n := _table_cards_anim.size()
 	var total := 0.0
 	for i in n:
@@ -254,7 +276,7 @@ func _run_table_anim() -> void:
 
 		var target := real.global_position + real.size * 0.5
 
-		var ghost := CardVisual.new(Vector2(CARD_W, CARD_H))
+		var ghost := CardVisual.new(Vector2(cw, ch))
 		ghost.show_texture(CardVisual.texture_for_id(Card.id_for(card.point, card.suit)))
 		ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ghost.z_index = 100

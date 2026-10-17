@@ -7,6 +7,7 @@ extends PlayUI
 
 
 func _ready() -> void:
+	setup_responsive()
 	_setup_ui_theme()
 	_anim_overlay = Control.new()
 	_anim_overlay.name = "AnimOverlay"

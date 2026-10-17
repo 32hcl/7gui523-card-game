@@ -40,6 +40,20 @@ const DRAG_RETURN_DUR := 0.18
 
 const _TILT_MAX := 14.0
 
+## 手机端自适应
+const MOBILE_MAX_WIDTH := 768.0
+var _is_mobile := false
+
+var _mobile_card_w: float = 0.0
+var _mobile_card_h: float = 0.0
+var _mobile_hand_w: float = 0.0
+var _mobile_hand_h: float = 0.0
+var _mobile_boss_w: float = 0.0
+var _mobile_boss_h: float = 0.0
+var _mobile_gap: float = -12.0
+var _mobile_instant_gap: float = 12.0
+var _mobile_boss_gap: float = -18.0
+
 ## 顶栏
 @onready var _title_lbl: Label = $MainLayout/LeftPanel/TopBar/TitleLabel
 @onready var _round_lbl: Label = $MainLayout/LeftPanel/TopBar/RoundLabel
@@ -125,6 +139,105 @@ var _table_anim_pending := false
 var _table_anim_running := false
 
 
+## 检测并应用手机竖屏布局
+func setup_responsive() -> void:
+	var vs := get_viewport().get_visible_rect().size
+	_is_mobile = vs.x < MOBILE_MAX_WIDTH or (vs.y > vs.x * 1.2 and vs.x < 1024)
+	if not _is_mobile:
+		return
+	_calc_mobile_card_sizes(vs)
+	_restructure_for_mobile(vs)
+
+
+func _calc_mobile_card_sizes(vs: Vector2) -> void:
+	## 5张主力牌铺满90%宽度，牌间有微小重叠
+	var total := vs.x * 0.9
+	_mobile_hand_w = total / 4.4
+	_mobile_hand_h = _mobile_hand_w * 1.5
+	_mobile_card_w = _mobile_hand_w * 0.72
+	_mobile_card_h = _mobile_card_w * 1.4
+	_mobile_boss_w = _mobile_hand_w * 0.62
+	_mobile_boss_h = _mobile_boss_w * 1.4
+	_mobile_gap = _mobile_hand_w * -0.16
+	_mobile_instant_gap = _mobile_hand_w * 0.14
+	_mobile_boss_gap = _mobile_boss_w * -0.35
+
+
+func _restructure_for_mobile(vs: Vector2) -> void:
+	## 拆掉横向 HBox → 竖向 VBox
+	var root := $"."
+	var old_layout := $"MainLayout"
+	var left := $"MainLayout/LeftPanel"
+	var right := $"MainLayout/RightPanel"
+	var log_title := $"MainLayout/RightPanel/RightVBox/LogTitle"
+
+	old_layout.remove_child(left)
+	old_layout.remove_child(right)
+	root.remove_child(old_layout)
+
+	var vbox := VBoxContainer.new()
+	vbox.name = "MainLayout"
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.offset_left = 6.0
+	vbox.offset_top = 4.0
+	vbox.offset_right = -6.0
+	vbox.offset_bottom = -4.0
+	vbox.add_theme_constant_override("separation", 6)
+	root.add_child(vbox)
+
+	left.custom_minimum_size = Vector2(0, 0)
+	left.size_flags_vertical = Control.SIZE_FILL | Control.SIZE_EXPAND
+	left.size_flags_horizontal = Control.SIZE_FILL
+	vbox.add_child(left)
+
+	## 调整各区域最小高度匹配手机端卡牌尺寸
+	var boss_zone := left.get_node("BossZone") as Control
+	var player_zone := left.get_node("PlayerZone") as Control
+	var table_zone := left.get_node("TableZone") as Control
+	if boss_zone:
+		boss_zone.custom_minimum_size = Vector2(0, _mobile_boss_h + 24)
+	if player_zone:
+		player_zone.custom_minimum_size = Vector2(0, _mobile_hand_h + 36)
+	if table_zone:
+		table_zone.size_flags_vertical = Control.SIZE_FILL | Control.SIZE_EXPAND
+
+	## 右面板 → 底部悬浮 HUD 条，半透明
+	right.custom_minimum_size = Vector2(0, clampf(vs.y * 0.18, 80, 140))
+	right.size_flags_vertical = 0
+	right.size_flags_horizontal = Control.SIZE_FILL
+
+	var pstyle := StyleBoxFlat.new()
+	pstyle.bg_color = Color(0.08, 0.04, 0.02, 0.88)
+	pstyle.set_corner_radius_all(10)
+	pstyle.border_color = Color(1.0, 0.84, 0.42, 0.25)
+	pstyle.set_border_width_all(1)
+	right.add_theme_stylebox_override("panel", pstyle)
+
+	log_title.visible = false
+
+	vbox.add_child(right)
+
+	## 按钮走水平一行，3列改6列，调大触控尺寸
+	var grid := right.get_node("RightVBox/ButtonGrid")
+	grid.columns = 6
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 4)
+	for b: Button in grid.get_children():
+		b.custom_minimum_size = Vector2(0, 44)
+
+	## 日志滚动区缩小
+	var log_scroll := right.get_node("RightVBox/LogScroll") as ScrollContainer
+	if log_scroll:
+		log_scroll.custom_minimum_size = Vector2(0, 36)
+		log_scroll.size_flags_vertical = Control.SIZE_EXPAND | Control.SIZE_FILL
+	_log_lbl.add_theme_font_size_override("normal_font_size", 10)
+
+	## HP 标签缩小
+	_hp_lbl.add_theme_font_size_override("font_size", 11)
+
+	old_layout.queue_free()
+
+
 ## 金&朱红赌场主题
 func _setup_ui_theme() -> void:
 	var gold := Color(1.0, 0.84, 0.42)
@@ -158,8 +271,8 @@ func _setup_ui_theme() -> void:
 
 
 func _setup_deck_display() -> void:
-	_player_deck_lbl = _build_deck_visual(_player_deck, Vector2(70, 100))
-	_boss_deck_lbl = _build_deck_visual(_boss_deck, Vector2(56, 80))
+	_player_deck_lbl = _build_deck_visual(_player_deck, Vector2(70, 100) if not _is_mobile else Vector2(_mobile_card_w * 0.9, _mobile_card_h * 0.9))
+	_boss_deck_lbl = _build_deck_visual(_boss_deck, Vector2(56, 80) if not _is_mobile else Vector2(_mobile_boss_w * 0.9, _mobile_boss_h * 0.9))
 
 
 func _build_deck_visual(container: Control, deck_size: Vector2 = Vector2(56, 80)) -> Label:
@@ -282,6 +395,18 @@ static func _sorted_order(hand: Array) -> Array:
 
 
 func _hand_metrics(n: int, m: int) -> Dictionary:
+	if _is_mobile:
+		var hw := _mobile_hand_w
+		var gap := _mobile_gap
+		var igap := _mobile_instant_gap
+		var normal_w := float(n) * hw + float(maxi(n - 1, 0)) * gap
+		var instant_w := float(m) * hw + float(maxi(m - 1, 0)) * gap
+		var all_w := normal_w + (igap if m > 0 else 0.0) + instant_w
+		var cw := _player_hand.size.x
+		var start_x: float = (cw - all_w) * 0.5 if cw > all_w else 0.0
+		var instant_x := start_x + normal_w + (igap if (m > 0 and n > 0) else 0.0)
+		return {"start_x": start_x, "instant_x": instant_x, "total": n + m}
+
 	var gap := HAND_CARD_GAP
 	var normal_w := float(n) * HAND_W + float(maxi(n - 1, 0)) * gap
 	var instant_w := float(m) * HAND_W + float(maxi(m - 1, 0)) * gap
@@ -294,6 +419,16 @@ func _hand_metrics(n: int, m: int) -> Dictionary:
 
 ## 扇形布局单卡目标
 func _fan_target(overall: int, m: int, p: int, gp: int, anchor_x: float, rot_scale: float, key: int) -> Dictionary:
+	if _is_mobile:
+		var g := gp if (overall > 1) else p
+		var t := 0.5 if overall <= 1 else float(g) / float(overall - 1)
+		var rot_z := lerpf(-HAND_ROT_MAX, HAND_ROT_MAX, t) * rot_scale
+		var hand_h := _mobile_hand_h
+		var pos := Vector2(anchor_x + float(p) * (_mobile_hand_w + _mobile_gap), 0.0)
+		if _selected.has(key):
+			pos += Vector2(0, -SELECTED_LIFT * 0.8)
+		return {"pos": pos, "rot": rot_z}
+
 	var g := gp if (overall > 1) else p
 	var t := 0.5 if overall <= 1 else float(g) / float(overall - 1)
 	var rot_z := lerpf(-HAND_ROT_MAX, HAND_ROT_MAX, t) * rot_scale
@@ -307,6 +442,12 @@ func _fan_target(overall: int, m: int, p: int, gp: int, anchor_x: float, rot_sca
 
 
 func _face(card: Card) -> Control:
+	if _is_mobile:
+		var visual := CardVisual.new(Vector2(_mobile_card_w, _mobile_card_h))
+		visual.show_texture(CardVisual.texture_for_id(Card.id_for(card.point, card.suit)))
+		visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		visual.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		return visual
 	var visual := CardVisual.new(Vector2(CARD_W, CARD_H))
 	visual.show_texture(CardVisual.texture_for_id(Card.id_for(card.point, card.suit)))
 	visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -316,7 +457,9 @@ func _face(card: Card) -> Control:
 
 ## 手牌卡（点击选中 / 假3D 悬停 / 拖拽）
 func _hand_card(card: Card, index: int, selected: bool) -> CardVisual:
-	var visual := CardVisual.new(Vector2(HAND_W, HAND_H))
+	var w := _mobile_hand_w if _is_mobile else HAND_W
+	var h := _mobile_hand_h if _is_mobile else HAND_H
+	var visual := CardVisual.new(Vector2(w, h))
 	visual.show_texture(CardVisual.texture_for_id(Card.id_for(card.point, card.suit)))
 	visual.enable_fake3d(true)
 	if selected:

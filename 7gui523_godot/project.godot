@@ -15,3 +15,15 @@ config/description="斗地主变体卡牌游戏"
 config/version="1.0.0"
 run/main_scene="res://scenes/play/play.tscn"
 config/features=PackedStringArray("4.7")
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/size/resizable=true
+window/stretch/mode=canvas_items
+window/stretch/aspect=expand
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=false
