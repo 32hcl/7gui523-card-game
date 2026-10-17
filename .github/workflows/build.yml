@@ -3,91 +3,59 @@ name: Build & Release
 on:
   push:
     branches: [main]
-    paths:
-      - '7gui523_godot/**'
   workflow_dispatch:
 
 jobs:
-  export-windows:
-    name: Windows (.exe)
+  export-all:
+    name: Export All Platforms
     runs-on: ubuntu-latest
-    container:
-      image: barichello/godot-ci:4.4
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: Windows Desktop
+            artifact: 7gui523-win64
+          - preset: Android
+            artifact: 7gui523-android
+          - preset: Web
+            artifact: 7gui523-web
     steps:
       - uses: actions/checkout@v4
-      - name: Setup
-        run: |
-          mkdir -p build/windows
-      - name: Export
-        run: |
-          godot --headless --path 7gui523_godot --export-release "Windows Desktop" build/windows/7gui523.exe
-      - name: Zip
-        run: |
-          cd 7gui523_godot/build/windows
-          zip -r ../../../../7gui523-win64.zip .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: 7gui523-win64
-          path: 7gui523-win64.zip
 
-  export-web:
-    name: Web (HTML5)
-    runs-on: ubuntu-latest
-    container:
-      image: barichello/godot-ci:4.4
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup
-        run: |
-          mkdir -p build/web
-      - name: Export
-        run: |
-          godot --headless --path 7gui523_godot --export-release "Web" build/web/index.html
-      - name: Zip
-        run: |
-          cd 7gui523_godot/build/web
-          zip -r ../../../../7gui523-web.zip .
-      - uses: actions/upload-artifact@v4
+      - name: Export ${{ matrix.preset }}
+        uses: game-ci/godot-export@v1
         with:
-          name: 7gui523-web
-          path: 7gui523-web.zip
+          godot-version: '4.4.1'
+          preset: ${{ matrix.preset }}
+          project-path: 7gui523_godot
+          relative-export-path: build/${{ matrix.artifact }}
 
-  export-android:
-    name: Android (.apk)
-    runs-on: ubuntu-latest
-    container:
-      image: barichello/godot-ci:4.4
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup
-        run: |
-          mkdir -p build/android
-      - name: Setup Android keystore
-        run: |
-          keytool -genkey -v -keystore debug.keystore -alias debug -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Debug, OU=Dev, O=32Hcl, L=City, S=State, C=CN"
-      - name: Export
-        run: |
-          godot --headless --path 7gui523_godot --export-release "Android" build/android/7gui523.apk
       - name: Zip
         run: |
-          cp 7gui523_godot/build/android/7gui523.apk 7gui523-android.apk
-          zip 7gui523-android.zip 7gui523-android.apk
+          cd 7gui523_godot/build/${{ matrix.artifact }}
+          zip -r ../../../../${{ matrix.artifact }}.zip *
+
       - uses: actions/upload-artifact@v4
         with:
-          name: 7gui523-android
-          path: 7gui523-android.zip
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
 
   release:
     name: Create Release
-    needs: [export-windows, export-web, export-android]
+    needs: export-all
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always() && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts/
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -102,8 +70,8 @@ jobs:
             | Android | 7gui523-android.zip |
             | Web     | 7gui523-web.zip |
           files: |
-            artifacts/7gui523-win64/7gui523-win64.zip
-            artifacts/7gui523-android/7gui523-android.zip
-            artifacts/7gui523-web/7gui523-web.zip
+            artifacts/7gui523-win64.zip
+            artifacts/7gui523-android.zip
+            artifacts/7gui523-web.zip
           draft: false
           prerelease: false
