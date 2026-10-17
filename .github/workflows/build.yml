@@ -13,27 +13,52 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - preset: Windows Desktop
+          - preset: "Windows Desktop"
             artifact: 7gui523-win64
+            ext: exe
           - preset: Android
             artifact: 7gui523-android
+            ext: apk
           - preset: Web
             artifact: 7gui523-web
+            ext: html
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Export ${{ matrix.preset }}
-        uses: game-ci/godot-export@v1
-        with:
-          godot-version: '4.4.1'
-          preset: ${{ matrix.preset }}
-          project-path: 7gui523_godot
-          relative-export-path: build/${{ matrix.artifact }}
+      - name: Download Godot
+        run: |
+          GODOT_VER="4.4.1"
+          GODOT_BASENAME="Godot_v${GODOT_VER}-stable_linux.x86_64"
+          TPL_BASENAME="Godot_v${GODOT_VER}-stable_export_templates.tpz"
+
+          echo "Downloading Godot ${GODOT_VER}..."
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VER}-stable/${GODOT_BASENAME}.zip"
+          unzip -q godot.zip
+          mv ${GODOT_BASENAME} /usr/local/bin/godot
+          chmod +x /usr/local/bin/godot
+
+          echo "Downloading export templates..."
+          curl -sSL -o templates.tpz "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VER}-stable/${TPL_BASENAME}"
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VER}.stable
+          unzip -q templates.tpz -d ~/.local/share/godot/export_templates/${GODOT_VER}.stable
+          mv ~/.local/share/godot/export_templates/${GODOT_VER}.stable/templates/* ~/.local/share/godot/export_templates/${GODOT_VER}.stable/
+          echo "Godot ready: $(godot --version)"
+
+      - name: Setup Android (debug keystore)
+        if: matrix.preset == 'Android'
+        run: |
+          keytool -genkey -v -keystore 7gui523_godot/debug.keystore -alias debug -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Debug, OU=Dev, O=32Hcl, L=City, S=State, C=CN" -noprompt
+
+      - name: Export
+        run: |
+          mkdir -p build
+          godot --headless --path 7gui523_godot --export-release "${{ matrix.preset }}" "../build/${{ matrix.artifact }}.${{ matrix.ext }}"
 
       - name: Zip
         run: |
-          cd 7gui523_godot/build/${{ matrix.artifact }}
-          zip -r ../../../../${{ matrix.artifact }}.zip *
+          cd build
+          zip -r ../${{ matrix.artifact }}.zip *
 
       - uses: actions/upload-artifact@v4
         with:
@@ -44,17 +69,13 @@ jobs:
     name: Create Release
     needs: export-all
     runs-on: ubuntu-latest
-    if: always() && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
-
-      - name: List artifacts
-        run: ls -la artifacts/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -62,7 +83,7 @@ jobs:
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
           body: |
-            自动构建版本 — 提交 ${{ github.sha }}
+            自动构建版本
 
             | 平台 | 文件 |
             |------|------|
@@ -70,8 +91,6 @@ jobs:
             | Android | 7gui523-android.zip |
             | Web     | 7gui523-web.zip |
           files: |
-            artifacts/7gui523-win64.zip
-            artifacts/7gui523-android.zip
-            artifacts/7gui523-web.zip
+            artifacts/**/*.zip
           draft: false
           prerelease: false
