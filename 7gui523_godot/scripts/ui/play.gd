@@ -725,7 +725,13 @@ func _drag_drop() -> void:
 		_drag_cancel()
 		return
 	var indices := _drag_indices.duplicate()
+	## 强制清除选中态：与 _on_play_pressed 走统一模式，
+	## 防止 _do_play → _refresh_hand_smooth 时 _selected 残留
+	## 导致新渲染手牌在相同 index 位置仍显示"选中上浮/发光"
+	var saved := _selected.duplicate()
+	_selected.clear()
 	if not _do_play(indices):
+		_selected = saved
 		_drag_cancel()
 		return
 	## 出牌起点：用被拖卡在手牌里的原始全局位置覆盖默认中心。
