@@ -1,0 +1,16 @@
+# Godot export
+7gui523_godot/build/
+
+# C++ leftovers
+build/
+build-mingw64/
+release/
+resources/
+*.bat
+*.ps1
+campaign_log.txt
+common/
+tests/
+
+# Godot temp
+.godot/
