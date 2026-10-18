@@ -64,6 +64,19 @@ static func get_rank(p: String) -> int:
 	return RANK_MAP.get(p, 0)
 
 
+## 手牌排序（rank 降序 → 花色 Unicode 升序）
+## 返回索引数组，order[0] = 应排最左的元素在 hand 中的原始下标
+static func sorted_order(hand: Array) -> Array:
+	var order := range(hand.size())
+	order.sort_custom(func(a: int, b: int) -> bool:
+		var ra := get_rank(hand[a].point)
+		var rb := get_rank(hand[b].point)
+		if ra != rb:
+			return ra > rb
+		return hand[a].suit < hand[b].suit)
+	return order
+
+
 # ═══════════════════════════════════════════════════════════════
 # 实例方法
 # ═══════════════════════════════════════════════════════════════

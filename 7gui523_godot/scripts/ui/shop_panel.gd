@@ -40,26 +40,26 @@ func _ready() -> void:
 
 
 func _apply_theme() -> void:
-	var gold := Color(1.0, 0.84, 0.42)
-	var dark := Color(0.25, 0.18, 0.08)
-	var crimson := Color(0.35, 0.10, 0.08)
+	var dark := Color(0.15, 0.14, 0.17)
+	var accent := Color(0.20, 0.38, 0.58)
+	var crimson := Color(0.90, 0.24, 0.30)
 
 	_panel_bg.add_theme_stylebox_override("panel", _flat_style(
-		Color(0.12, 0.06, 0.04, 0.98), gold, 2, 12,
-		Color(0, 0, 0, 0.5), 24, 8))
+		Color(0.12, 0.11, 0.14, 0.98), Color(0.22, 0.21, 0.24), 1, 8,
+		Color(0, 0, 0, 0.5), 12, 6))
 
-	_style_btn(_refresh_btn, dark, gold)
-	_style_btn(_close_btn, dark, gold)
-	_style_btn(_close_bottom_btn, Color(0.30, 0.12, 0.10), Color(0.70, 0.52, 0.18))
-	_style_btn(_next_btn, Color(0.90, 0.24, 0.30), gold)
+	_style_btn(_refresh_btn, accent, Color(0.95, 0.95, 0.93))
+	_style_btn(_close_btn, dark, Color(0.88, 0.86, 0.83))
+	_style_btn(_close_bottom_btn, Color(0.35, 0.12, 0.15), Color(0.95, 0.90, 0.88))
+	_style_btn(_next_btn, Color(0.90, 0.24, 0.30), Color(0.95, 0.90, 0.88))
 
-	_style_header(%FixedHeader, gold)
-	_style_header(_enchant_header, gold)
-	_style_header(_refresh_sep, Color(0.55, 0.5, 0.45))
-	_style_header(%TitleLabel, gold)
+	_style_header(%FixedHeader, Color(0.88, 0.86, 0.83))
+	_style_header(_enchant_header, Color(0.88, 0.86, 0.83))
+	_style_header(_refresh_sep, Color(0.55, 0.53, 0.50))
+	_style_header(%TitleLabel, Color(0.95, 0.95, 0.93))
 
-	_chips_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
-	_refresh_cost_lbl.add_theme_color_override("font_color", Color(0.75, 0.7, 0.6))
+	_chips_lbl.add_theme_color_override("font_color", Color(0.95, 0.95, 0.93))
+	_refresh_cost_lbl.add_theme_color_override("font_color", Color(0.65, 0.63, 0.60))
 
 
 func _adjust_for_mobile() -> void:
@@ -150,7 +150,7 @@ func _make_row(it: Shop.ShopItem, chips: int) -> Control:
 	var btn := Button.new()
 	btn.text = "💰%d" % it.price
 	btn.disabled = (it.stock == 0) or (chips < it.price)
-	_style_btn(btn, Color(0.25, 0.45, 0.25), Color(1.0, 0.84, 0.42))
+	_style_btn(btn, Color(0.22, 0.42, 0.24), Color(0.95, 0.95, 0.93))
 	var t := it.type
 	btn.pressed.connect(func(): item_buy_requested.emit(t))
 	row.add_child(btn)
@@ -179,7 +179,7 @@ func _make_enchant_row(ei, index: int, chips: int) -> Control:
 	var btn := Button.new()
 	btn.text = ei.display_price()
 	btn.disabled = ei.sold_out or chips < ei.enchant.cost_chips
-	_style_btn(btn, Color(0.35, 0.20, 0.45), Color(1.0, 0.84, 0.42))
+	_style_btn(btn, Color(0.25, 0.18, 0.35), Color(0.95, 0.95, 0.93))
 	var idx := index
 	btn.pressed.connect(func(): enchant_buy_requested.emit(idx))
 	row.add_child(btn)
@@ -191,20 +191,21 @@ func _make_enchant_row(ei, index: int, chips: int) -> Control:
 ## 样式工具
 ## ═══════════════════════════════════════════════════════════════
 
-func _style_btn(btn: Button, bg: Color, border: Color) -> void:
-	var gold_glow := Color(border.r * 0.7, border.g * 0.55, border.b * 0.2, 0.55)
-	btn.add_theme_stylebox_override("normal", _flat_style(bg, border, 2, 9, gold_glow, 8, 3))
-	btn.add_theme_stylebox_override("hover", _flat_style(bg.lightened(0.12), border.lightened(0.15), 2, 9, gold_glow, 16, 4))
-	btn.add_theme_stylebox_override("pressed", _flat_style(bg.darkened(0.18), border.darkened(0.25), 2, 9, Color(0, 0, 0, 0.4), 6, 2))
-	btn.add_theme_stylebox_override("disabled", _flat_style(Color(0.24, 0.18, 0.16), Color(0.30, 0.24, 0.18), 2, 9))
-	btn.add_theme_color_override("font_color", Color(1, 0.96, 0.85))
-	btn.add_theme_color_override("font_hover_color", Color(1, 1, 0.92))
-	btn.add_theme_color_override("font_pressed_color", Color(1, 0.82, 0.62))
-	btn.add_theme_color_override("font_disabled_color", Color(0.55, 0.45, 0.35))
+func _style_btn(btn: Button, bg: Color, text_col: Color) -> void:
+	var shadow_c := Color(0.0, 0.0, 0.0, 0.55)
+	var border_c := bg.darkened(0.18)
+	btn.add_theme_stylebox_override("normal", _flat_style(bg, border_c, 1, 6, shadow_c, 4, 4, 2))
+	btn.add_theme_stylebox_override("hover", _flat_style(bg.lightened(0.08), border_c.lightened(0.05), 1, 6, shadow_c, 5, 4, 2))
+	btn.add_theme_stylebox_override("pressed", _flat_style(bg.darkened(0.12), border_c.darkened(0.08), 1, 6, shadow_c, 1, 1, 6))
+	btn.add_theme_stylebox_override("disabled", _flat_style(Color(0.18, 0.18, 0.19), Color(0.22, 0.22, 0.23), 1, 6))
+	btn.add_theme_color_override("font_color", text_col)
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.97))
+	btn.add_theme_color_override("font_pressed_color", text_col.darkened(0.12))
+	btn.add_theme_color_override("font_disabled_color", Color(0.45, 0.44, 0.43))
 
 
 func _flat_style(bg_c: Color, border_c: Color, bw: int = 2, radius: int = 6,
-		shadow_c: Color = Color(0, 0, 0, 0), shadow_size: int = 0, shadow_off: int = 0) -> StyleBoxFlat:
+		shadow_c: Color = Color(0, 0, 0, 0), shadow_size: int = 0, shadow_off: int = 0, content_top: int = 0) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg_c
 	sb.border_color = border_c
@@ -214,6 +215,8 @@ func _flat_style(bg_c: Color, border_c: Color, bw: int = 2, radius: int = 6,
 		sb.shadow_color = shadow_c
 		sb.shadow_size = shadow_size
 		sb.shadow_offset = Vector2(0, shadow_off)
+	if content_top != 0:
+		sb.content_margin_top = content_top
 	return sb
 
 

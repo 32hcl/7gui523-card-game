@@ -16,8 +16,9 @@ const SUIT_DIR := {
 	3: "Diamonds",  ## 方块  id 39-51
 }
 const CARDS_DIR := "res://art/Top-Down/Cards"
-const BACK_TEX := "res://art/Top-Down/Cards/Card_Back-Red-88x124.png"  ## 单张红色牌背（源自 Demo CardsBack/0.png）
-## 注：旧 Card_Back-88x124.png 实为左右双联图，勿用作单卡背面
+const BACK_TEX := "res://art/Top-Down/Cards/Card_Back-Red-88x124.png"
+const JOKER_BLACK := "res://art/Top-Down/Cards/joker_black.png"
+const JOKER_RED := "res://art/Top-Down/Cards/joker_red.png"
 
 const SHADOW_OFFSET := Vector2(6, 10)   ## 阴影偏移（右下，模拟左上光源）
 const SHADOW_ALPHA := 0.42              ## 阴影浓度
@@ -84,13 +85,21 @@ func _notification(what: int) -> void:
 ## 逻辑→视觉唯一入口：按 Card id 显示牌面
 func show_id(id: int) -> void:
 	card_id = id
-	_tex.texture = texture_for_id(id)
+	var tex := texture_for_id(id)
+	_tex.texture = tex
+	_sync_shadow_texture(tex)
 
 
 ## 显示任意资源图（牌背 / 牌堆 / 筹码 / 画廊用）
 func show_texture(tex: Texture2D) -> void:
 	card_id = -1
 	_tex.texture = tex
+	_sync_shadow_texture(tex)
+
+
+func _sync_shadow_texture(tex: Texture2D) -> void:
+	if _shadow_enabled and _shadow_tex:
+		_shadow_tex.texture = tex
 
 
 ## 交换当前展示为牌背
@@ -318,6 +327,10 @@ func _enable_shadow() -> void:
 	mat.set_shader_parameter("alpha", SHADOW_ALPHA)
 	_shadow_tex.material = mat
 
+	## 同步当前牌面纹理到阴影层（解耦 show_texture / enable_fake3d 调用顺序）
+	if _tex.texture:
+		_shadow_tex.texture = _tex.texture
+
 	## 阴影必须在卡牌之下（作为第一个子节点）
 	add_child(_shadow_tex)
 	move_child(_shadow_tex, 0)
@@ -327,35 +340,13 @@ func _enable_shadow() -> void:
 # 静态工具
 # ═══════════════════════════════════════════════════════════════
 
-## 按 id 返回牌面贴图（id 0-51 花色牌，52 小鬼 / 53 大鬼）
+## 按 id 返回牌面贴图（id 0-51 花色牌，52 小鬼/黑Joker / 53 大鬼/红Joker）
 static func texture_for_id(id: int) -> Texture2D:
-	if id >= 52:
-		return joker_image(id == 53)
+	if id == 52:
+		return load(JOKER_BLACK)
+	if id == 53:
+		return load(JOKER_RED)
 	var suit_i := id / 13
 	var rank_i := id % 13
 	var path := "%s/%s/%02d.png" % [CARDS_DIR, SUIT_DIR[suit_i], rank_i]
 	return load(path)
-
-
-## 代码生成大小王（88x124，与花色牌同尺寸，风格统一）
-static func joker_image(is_red: bool) -> Texture2D:
-	var w := 88
-	var h := 124
-	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	# 卡底
-	var base_color: Color
-	if is_red:
-		base_color = Color(0.72, 0.16, 0.12, 1)
-	else:
-		base_color = Color(0.12, 0.12, 0.14, 1)
-	img.fill(base_color)
-	# 浅色内框
-	var fw := w - 8
-	var fh := h - 8
-	var frame_color: Color
-	if is_red:
-		frame_color = Color(0.86, 0.30, 0.24, 1)
-	else:
-		frame_color = Color(0.22, 0.22, 0.26, 1)
-	img.fill_rect(Rect2i(4, 4, fw, fh), frame_color)
-	return ImageTexture.create_from_image(img)

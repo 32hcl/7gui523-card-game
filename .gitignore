@@ -17,3 +17,10 @@ tests/
 
 # Godot temp
 .godot/
+
+# Test artifacts
+_devtest/*_err.txt
+_devtest/*_output.txt
+
+# User notes
+PROJECT_NOTES.txt

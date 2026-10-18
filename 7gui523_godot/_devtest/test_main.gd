@@ -17,6 +17,7 @@ const TestScore := preload("res://_devtest/test_score.gd")
 const TestDeckPlayer := preload("res://_devtest/test_deck_player.gd")
 const TestAIRound := preload("res://_devtest/test_ai_round.gd")
 const TestCampaign := preload("res://_devtest/test_campaign.gd")
+const TestSort := preload("res://_devtest/test_sort.gd")
 
 
 func _init() -> void:
@@ -39,8 +40,11 @@ static func _run() -> int:
 	failed += TestAIRound._run()
 	print("──── 调用 test_campaign.gd ────")
 	failed += TestCampaign._run()
+	print("──── 调用 test_sort.gd ────")
+	failed += TestSort._run()
 
 	print("")
 	print("汇总 Result: %s failed" % failed)
 	print("=".repeat(60))
 	return failed
+	

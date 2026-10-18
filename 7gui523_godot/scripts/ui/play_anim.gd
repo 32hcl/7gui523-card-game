@@ -7,10 +7,13 @@ class_name PlayAnim
 
 func _render_hand_block(hand: Array, anchor_x: float, rot_scale: float, tint: Color,
 		idx_base: int, id_prefix: String, z_base: int,
-		by_id: Dictionary, animate: bool, deal_from: Vector2, base_delay: int, overall: int = 0) -> void:
-	var order := _sorted_order(hand)
+		by_id: Dictionary, animate: bool, deal_from: Vector2, base_delay: int, overall: int = 0,
+		card_w: float = float(HAND_W), card_gap: float = float(HAND_CARD_GAP), base_y: float = 0.0, card_h: float = float(HAND_H),
+		x_positions: Array = [], y_positions: Array = [], order_override: Array = []) -> void:
+	var order := order_override if not order_override.is_empty() else Card.sorted_order(hand)
 	var m := hand.size()
-	var rot_eff := 1.0 if overall > 0 else rot_scale
+	var rot_eff := rot_scale
+	var card_size := Vector2(card_w, card_h)
 	for p in m:
 		var real: int = order[p]
 		var key: int = idx_base + real
@@ -19,7 +22,7 @@ func _render_hand_block(hand: Array, anchor_x: float, rot_scale: float, tint: Co
 		var v: CardVisual = by_id.get(cid, null)
 		var sel := _selected.has(key)
 		if v == null:
-			v = _hand_card(card, key, sel)
+			v = _hand_card(card, key, sel, card_size)
 			v.set_meta("card_id", cid)
 			_player_hand.add_child(v)
 		else:
@@ -35,15 +38,27 @@ func _render_hand_block(hand: Array, anchor_x: float, rot_scale: float, tint: Co
 				var tin := v.create_tween()
 				tin.tween_property(v, "modulate:a", 1.0, 0.15)
 
-		var target := _fan_target(overall, m, p, idx_base + p, anchor_x, rot_eff, key)
+		var x_override: float = x_positions[real] if x_positions.size() > real else NAN
+		var y_override: float = y_positions[real] if y_positions.size() > real else NAN
+		var target := _fan_target(overall, m, p, idx_base + p, anchor_x, rot_eff, key, card_w, card_gap, base_y, x_override, y_override)
 		var z_rot: float = target["rot"]
+		if not is_nan(x_override) and x_positions.size() > 1:
+			var min_x: float = INF
+			var max_x: float = -INF
+			for xv in x_positions:
+				if not is_nan(xv):
+					min_x = minf(min_x, xv)
+					max_x = maxf(max_x, xv)
+			if max_x > min_x:
+				var t_local := (x_override - min_x) / (max_x - min_x)
+				z_rot = lerpf(-HAND_ROT_MAX, HAND_ROT_MAX, t_local) * rot_eff
 		var target_scale := Vector2(SELECTED_SCALE, SELECTED_SCALE) if sel else Vector2.ONE
 		v.mouse_filter = Control.MOUSE_FILTER_STOP
 		v.set_selected(sel)
 		v.modulate = tint if not sel else Color(1.0, 1.0, 1.0, 1.0)
 		var layer_z := z_base + p
 		v.base_z = layer_z
-		v.z_index = 100 if v.get_meta("_hovered", false) else layer_z
+		v.z_index = layer_z
 
 		if animate:
 			_deal_card_anim(v, deal_from, target["pos"], z_rot,
@@ -74,14 +89,16 @@ func _refresh_hand_smooth() -> void:
 
 	var n := _human.normal_hand.size()
 	var m := _human.instant_hand.size()
-	var met := _hand_metrics(n, m)
+	var met := _hand_metrics(n, m, _human.normal_hand, _human.instant_hand)
 
 	var deal_from: Vector2 = _player_hand.get_global_transform_with_canvas().affine_inverse() \
 		* (_player_deck.global_position + _player_deck.size * 0.5)
 
-	## 7 张整体连续扇形（统一弧面）+ INSTANT_GAP 标注 5+2；补区保留淡蓝身份
-	_render_hand_block(_human.normal_hand, met["start_x"], 1.0, Color.WHITE, 0, "", 10, by_id, false, deal_from, 0, met["total"])
-	_render_hand_block(_human.instant_hand, met["instant_x"], 0.5, INSTANT_TINT, n, "i_", 30, by_id, false, deal_from, 0, met["total"])
+	## 双层布局：备用先加入树（前），主力后加入树（后 → 优先收到事件）
+	_render_hand_block(_human.instant_hand, met["instant_x"], 0.5, INSTANT_TINT, n, "i_", 10, by_id, false, deal_from, 0, met["total"],
+		met["card_w"], met["igap"], met["instant_y"], met["card_h"], met.get("instant_positions", []))
+	_render_hand_block(_human.normal_hand, met["start_x"], 1.0, Color.WHITE, 0, "", 30, by_id, false, deal_from, 0, met["total"],
+		met["card_w"], 0.0, 0.0, met["card_h"], met.get("normal_xpos", []), met.get("normal_ypos", []), met.get("normal_order", []))
 
 	## 消失的卡（已打出）：直接释放，无动画，避免残影
 	for cid in by_id:
@@ -100,15 +117,17 @@ func _refresh_hand_with_animation(animate: bool) -> void:
 	if n == 0 and m == 0:
 		return
 
-	var met := _hand_metrics(n, m)
+	var met := _hand_metrics(n, m, _human.normal_hand, _human.instant_hand)
 	## 抽卡起点：从玩家牌堆中心飞入手牌区（转成 _player_hand 局部坐标）
 	## Control 无 to_local（Node2D 专属），改用全局画布变换求逆
 	var deal_from: Vector2 = _player_hand.get_global_transform_with_canvas().affine_inverse() \
 		* (_player_deck.global_position + _player_deck.size * 0.5)
-	## 开局重建，by_id 为空；7 张整体扇形，普通区与补区都从牌堆中心飞出
+	## 开局重建，by_id 为空；备用先加入树，主力后加入 → 主力优先收到事件
 	var empty_ids := {}
-	_render_hand_block(_human.normal_hand, met["start_x"], 1.0, Color.WHITE, 0, "", 10, empty_ids, animate, deal_from, 0, met["total"])
-	_render_hand_block(_human.instant_hand, met["instant_x"], 0.5, INSTANT_TINT, n, "i_", 30, empty_ids, animate, deal_from, n, met["total"])
+	_render_hand_block(_human.instant_hand, met["instant_x"], 0.5, INSTANT_TINT, n, "i_", 10, empty_ids, animate, deal_from, n, met["total"],
+		met["card_w"], met["igap"], met["instant_y"], met["card_h"], met.get("instant_positions", []))
+	_render_hand_block(_human.normal_hand, met["start_x"], 1.0, Color.WHITE, 0, "", 30, empty_ids, animate, deal_from, 0, met["total"],
+		met["card_w"], 0.0, 0.0, met["card_h"], met.get("normal_xpos", []), met.get("normal_ypos", []), met.get("normal_order", []))
 
 
 func _deal_card_anim(visual: CardVisual, from_pos: Vector2, target_pos: Vector2,
@@ -261,8 +280,8 @@ func _run_table_anim() -> void:
 	if not is_instance_valid(self) or not _table_anim_running:
 		return
 
-	var cw := _mobile_card_w if _is_mobile else CARD_W
-	var ch := _mobile_card_h if _is_mobile else CARD_H
+	var cw: float = _mobile_card_w if _is_mobile else CARD_W
+	var ch: float = _mobile_card_h if _is_mobile else CARD_H
 	var half := Vector2(cw, ch) * 0.5
 	var n := _table_cards_anim.size()
 	var total := 0.0

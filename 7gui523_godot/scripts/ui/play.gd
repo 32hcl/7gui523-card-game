@@ -5,6 +5,11 @@ extends PlayUI
 ## 继承链顶层的正式对战主场景。
 ## 双牌堆 + Round 引擎 + AI，玩家选牌出牌，桌面伤害结算。
 
+## 双击桌面 = 不要（移动端 touchstart 兼容）
+const DOUBLE_CLICK_MSEC := 300
+var _last_table_click_msec := 0
+var _last_table_click_pos := Vector2.ZERO
+
 
 func _ready() -> void:
 	setup_responsive()
@@ -32,8 +37,6 @@ func _ready() -> void:
 
 	## 连接额外按钮信号（场景中未预置 connection）
 	_shop_btn.pressed.connect(_on_shop_pressed)
-	_hp_swap_btn.pressed.connect(_on_hp_swap_pressed)
-	_return_btn.pressed.connect(_on_return_pressed)
 
 	_campaign = Campaign.new()
 	_campaign.player_chips = 50   ## 起始筹码
@@ -127,7 +130,6 @@ func _start_level(level: int) -> void:
 	_table_cards_anim.clear()
 	_play_src_global = Vector2.ZERO
 	_selected.clear()
-	_log_lines.clear()
 
 	var rule = Campaign.level_rule(level)
 	## 猜牌决定先手；猜先期间隔离操作按钮
@@ -172,11 +174,8 @@ func _start_level(level: int) -> void:
 
 ## 统一开关操作按钮（猜先等流程隔离用）
 func _set_op_buttons_enabled(on: bool) -> void:
-	_play_btn.disabled = not on
 	_pass_btn.disabled = not on
 	_shop_btn.disabled = not on
-	_hp_swap_btn.disabled = not on
-	_return_btn.disabled = not on
 	_new_game_btn.disabled = not on
 
 
@@ -366,7 +365,6 @@ func _on_round_won(winner: RefCounted, damage: int) -> void:
 func _end_level(player_won: bool) -> void:
 	_phase = "level_end"
 	_finished = true
-	_play_btn.disabled = true
 	_pass_btn.disabled = true
 
 	var player_remain := _human.normal_hand.size() + _human_deck.total()
@@ -411,28 +409,7 @@ func _show_game_over(title: String, detail: String) -> void:
 # AI 逻辑
 # ═══════════════════════════════════════════════════════════════
 
-## 出牌按钮：选中非空 → 复用 _do_play；失败保留选中便于调整
-func _on_play_pressed() -> void:
-	if _finished: return
-	if _round == null or not is_instance_valid(_round):
-		return
-	if _round.whose_turn() != _human:
-		_log("还没轮到你")
-		return
-	# 官方流程：选定非空 → 牌型合法 → 压得过，才真正执行
-	if _selected.is_empty():
-		_log("请先选择要出的牌")
-		return
-	## 先把选中快照并清空：_do_play 内部的 process_play → _refresh 渲染用的是当时的 _selected，
-	## 若不清空，出牌那几张的选中态会被渲到界面再回落，视觉会"残留/移位到相邻牌"。
-	## 清空后 refresh 所见即出牌后的新集合，出牌成功无需二次刷新（不中断补牌动画）。
-	var chosen := _selected.duplicate()
-	_selected.clear()
-	if not _do_play(chosen):
-		_selected = chosen  # 出牌失败保留原选中
-
-
-## 共用出牌流程（按钮与拖拽）：牌型合法 → 压得过 → process_play → 刷新
+## 共用出牌流程（拖拽松手调用）：牌型合法 → 压得过 → process_play → 刷新
 ## 返回是否成功；失败时选中不动，由调用方决定
 func _do_play(indices: Array[int]) -> bool:
 	if _finished or not is_instance_valid(_round) or _round.whose_turn() != _human:
@@ -501,7 +478,6 @@ func _schedule_ai_if_needed() -> void:
 	var cur := _round.whose_turn()
 	if not cur.is_human and not _ai_busy:
 		_ai_busy = true
-		_play_btn.disabled = true
 		_pass_btn.disabled = true
 		_hand_type_lbl.text = "AI 思考中…"
 		var t := get_tree().create_timer(0.7)
@@ -516,7 +492,6 @@ func _ai_think() -> void:
 	var lp := _round.last_play
 	var table_score := _round.table_score
 	var play := AICore.choose(_ai, _human, lp, _ai_deck, table_score, _tracker)
-	_play_btn.disabled = false
 	_pass_btn.disabled = false
 	## 赖账鬼强压：AI Pass 前，同花色任意单张强压玩家 J 以下单张
 	if play.is_empty() and lp != null and not lp.cards.is_empty() and not _ai.hand.is_empty():
@@ -595,21 +570,6 @@ func _on_shop_pressed() -> void:
 		_show_shop_panel()
 
 
-func _on_return_pressed() -> void:
-	## 返回 / 重开：重置战役
-	_on_reset_pressed()
-
-
-func _on_hp_swap_pressed() -> void:
-	## 调试用：HP 互换（作弊按钮）
-	var t := _human_hp
-	_human_hp = _ai_hp
-	_ai_hp = t
-	_campaign.player_hp = _human_hp
-	_campaign.boss_hp = _ai_hp
-	_refresh("HP 已互换（调试）")
-
-
 func _on_next_level() -> void:
 	_hide_shop_panel()
 	if _campaign.current_level >= _campaign.config.total_levels:
@@ -619,7 +579,25 @@ func _on_next_level() -> void:
 
 
 ## 拖拽输入路由：点击 vs 拖拽判定、松手出牌、右键/Esc 取消
+## 双击桌面触发"不要"（移动端 touchstart 兼容，间隔 < 300ms）
 func _input(event: InputEvent) -> void:
+	## — 桌面双击 = 不要（Pointer Event 兼容触屏+鼠标）—
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT \
+			and not _dragging and not _drag_pending:
+		var table_rect: Rect2 = _table_cards.get_global_rect()
+		if table_rect.has_point(event.global_position):
+			var now: int = Time.get_ticks_msec()
+			var dist: float = event.global_position.distance_to(_last_table_click_pos)
+			if (now - _last_table_click_msec) < DOUBLE_CLICK_MSEC and dist < 44.0:
+				get_viewport().set_input_as_handled()
+				_last_table_click_msec = 0
+				_last_table_click_pos = Vector2.ZERO
+				_on_pass_pressed()
+				return
+			_last_table_click_msec = now
+			_last_table_click_pos = event.global_position
+
 	if not _drag_pending and not _dragging:
 		return
 	if event is InputEventMouseMotion:
@@ -718,37 +696,95 @@ func _drag_start(index: int) -> void:
 		_drag_visuals.append(v)
 
 
-## 松手：在桌面区 → 出牌；否则弹回
+## 松手：在桌面区 → 出牌；在手牌区 → 排序；否则弹回
 func _drag_drop() -> void:
 	var mouse := get_global_mouse_position()
-	if not _table_cards.get_global_rect().has_point(mouse):
-		_drag_cancel()
+	if _table_cards.get_global_rect().has_point(mouse):
+		_drag_drop_play()
 		return
+	## 手牌区松手 → 拖拽排序（仅单张，横向拖动交换位置）
+	if _player_hand.get_global_rect().has_point(mouse) and _drag_indices.size() == 1:
+		_drag_sort(mouse.x)
+		return
+	_drag_cancel()
+
+
+## 拖拽到桌面区 → 出牌（原有逻辑）
+func _drag_drop_play() -> void:
 	var indices := _drag_indices.duplicate()
-	## 强制清除选中态：与 _on_play_pressed 走统一模式，
-	## 防止 _do_play → _refresh_hand_smooth 时 _selected 残留
-	## 导致新渲染手牌在相同 index 位置仍显示"选中上浮/发光"
 	var saved := _selected.duplicate()
 	_selected.clear()
 	if not _do_play(indices):
 		_selected = saved
 		_drag_cancel()
 		return
-	## 出牌起点：用被拖卡在手牌里的原始全局位置覆盖默认中心。
-	## 立刻补牌区(右侧)与普通区由此都能从卡片原位飞出，不再偏移到整区中心。
+	## 出牌起点：被拖卡在手牌里的原始全局位置
 	if not _drag_origin.is_empty():
 		var o: Dictionary = _drag_origin[0]
 		var p: Control = o["parent"]
 		if is_instance_valid(p):
 			_play_src_global = p.get_global_transform_with_canvas() * o["pos"]
-	## 出牌成功：拖拽视觉卡丢弃（数据刷新已重建手牌/桌面）
+	_dismiss_drag_visuals()
+
+
+## 手牌内横向拖动 → 交换位置（splice + 平滑刷新）
+func _drag_sort(mouse_x: float) -> void:
+	var idx: int = _drag_indices[0]
+	if idx >= _human.normal_hand.size():
+		_drag_cancel()
+		return
+
+	## 收集手牌区中其余卡牌的中心 x（它们位置未变，因为拖拽卡已被 reparent）
+	var refs: Array[Dictionary] = []
+	for ch in _player_hand.get_children():
+		if not (ch is CardVisual) or ch.is_queued_for_deletion():
+			continue
+		var ci: int = ch.get_meta("hand_index", -1)
+		if ci < 0 or ci >= _human.normal_hand.size() or ci == idx:
+			continue
+		refs.append({"index": ci, "cx": ch.global_position.x + ch.size.x * 0.5})
+	refs.sort_custom(func(a, b): return a.cx < b.cx)
+
+	if refs.is_empty():
+		_drag_cancel()
+		return
+
+	## 横坐标落在哪张牌左侧，就插入到那张牌的位置
+	var target: int = idx
+	if mouse_x <= refs[0].cx:
+		target = 0
+	elif mouse_x >= refs[-1].cx:
+		target = _human.normal_hand.size() - 1
+	else:
+		for r in refs:
+			if mouse_x < r.cx:
+				target = r.index
+				break
+
+	if target == idx:
+		_drag_cancel()
+		return
+
+	## splice 重排
+	var card: Card = _human.normal_hand[idx]
+	_human.normal_hand.remove_at(idx)
+	_human.normal_hand.insert(target, card)
+
+	_selected.clear()
+	_dismiss_drag_visuals()
+	_refresh_hand()
+
+
+## 释放所有拖拽视觉（丢弃 overlay 上的卡并重置状态）
+func _dismiss_drag_visuals() -> void:
+	_dragging = false
+	_drop_hint.visible = false
 	for v in _drag_visuals:
 		if is_instance_valid(v):
 			v.queue_free()
 	_drag_visuals.clear()
 	_drag_indices.clear()
 	_drag_origin.clear()
-	_drop_hint.visible = false
 
 
 ## 取消拖拽：逐张弹回原位（tween 并行；期间手牌若被重建则随节点释放，无残留）
@@ -760,8 +796,10 @@ func _drag_cancel() -> void:
 		if not is_instance_valid(v):
 			continue
 		var o: Dictionary = _drag_origin[i]
+		var cur_global := v.global_position
 		if is_instance_valid(o["parent"]):
 			v.reparent(o["parent"])
+		v.global_position = cur_global
 		v.z_index = o["z"]
 		var tw := v.create_tween()
 		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
