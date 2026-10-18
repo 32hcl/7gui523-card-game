@@ -1,6 +1,6 @@
 # 7鬼523 变体
 
-Copyright © 2026 32%Hcl 陈龙大王
+Copyright (c) 2026 32%Hcl 陈龙大王
 
 两人对战的扑克牌游戏。Godot 4 重制版，支持 AI 对战和关卡模式。
 
