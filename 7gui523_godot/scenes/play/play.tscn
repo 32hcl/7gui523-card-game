@@ -62,7 +62,7 @@ layout_mode = 2
 
 [node name="BossRow" type="HBoxContainer" parent="MainVBox/BossZone" unique_id=1605942088]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 12
 
 [node name="BossAvatarArea" type="Control" parent="MainVBox/BossZone/BossRow" unique_id=1399433045]
 custom_minimum_size = Vector2(72, 0)
@@ -70,17 +70,26 @@ layout_mode = 2
 mouse_filter = 2
 
 [node name="BossHand" type="HBoxContainer" parent="MainVBox/BossZone/BossRow" unique_id=258029177]
+custom_minimum_size = Vector2(264, 0)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 0
 mouse_filter = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = -24
 alignment = 1
 
-[node name="BossHandInstant" type="HBoxContainer" parent="MainVBox/BossZone/BossRow" unique_id=258029178]
+[node name="BossSep" type="ColorRect" parent="MainVBox/BossZone/BossRow"]
+custom_minimum_size = Vector2(1, 0)
+color = Color(0.30, 0.28, 0.32, 1)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_vertical = 3
 mouse_filter = 2
-theme_override_constants/separation = 14
+
+[node name="BossHandInstant" type="HBoxContainer" parent="MainVBox/BossZone/BossRow" unique_id=258029178]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+size_flags_horizontal = 0
+mouse_filter = 2
+theme_override_constants/separation = -24
 alignment = 1
 
 [node name="TableArea" type="Panel" parent="MainVBox" unique_id=558354268]
