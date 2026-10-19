@@ -1,4 +1,4 @@
-extends PlayAnim
+extends "res://scripts/ui/play_anim.gd"
 class_name PlayUI
 
 ## — 第 3 层 play_ui：关末商店

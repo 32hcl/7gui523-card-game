@@ -40,26 +40,22 @@ func _ready() -> void:
 
 
 func _apply_theme() -> void:
-	var dark := Color(0.15, 0.14, 0.17)
-	var accent := Color(0.20, 0.38, 0.58)
-	var crimson := Color(0.90, 0.24, 0.30)
-
 	_panel_bg.add_theme_stylebox_override("panel", _flat_style(
-		Color(0.12, 0.11, 0.14, 0.98), Color(0.22, 0.21, 0.24), 1, 8,
+		Color(PlayBase.COL_PANEL, 0.98), Color(0.22, 0.21, 0.24), 1, 8,
 		Color(0, 0, 0, 0.5), 12, 6))
 
-	_style_btn(_refresh_btn, accent, Color(0.95, 0.95, 0.93))
-	_style_btn(_close_btn, dark, Color(0.88, 0.86, 0.83))
-	_style_btn(_close_bottom_btn, Color(0.35, 0.12, 0.15), Color(0.95, 0.90, 0.88))
-	_style_btn(_next_btn, Color(0.90, 0.24, 0.30), Color(0.95, 0.90, 0.88))
+	_style_btn(_refresh_btn, PlayBase.COL_ACCENT, Color(0.95, 0.95, 0.93))
+	_style_btn(_close_btn, PlayBase.COL_PANEL, Color(0.88, 0.86, 0.83))
+	_style_btn(_close_bottom_btn, PlayBase.COL_CRIMSON.darkened(0.55), Color(0.95, 0.90, 0.88))
+	_style_btn(_next_btn, PlayBase.COL_CRIMSON, Color(0.95, 0.90, 0.88))
 
-	_style_header(%FixedHeader, Color(0.88, 0.86, 0.83))
-	_style_header(_enchant_header, Color(0.88, 0.86, 0.83))
-	_style_header(_refresh_sep, Color(0.55, 0.53, 0.50))
-	_style_header(%TitleLabel, Color(0.95, 0.95, 0.93))
+	_style_header(%FixedHeader, PlayBase.COL_TEXT)
+	_style_header(_enchant_header, PlayBase.COL_TEXT)
+	_style_header(_refresh_sep, PlayBase.COL_TEXT_DIM)
+	_style_header(%TitleLabel, PlayBase.COL_TEXT)
 
-	_chips_lbl.add_theme_color_override("font_color", Color(0.95, 0.95, 0.93))
-	_refresh_cost_lbl.add_theme_color_override("font_color", Color(0.65, 0.63, 0.60))
+	_chips_lbl.add_theme_color_override("font_color", PlayBase.COL_GOLD)
+	_refresh_cost_lbl.add_theme_color_override("font_color", PlayBase.COL_TEXT_DIM)
 
 
 func _adjust_for_mobile() -> void:
@@ -104,7 +100,7 @@ func populate(fixed: Array[Shop.ShopItem], refreshable: Array[Shop.ShopItem],
 	if not enchant_unlocked:
 		var lock := Label.new()
 		lock.text = "🔒 本关已消费 %d / 32 筹码，达成后解锁" % level_spent
-		lock.add_theme_color_override("font_color", Color(0.6, 0.55, 0.5))
+		lock.add_theme_color_override("font_color", PlayBase.COL_TEXT_DIM)
 		lock.add_theme_font_size_override("font_size", 12)
 		_enchant_box.add_child(lock)
 	else:
@@ -131,26 +127,26 @@ func _make_row(it: Shop.ShopItem, chips: int) -> Control:
 	var name_lbl := Label.new()
 	name_lbl.text = it.name
 	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_lbl.add_theme_color_override("font_color", Color(1, 0.96, 0.85))
+	name_lbl.add_theme_color_override("font_color", PlayBase.COL_TEXT)
 	row.add_child(name_lbl)
 
 	var desc_lbl := Label.new()
 	desc_lbl.text = it.desc
-	desc_lbl.add_theme_color_override("font_color", Color(0.7, 0.65, 0.55))
+	desc_lbl.add_theme_color_override("font_color", PlayBase.COL_TEXT_DIM)
 	desc_lbl.add_theme_font_size_override("font_size", 11)
 	desc_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(desc_lbl)
 
 	var stock_lbl := Label.new()
 	stock_lbl.text = "∞" if it.stock < 0 else "×%d" % it.stock
-	stock_lbl.add_theme_color_override("font_color", Color(0.8, 0.75, 0.65))
+	stock_lbl.add_theme_color_override("font_color", PlayBase.COL_TEXT_DIM)
 	stock_lbl.custom_minimum_size = Vector2(32, 0)
 	row.add_child(stock_lbl)
 
 	var btn := Button.new()
 	btn.text = "💰%d" % it.price
 	btn.disabled = (it.stock == 0) or (chips < it.price)
-	_style_btn(btn, Color(0.22, 0.42, 0.24), Color(0.95, 0.95, 0.93))
+	_style_btn(btn, PlayBase.COL_GREEN, Color(0.95, 0.95, 0.93))
 	var t := it.type
 	btn.pressed.connect(func(): item_buy_requested.emit(t))
 	row.add_child(btn)
@@ -166,12 +162,12 @@ func _make_enchant_row(ei, index: int, chips: int) -> Control:
 	var name_lbl := Label.new()
 	name_lbl.text = ei.display_name()
 	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_lbl.add_theme_color_override("font_color", Color(1, 0.9, 0.7))
+	name_lbl.add_theme_color_override("font_color", PlayBase.COL_GOLD)
 	row.add_child(name_lbl)
 
 	var desc_lbl := Label.new()
 	desc_lbl.text = ei.enchant.desc
-	desc_lbl.add_theme_color_override("font_color", Color(0.7, 0.65, 0.55))
+	desc_lbl.add_theme_color_override("font_color", PlayBase.COL_TEXT_DIM)
 	desc_lbl.add_theme_font_size_override("font_size", 11)
 	desc_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(desc_lbl)
@@ -179,7 +175,7 @@ func _make_enchant_row(ei, index: int, chips: int) -> Control:
 	var btn := Button.new()
 	btn.text = ei.display_price()
 	btn.disabled = ei.sold_out or chips < ei.enchant.cost_chips
-	_style_btn(btn, Color(0.25, 0.18, 0.35), Color(0.95, 0.95, 0.93))
+	_style_btn(btn, PlayBase.COL_ACCENT, Color(0.95, 0.95, 0.93))
 	var idx := index
 	btn.pressed.connect(func(): enchant_buy_requested.emit(idx))
 	row.add_child(btn)

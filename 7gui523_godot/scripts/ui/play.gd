@@ -1,4 +1,4 @@
-extends PlayUI
+extends "res://scripts/ui/play_ui.gd"
 
 ## — 第 4 层 play：入口 · 关卡流程 · Round 信号 · AI · 拖拽
 ##
@@ -28,8 +28,8 @@ func _ready() -> void:
 	_drop_hint.z_index = 40
 	_drop_hint.visible = false
 	var hint_sb := StyleBoxFlat.new()
-	hint_sb.bg_color = Color(1.0, 0.83, 0.25, 0.10)
-	hint_sb.border_color = Color(1.0, 0.83, 0.25, 0.65)
+	hint_sb.bg_color = Color(COL_GOLD, 0.10)
+	hint_sb.border_color = Color(COL_GOLD, 0.65)
 	hint_sb.set_border_width_all(2)
 	hint_sb.set_corner_radius_all(8)
 	_drop_hint.add_theme_stylebox_override("panel", hint_sb)
@@ -43,7 +43,142 @@ func _ready() -> void:
 	_campaign.cleared_level = 0
 	_shop = Shop.new()
 	_tracker = AICore.CardTracker.new()
-	_enter_casino_then_start(_campaign.current_level)
+	_show_main_menu()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 主界面（play 内覆盖层）：开始游戏 / 阅读规则
+# ═══════════════════════════════════════════════════════════════
+
+const RULES_TEXT := """【目标】逐关击败 BOSS：把对方 HP 扣到 0 即过关；你的 HP 归零则挑战失败。
+
+【出牌】拖拽手牌到桌面区域出牌，牌型必须合法且压过上家。双击桌面 = 不要（首出不能不要）。
+
+【战力】7 > 大鬼 > 小鬼 > 5 > 2 > 3 > A > K > Q > J > 10 > 9 > 8 > 6 > 4。
+
+【7鬼523】凑齐 7 + 任意鬼 + 5 + 2 + 3 共 5 张一次打出，直接赢得本关（第 9 关禁用）。
+
+【得分与伤害】桌面牌面总分为本局伤害；以相同牌型相同点数压制全伤害牌时触发压迫加分。
+
+【补牌】每小局结束后由赢家从牌堆补牌。
+
+【筹码与门票】首次进入赌场需购买门票（金币）；每关入场消耗筹码，过关赢得筹码。
+
+【关末商店】每关胜利后自动开启：可购买附魔强化小丑牌；一级店消费满 32 筹码解锁二级店（随机 2 件附魔商品）。
+
+【关卡】共 9 关。第 7 关「黑老大」：BOSS 出完牌强制弃掉你最大的牌；第 9 关「赌场老板」是不可战胜的最终挑战。"""
+
+
+func _show_main_menu() -> void:
+	var overlay := Control.new()
+	overlay.name = "MainMenuOverlay"
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.z_index = 80
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(overlay)
+
+	## 底色压暗：与全局背景同色系，主界面独立成屏
+	var dim := ColorRect.new()
+	dim.color = Color(COL_BG, 0.97)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(dim)
+
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	box.offset_left = -160
+	box.offset_top = -160
+	box.offset_right = 160
+	box.offset_bottom = 160
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 16)
+	overlay.add_child(box)
+
+	var title := Label.new()
+	title.text = "七鬼 523"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 44)
+	title.add_theme_color_override("font_color", COL_GOLD)
+	title.add_theme_color_override("font_outline_color", Color(0.3, 0.2, 0.08, 1.0))
+	title.add_theme_constant_override("outline_size", 8)
+	box.add_child(title)
+
+	var sub := Label.new()
+	sub.text = "鸿运赌场 · 逐关挑战"
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.add_theme_font_size_override("font_size", 14)
+	sub.add_theme_color_override("font_color", COL_TEXT_DIM)
+	box.add_child(sub)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 18)
+	box.add_child(spacer)
+
+	var start_btn := Button.new()
+	start_btn.text = "开始游戏"
+	start_btn.custom_minimum_size = Vector2(220, 52)
+	style_button_balatro(start_btn, COL_GREEN, Color(0.95, 0.95, 0.93))
+	box.add_child(start_btn)
+
+	var rules_btn := Button.new()
+	rules_btn.text = "阅读规则"
+	rules_btn.custom_minimum_size = Vector2(220, 52)
+	style_button_balatro(rules_btn, COL_ACCENT, Color(0.95, 0.95, 0.93))
+	box.add_child(rules_btn)
+
+	start_btn.pressed.connect(func():
+		overlay.queue_free()
+		_enter_casino_then_start(_campaign.current_level))
+	rules_btn.pressed.connect(func(): _show_rules_dialog(overlay))
+
+
+## 规则弹窗：挂在主界面 overlay 内，金边面板 + 滚动文本
+func _show_rules_dialog(menu: Control) -> void:
+	var panel := Panel.new()
+	panel.add_theme_stylebox_override("panel", flat_border(
+		COL_PANEL, COL_GOLD.darkened(0.3), 2, 10, Color(0, 0, 0, 0.5), 10, 4))
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.offset_left = -260
+	panel.offset_top = -250
+	panel.offset_right = 260
+	panel.offset_bottom = 250
+	panel.z_index = 5
+	menu.add_child(panel)
+
+	var vb := VBoxContainer.new()
+	vb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vb.offset_left = 16
+	vb.offset_top = 14
+	vb.offset_right = -16
+	vb.offset_bottom = -14
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+
+	var title := Label.new()
+	title.text = "游戏规则"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", COL_GOLD)
+	vb.add_child(title)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vb.add_child(scroll)
+	var body := Label.new()
+	body.text = RULES_TEXT
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_theme_font_size_override("font_size", 13)
+	body.add_theme_color_override("font_color", COL_TEXT)
+	scroll.add_child(body)
+
+	var close_btn := Button.new()
+	close_btn.text = "关闭"
+	close_btn.custom_minimum_size = Vector2(140, 40)
+	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	style_button_balatro(close_btn, Color(0.18, 0.17, 0.19), Color(0.88, 0.86, 0.83))
+	vb.add_child(close_btn)
+	close_btn.pressed.connect(func(): panel.queue_free())
 
 
 func _on_reset_pressed() -> void:
@@ -128,6 +263,7 @@ func _start_level(level: int) -> void:
 	_table_anim_running = false
 	_table_anim_pending = false
 	_table_cards_anim.clear()
+	_table_render_sig = "@init"   ## 强制新关卡首次 _refresh_table 全量重建（含旧桌面溶解）
 	_play_src_global = Vector2.ZERO
 	_selected.clear()
 
@@ -155,10 +291,12 @@ func _start_level(level: int) -> void:
 	_log("猜牌决定先手：" + ("你先手" if player_first else "电脑先手"))
 
 	## 开局发牌动画：先清空，再逐张飞入
-	for child in _player_hand.get_children():
-		child.queue_free()
-	for child in _boss_hand.get_children():
-		child.queue_free()
+	for row: HBoxContainer in [_top_hand, _bottom_hand, _boss_hand, _boss_hand_instant]:
+		for slot in row.get_children():
+			row.remove_child(slot)
+			slot.queue_free()
+	_boss_hand.set_meta("_boss_known_normal", 0)
+	_boss_hand_instant.set_meta("_boss_known_instant", 0)
 	_refresh_status("新关卡开始")
 	_refresh_turn()
 	_refresh_top()
@@ -174,14 +312,13 @@ func _start_level(level: int) -> void:
 
 ## 统一开关操作按钮（猜先等流程隔离用）
 func _set_op_buttons_enabled(on: bool) -> void:
-	_pass_btn.disabled = not on
 	_shop_btn.disabled = not on
 	_new_game_btn.disabled = not on
 
 
 ## 猜先阶段 — 猜对玩家先手，猜错电脑先手
 func _run_guess_phase() -> bool:
-	var zone: Control = $MainLayout/LeftPanel/TableZone
+	var zone: Control = $MainVBox/TableArea
 	var overlay := Control.new()
 	overlay.name = "GuessOverlay"
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -223,7 +360,7 @@ func _run_guess_phase() -> bool:
 	title.text = "猜牌决定先手"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 20)
-	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.42))
+	title.add_theme_color_override("font_color", COL_GOLD)
 	title.add_theme_color_override("font_outline_color", Color(0.3, 0.2, 0.08, 1.0))
 	title.add_theme_constant_override("outline_size", 5)
 	outer.add_child(title)
@@ -247,8 +384,8 @@ func _run_guess_phase() -> bool:
 	var small_btn := Button.new()
 	small_btn.text = "猜小鬼"
 	small_btn.custom_minimum_size = Vector2(120, 46)
-	style_button_casino(big_btn, Color(0.90, 0.24, 0.30), Color(1.0, 0.84, 0.42))
-	style_button_casino(small_btn, Color(0.20, 0.26, 0.42), Color(1.0, 0.84, 0.42))
+	style_button_balatro(big_btn, COL_CRIMSON, COL_GOLD)
+	style_button_balatro(small_btn, COL_ACCENT, COL_GOLD)
 	mid_row.add_child(big_btn)
 	mid_row.add_child(small_btn)
 	outer.add_child(mid_row)
@@ -258,7 +395,7 @@ func _run_guess_phase() -> bool:
 	hint.text = "大鬼（上）与小鬼（下）其中一张，猜对先手"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_font_size_override("font_size", 12)
-	hint.add_theme_color_override("font_color", Color(0.8, 0.74, 0.6))
+	hint.add_theme_color_override("font_color", COL_TEXT_DIM)
 	outer.add_child(hint)
 
 	## 等待玩家点击（结果写入局部容器，竞态安全）
@@ -290,7 +427,7 @@ func _run_guess_phase() -> bool:
 	card_vis.show_id(53 if actual_big else 52)   ## 53=大鬼 , 52=小鬼
 	card_vis.to_rot(0.0, 0.0, 0.32, Tween.TRANS_BACK, Tween.EASE_OUT)
 	title.text = "✓ 猜对了！你先手" if correct else "✗ 猜错了！电脑先手"
-	title.add_theme_color_override("font_color", Color(0.24, 0.85, 0.42) if correct else Color(0.95, 0.32, 0.30))
+	title.add_theme_color_override("font_color", COL_GREEN if correct else COL_CRIMSON)
 
 	## 1500ms 后进入发牌
 	await get_tree().create_timer(1.5).timeout
@@ -327,10 +464,11 @@ func _on_card_played(who: RefCounted, cards: Array) -> void:
 	## process_play 是同步发射，human(_do_play) 与 AI(_ai_think) 在返回后都会紧跟一次 _refresh，
 	## 若这里也 _refresh 会与上游重复、二次 _refresh_hand_smooth kill 掉补牌动画（"补牌不飞"）。
 	## 由紧跟的那次 _refresh 消费 _table_anim_pending 统一播放。
+	## 严格使用容器中心（不查 CardVisual、不存临时投递）
 	if who == _human:
 		_play_src_global = _hand_area_center()
 	else:
-		_play_src_global = _boss_area_center()
+		_play_src_global = _boss_src_center(cards)
 	_table_anim_pending = true
 
 
@@ -365,7 +503,6 @@ func _on_round_won(winner: RefCounted, damage: int) -> void:
 func _end_level(player_won: bool) -> void:
 	_phase = "level_end"
 	_finished = true
-	_pass_btn.disabled = true
 
 	var player_remain := _human.normal_hand.size() + _human_deck.total()
 	var boss_remain := _ai.normal_hand.size() + _ai_deck.total()
@@ -382,7 +519,8 @@ func _end_level(player_won: bool) -> void:
 		msg = "☠ 第 %d 关失败… HP %+d" % [_campaign.current_level, result.player_hp_delta]
 
 	_log(msg)
-	_hand_type_lbl.text = msg
+	_round_lbl.text = msg
+	_round_lbl.add_theme_color_override("font_color", COL_GOLD)
 
 	if _campaign.is_game_over():
 		_show_game_over("挑战失败", "你被击败了… 筹码 %d" % _campaign.player_chips)
@@ -391,11 +529,12 @@ func _end_level(player_won: bool) -> void:
 	elif _campaign.current_level >= _campaign.config.total_levels:
 		_show_game_over("最终挑战结束", "赌场老板未被击败，无法通关。最终筹码 %d" % _campaign.player_chips)
 	else:
-		## 进入关末商店
+		## 进入关末商店：自动弹出面板（此前只设 phase 不弹窗，表现为"胜利后不进商店"）
 		_shop.on_level_end()
 		_phase = "shop"
 		_log("关末商店开启（消费 ≥32 筹码解锁附魔）")
 		_refresh("关末商店")
+		_show_shop_panel()
 
 
 func _show_game_over(title: String, detail: String) -> void:
@@ -478,8 +617,8 @@ func _schedule_ai_if_needed() -> void:
 	var cur := _round.whose_turn()
 	if not cur.is_human and not _ai_busy:
 		_ai_busy = true
-		_pass_btn.disabled = true
-		_hand_type_lbl.text = "AI 思考中…"
+		_round_lbl.text = "AI 思考中…"
+		_round_lbl.add_theme_color_override("font_color", COL_TEXT)
 		var t := get_tree().create_timer(0.7)
 		t.timeout.connect(_ai_think)
 
@@ -492,7 +631,6 @@ func _ai_think() -> void:
 	var lp := _round.last_play
 	var table_score := _round.table_score
 	var play := AICore.choose(_ai, _human, lp, _ai_deck, table_score, _tracker)
-	_pass_btn.disabled = false
 	## 赖账鬼强压：AI Pass 前，同花色任意单张强压玩家 J 以下单张
 	if play.is_empty() and lp != null and not lp.cards.is_empty() and not _ai.hand.is_empty():
 		var forced := _round.ghost_force_play(_ai.hand)
@@ -585,8 +723,9 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT \
 			and not _dragging and not _drag_pending:
-		var table_rect: Rect2 = _table_cards.get_global_rect()
-		if table_rect.has_point(event.global_position):
+		var table_rect: Rect2 = _drop_target.get_global_rect()
+		if table_rect.has_point(event.global_position) \
+				and not _point_over_table_controls(event.global_position):
 			var now: int = Time.get_ticks_msec()
 			var dist: float = event.global_position.distance_to(_last_table_click_pos)
 			if (now - _last_table_click_msec) < DOUBLE_CLICK_MSEC and dist < 44.0:
@@ -620,6 +759,15 @@ func _input(event: InputEvent) -> void:
 		_drag_cancel()
 
 
+## 点击点是否落在桌面覆盖控件上（牌堆/商店/重新开始）。
+## 这些控件位于出牌区上方，_input 先于 gui 消费，命中时应跳过双击"不要"判定。
+func _point_over_table_controls(p: Vector2) -> bool:
+	for c: Control in [_boss_deck, _player_deck, _shop_btn, _new_game_btn]:
+		if is_instance_valid(c) and c.visible and c.get_global_rect().has_point(p):
+			return true
+	return false
+
+
 func _process(_delta: float) -> void:
 	if not _dragging or _drag_visuals.is_empty():
 		return
@@ -629,12 +777,12 @@ func _process(_delta: float) -> void:
 		return
 	var mouse := get_global_mouse_position()
 	## 落点高亮：鼠标悬在桌面区时显示
-	var over := _table_cards.get_global_rect().has_point(mouse)
+	var over := _drop_target.get_global_rect().has_point(mouse)
 	if _drop_hint.visible != over:
 		_drop_hint.visible = over
 	if over:
-		_drop_hint.global_position = _table_cards.global_position - Vector2(10, 10)
-		_drop_hint.size = _table_cards.size + Vector2(20, 20)
+		_drop_hint.global_position = _drop_target.global_position - Vector2(10, 10)
+		_drop_hint.size = _drop_target.size + Vector2(20, 20)
 	## 被拖卡跟随鼠标：单张居中；多张水平展开 + 弧形上拱 + 微旋转
 	var n := _drag_visuals.size()
 	for i in n:
@@ -648,7 +796,8 @@ func _process(_delta: float) -> void:
 			off.x = (t - 0.5) * DRAG_SPREAD
 			off.y = -absf(sin(t * PI)) * DRAG_ARC_Y
 			rot = lerpf(-DRAG_ROT, DRAG_ROT, t)
-		v.global_position = mouse + off - Vector2(HAND_W, HAND_H) * 0.5
+		## 视觉中心 = position + size*0.5（pivot 居中，scale/rotation 不改变此偏移）
+		v.global_position = mouse + off - v.size * 0.5
 		v.rotation = deg_to_rad(rot)
 
 
@@ -672,14 +821,18 @@ func _drag_start(index: int) -> void:
 	else:
 		_drag_indices = [index]
 	## 记录原始 transform，reparent 到 overlay（保留全局位置）
-	## 节点按展示序(排序)添加，不能用 children 顺序取；按 hand_index meta 精确命中对应卡
-	var hand_cards := _player_hand.get_children()
+	## 卡位于槽位内：遍历两手牌行槽位，按 hand_index meta 精确命中对应卡
 	for idx in _drag_indices:
 		var v: CardVisual = null
-		for ch in hand_cards:
-			if ch is CardVisual and not ch.is_queued_for_deletion() \
-					and ch.get_meta("hand_index", -1) == idx:
-				v = ch
+		for row: HBoxContainer in [_bottom_hand, _top_hand]:
+			for slot in row.get_children():
+				if slot.is_queued_for_deletion() or slot.get_child_count() == 0:
+					continue
+				var ch := slot.get_child(0) as CardVisual
+				if ch != null and ch.get_meta("hand_index", -1) == idx:
+					v = ch
+					break
+			if v != null:
 				break
 		if v == null:
 			continue
@@ -690,6 +843,9 @@ func _drag_start(index: int) -> void:
 			"scale": v.scale,
 			"z": v.z_index,
 		})
+		## 杀掉残留弹回/布局动画（弹回 tween 存于 _layout_tween 槽位），
+		## 防止 0.18s 弹回期间再次拖拽时 tween 与 _process 跟随互相覆盖
+		v.kill_layout_tween()
 		v.reparent(_anim_overlay)
 		v.z_index = 60
 		v.set_fake3d_rot(0.0, 0.0)
@@ -699,17 +855,17 @@ func _drag_start(index: int) -> void:
 ## 松手：在桌面区 → 出牌；在手牌区 → 排序；否则弹回
 func _drag_drop() -> void:
 	var mouse := get_global_mouse_position()
-	if _table_cards.get_global_rect().has_point(mouse):
+	if _drop_target.get_global_rect().has_point(mouse):
 		_drag_drop_play()
 		return
 	## 手牌区松手 → 拖拽排序（仅单张，横向拖动交换位置）
-	if _player_hand.get_global_rect().has_point(mouse) and _drag_indices.size() == 1:
+	if _hand_area.get_global_rect().has_point(mouse) and _drag_indices.size() == 1:
 		_drag_sort(mouse.x)
 		return
 	_drag_cancel()
 
 
-## 拖拽到桌面区 → 出牌（原有逻辑）
+## 拖拽到桌面区 → 出牌
 func _drag_drop_play() -> void:
 	var indices := _drag_indices.duplicate()
 	var saved := _selected.duplicate()
@@ -718,12 +874,6 @@ func _drag_drop_play() -> void:
 		_selected = saved
 		_drag_cancel()
 		return
-	## 出牌起点：被拖卡在手牌里的原始全局位置
-	if not _drag_origin.is_empty():
-		var o: Dictionary = _drag_origin[0]
-		var p: Control = o["parent"]
-		if is_instance_valid(p):
-			_play_src_global = p.get_global_transform_with_canvas() * o["pos"]
 	_dismiss_drag_visuals()
 
 
@@ -736,8 +886,11 @@ func _drag_sort(mouse_x: float) -> void:
 
 	## 收集手牌区中其余卡牌的中心 x（它们位置未变，因为拖拽卡已被 reparent）
 	var refs: Array[Dictionary] = []
-	for ch in _player_hand.get_children():
-		if not (ch is CardVisual) or ch.is_queued_for_deletion():
+	for slot in _bottom_hand.get_children():
+		if slot.is_queued_for_deletion() or slot.get_child_count() == 0:
+			continue
+		var ch := slot.get_child(0) as CardVisual
+		if ch == null:
 			continue
 		var ci: int = ch.get_meta("hand_index", -1)
 		if ci < 0 or ci >= _human.normal_hand.size() or ci == idx:
@@ -749,26 +902,21 @@ func _drag_sort(mouse_x: float) -> void:
 		_drag_cancel()
 		return
 
-	## 横坐标落在哪张牌左侧，就插入到那张牌的位置
-	var target: int = idx
-	if mouse_x <= refs[0].cx:
-		target = 0
-	elif mouse_x >= refs[-1].cx:
-		target = _human.normal_hand.size() - 1
-	else:
-		for r in refs:
-			if mouse_x < r.cx:
-				target = r.index
-				break
+	## 槽位法：鼠标越过几张余牌的中心，就插入到第几个槽位。
+	## refs 已排除拖拽卡，槽位号即 remove_at(idx) 后的插入下标，左右拖都不错位。
+	var slot := 0
+	for r in refs:
+		if mouse_x > r.cx:
+			slot += 1
 
-	if target == idx:
+	if slot == idx:
 		_drag_cancel()
 		return
 
 	## splice 重排
 	var card: Card = _human.normal_hand[idx]
 	_human.normal_hand.remove_at(idx)
-	_human.normal_hand.insert(target, card)
+	_human.normal_hand.insert(slot, card)
 
 	_selected.clear()
 	_dismiss_drag_visuals()
@@ -802,6 +950,7 @@ func _drag_cancel() -> void:
 		v.global_position = cur_global
 		v.z_index = o["z"]
 		var tw := v.create_tween()
+		v._layout_tween = tw  ## 存入布局槽位：_drag_start 可 kill，重拖不打架
 		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 		tw.set_parallel(true)
 		tw.tween_property(v, "position", o["pos"], DRAG_RETURN_DUR)

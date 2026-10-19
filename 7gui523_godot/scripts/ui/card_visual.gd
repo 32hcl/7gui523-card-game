@@ -22,7 +22,7 @@ const JOKER_RED := "res://art/Top-Down/Cards/joker_red.png"
 
 const SHADOW_OFFSET := Vector2(6, 10)   ## 阴影偏移（右下，模拟左上光源）
 const SHADOW_ALPHA := 0.42              ## 阴影浓度
-const SHADOW_ALPHA_SEL := 0.85          ## 选中时阴影浓度（金影更浓更醒目）
+const SHADOW_ALPHA_SEL := 0.85          ## 选中时阴影浓度（边框冷光更浓更醒目）
 const SHADOW_INSET := 0.62              ## 阴影 inset（比牌面稍大，避免被矩形裁剪）
 const FLASH_GRADIENT := "res://art/effects/gloden_glow.tres"  ## 闪光金色渐变（源自 Demo）
 
@@ -31,9 +31,9 @@ const SHD_DISSOLVE := preload("res://shaders/dissolve2d.gdshader")
 const SHD_FAKE3D := preload("res://shaders/fake3d_flash.gdshader")
 const SHD_SHADOW := preload("res://shaders/fake3d_shadow.gdshader")
 
-## 选中金框（垫在卡牌最底层的发光描边）
-const SEL_FRAME_COLOR := Color(1.0, 0.83, 0.25, 0.98)
-const SEL_FRAME_GLOW := Color(1.0, 0.83, 0.25, 0.20)
+## 选中边框（垫在卡牌最底层的发光描边；非金色，用深靛蓝+冷光）
+const SEL_FRAME_COLOR := Color(0.32, 0.52, 0.88, 0.92)
+const SEL_FRAME_GLOW := Color(0.20, 0.38, 0.72, 0.25)
 
 ## 当前展示的 Card id（-1 表示非牌面图）
 var card_id: int = -1
@@ -147,7 +147,6 @@ func enable_fake3d(with_shadow: bool = true) -> void:
 ## 切换选中态（上浮/放大由布局处理；这里保留阴影金色高亮 + 牌面流光闪光）
 ## 不再绘制金框描边
 func set_selected(selected: bool) -> void:
-	set_shadow_selected(selected)
 	set_flash(selected)
 	set_shadow_alpha(SHADOW_ALPHA_SEL if selected else SHADOW_ALPHA)
 	if _sel_frame:
