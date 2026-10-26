@@ -11,11 +11,11 @@ extends RefCounted
 # ═══════════════════════════════════════════════════════════════
 
 class CampaignConfig:
-	var player_init_hp   := 140
-	var player_max_hp    := 210
-	var boss_max_hp      := 110
-	var total_levels     := 9
-	var heal_per_card    := 3
+	var player_init_hp   := GameConfig.PLAYER_INIT_HP
+	var player_max_hp    := GameConfig.PLAYER_MAX_HP
+	var boss_max_hp      := GameConfig.BOSS_MAX_HP
+	var total_levels     := GameConfig.TOTAL_LEVELS
+	var heal_per_card    := GameConfig.HEAL_PER_CARD
 
 
 class LevelResult:
@@ -30,21 +30,21 @@ class LevelResult:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 静态数据表
+# 静态数据（引用 GameConfig 全局常量，避免数据重复）
 # ═══════════════════════════════════════════════════════════════
 
 ## 入场筹码（赌注）
-const ENTRY_CHIPS := [0, 1, 5, 10, 20, 50, 100, 200, 400, 800]
+const ENTRY_CHIPS := GameConfig.ENTRY_CHIPS
 
 ## 赌场门票（金币；与每关入场筹码完全独立）
-const ENTRY_TICKET_DOLLARS := 5_000_000
-const INITIAL_DOLLARS := 50_000_000_000
+const ENTRY_TICKET_DOLLARS := GameConfig.ENTRY_TICKET_DOLLARS
+const INITIAL_DOLLARS := GameConfig.INITIAL_DOLLARS
 
 ## 奖励筹码（赢后获得）
-const REWARD_CHIPS := [0, 3, 12, 25, 50, 120, 250, 500, 1000, 2000]
+const REWARD_CHIPS := GameConfig.REWARD_CHIPS
 
 ## 每关 BOSS 名
-const BOSS_NAMES := ["", "新手", "换牌虫", "急眼雀", "疯狗", "赖账鬼", "不识数", "黑老大", "千里眼", "赌场老板"]
+const BOSS_NAMES := GameConfig.BOSS_NAMES
 
 
 ## 关卡 与 战役一体化：每关规则（LevelRule）+ 关卡间流程（Campaign）
@@ -55,6 +55,9 @@ const BOSS_NAMES := ["", "新手", "换牌虫", "急眼雀", "疯狗", "赖账�
 ## ═══════════════════════════════════════════════════════════════
 
 class LevelRule:
+	var mask_player_draws := false ## 抹牌虫(2)：初始发牌后，新摸牌有概率显示牌背
+	var boss_swap_low_cards := false ## 换牌鬼(8)：BOSS 可把4/6换成指定牌
+	var _boss_swapped_cards: Dictionary = {}
 	var boss_always_first := false   ## 急眼雀(3)：每轮 boss 先手
 	var boss_bite_damage  := false   ## 疯狗(4)：每张牌 ×3 额外伤害
 	var ghost_cheat       := false   ## 赖账鬼(5)：同花可压 + 禁同点
@@ -120,10 +123,12 @@ class LevelRule:
 	func steal_max_from(loser: Player.PlayerData) -> void:
 		if not boss_steal_max:
 			return
-		if loser == null or loser.hand.is_empty():
+		if loser == null or loser.is_hand_empty():
 			return
 		var max_card: Card = null
-		for c in loser.hand:
+		var loser_hand: Array[Card] = []
+		loser.collect_hand_into(loser_hand)
+		for c in loser_hand:
 			if max_card == null or Card.get_rank(c.point) > Card.get_rank(max_card.point):
 				max_card = c
 		if max_card != null:
@@ -134,16 +139,28 @@ class LevelRule:
 	func bite_damage(num_cards: int) -> int:
 		return num_cards * 3 if boss_bite_damage else 0
 
+	func mutate_boss_hand(hand: Array[Card]) -> void:
+		if not boss_swap_low_cards:
+			return
+		var replacements := ["6", "8", "9", "10", "J", "Q", "K"]
+		for card in hand:
+			if not _boss_swapped_cards.has(card) and (card.point == "4" or card.point == "6"):
+				_boss_swapped_cards[card] = true
+				card.point = replacements[randi() % replacements.size()]
+				card.score = Card.score_from_point(card.point)
+
 
 ## 获取关卡规则（工厂：九关特殊规则表）
 static func level_rule(level: int) -> LevelRule:
 	var r := LevelRule.new()
 	match level:
+		2: r.mask_player_draws = true
 		3: r.boss_always_first = true
 		4: r.boss_bite_damage  = true
 		5: r.ghost_cheat       = true
 		6: r.blind_mix         = true
 		7: r.boss_steal_max    = true
+		8: r.boss_swap_low_cards = true
 		9: r.ban_gui523        = true
 	return r
 
@@ -197,13 +214,6 @@ func start_new() -> void:
 	has_purchased_entry = false
 
 
-func load_persistent_state(chips: int, dollars: int, cleared: int, has_entry: bool) -> void:
-	player_chips = maxi(0, chips)
-	dollar = maxi(0, dollars)
-	cleared_level = cleared
-	has_purchased_entry = has_entry
-
-
 ## 购买一次赌场门票。门票金币和关卡筹码是两套独立资源。
 func purchase_entry_ticket() -> bool:
 	if has_purchased_entry:
@@ -229,12 +239,13 @@ func start_level(level: int) -> void:
 func apply_round_damage(damage: int, boss_won: bool) -> void:
 	if damage <= 0:
 		return
+	var hp_loss: int = Score.damage_to_hp(damage)
 	if current_level == 9:
-		player_hp -= damage
+		player_hp -= hp_loss
 	elif boss_won:
-		player_hp -= damage
+		player_hp -= hp_loss
 	else:
-		boss_hp -= damage
+		boss_hp -= hp_loss
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -256,10 +267,9 @@ func finish_level(player_won: bool, player_remain: int, boss_remain: int) -> Lev
 	var prev_player_hp := player_hp
 	var prev_boss_hp := boss_hp
 
-	var total_remain := player_remain + boss_remain
-	var heal_amount := total_remain * config.heal_per_card
-
+	## 按输家剩余牌计算血量变化：胜→对手余牌回血，败→自己余牌扣血
 	if accepted_player_win:
+		var heal_amount: int = boss_remain * config.heal_per_card
 		player_hp += heal_amount
 		var reward := get_level_reward_chips(current_level)
 		player_chips += reward
@@ -267,7 +277,8 @@ func finish_level(player_won: bool, player_remain: int, boss_remain: int) -> Lev
 		if current_level > cleared_level:
 			cleared_level = current_level
 	else:
-		player_hp -= heal_amount
+		var hurt_amount: int = player_remain * config.heal_per_card
+		player_hp -= hurt_amount
 
 	lr.chips_after = player_chips
 
@@ -283,13 +294,3 @@ func finish_level(player_won: bool, player_remain: int, boss_remain: int) -> Lev
 
 func is_game_over() -> bool:
 	return player_hp <= 0
-
-
-func is_victory() -> bool:
-	## 最后一关是不可通关挑战，不产生“全部通关”状态。
-	return false
-
-
-## 关卡挑战结束（通关或无法继续，如第 9 关无法击杀）
-func is_campaign_finished() -> bool:
-	return player_hp <= 0 or current_level >= config.total_levels

@@ -54,7 +54,7 @@ func _on_reset_pressed() -> void:
 
 ## 抽 1 张 → 游戏牌堆  补牌+1 → 手牌
 func _on_draw_pressed() -> void:
-	if _player.normal_hand.size() >= Player.PlayerData.NORMAL_MAX:
+	if _player.normal_hand.size() >= GameConfig.NORMAL_MAX:
 		_log("⚠ 手牌已满 (%d/5)，请先出牌再抽" % _player.normal_hand.size())
 		return
 	if _deck.active_size() <= 0:
@@ -81,16 +81,16 @@ func _on_play_pressed() -> void:
 
 ## 补牌：预设目标 32，分界线右移，隐藏头部并入游戏区
 func _on_refill_pressed() -> void:
-	var old := _deck.active_size()
+	var old: int = _deck.active_size()
 	_deck.refill_active()
-	var moved := _deck.active_size() - old
+	var moved: int = _deck.active_size() - old
 	_log("补牌: 隐藏牌堆头部 %d 张并入游戏牌堆" % moved)
 	_refresh()
 
 
 ## 商店：抽 7 → 销毁中间那张 → 其余随机回隐藏 → 补牌
 func _on_shop_pressed() -> void:
-	var res := _deck.shop_destroy_flow(3)
+	var res: Variant = _deck.shop_destroy_flow(3)
 	if res.shown.is_empty():
 		_log("⚠ 游戏牌堆不足 7 张，无法商店")
 		return
@@ -108,7 +108,7 @@ func _refresh() -> void:
 	_clear_children(_hand_row)
 
 	var cards := _deck.cards
-	var active := _deck.active_size()
+	var active: int = _deck.active_size()
 
 	# 游戏牌堆（0..active-1）
 	for i in active:

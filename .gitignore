@@ -19,8 +19,8 @@ tests/
 .godot/
 
 # Test artifacts
-_devtest/*_err.txt
-_devtest/*_output.txt
+7gui523_godot/_devtest/*_err.txt
+7gui523_godot/_devtest/*_output.txt
 
 # User notes
-PROJECT_NOTES.txt
+7gui523_godot/PROJECT_NOTES.txt

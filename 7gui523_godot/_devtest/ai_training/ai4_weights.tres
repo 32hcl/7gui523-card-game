@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="AIWeights" format=3]
+
+[ext_resource type="Script" path="res://scripts/ai/ai_weights.gd" id="1_jeyhg"]
+
+[resource]
+script = ExtResource("1_jeyhg")
+finish_hand_reward = 100000.0
+finish_round_reward = 1000.0
+clear_table_reward = 100.0
+reduce_hand_size_reward = 0.1
+play_card_count_cost = 1.0
+rank_cost = 10.0
+high_card_cost = 10.0
+low_card_release_reward = 1.0
+break_pair_cost = 1000.0
+break_triple_cost = 1000.0
+break_bomb_cost = 1019.9558019638062
+break_five_kind_cost = 1000.0
+break_rocket_cost = 1000.0
+preserve_same_point_reward = 96.61624550819397
+preserve_bomb_reward = 1000.0
+preserve_rocket_reward = 1000.0
+preserve_gui523_reward = 100.0
+beat_same_type_reward = 1000.0
+beat_bomb_reward = -1000.0
+opponent_low_hand_reward = 11315.888881683351
+opponent_empty_hand_penalty = 1000.0
+counter_risk_cost = 1.0
+table_score_reward = 1.0
+score_card_reward = 10.0
+five_card_score_reward = 1000.0
+damage_per_point_reward = 0.8629445135593414
+round_damage_reward = 1.0
+large_damage_reward = 1000.0
+exhausted_point_reward = 10.0
+rare_point_reward = 1.0
+known_opponent_card_reward = 100.0
+unknown_card_risk_cost = 1.0
+remaining_deck_risk_cost = 0.1

@@ -1,53 +1,68 @@
-// Balatro 风格 · 紧凑旋涡 · 强像素风 · 全屏背景
-// 从 Shadertoy 移植为 Godot canvas_item shader
-// 调参：旋涡拧得更紧(d*8)、像素块更粗(grid=96)、黏糊感加强(0.45 × 4轮)
+// Balatro 原版 LÖVE 旋涡 · 逐行数学直译 · Godot canvas_item
+// 像素画版：粗像素块 → 模拟 → 颜色量化
 
 shader_type canvas_item;
 
-// 由 GDScript 传入该 ColorRect 实际渲染尺寸（像素）
-uniform vec2 u_resolution = vec2(1920.0, 1080.0);
+uniform float time_val : hint_range(0.0, 10000.0) = 0.0;
+uniform float spin_time : hint_range(0.0, 10000.0) = 0.0;
+uniform vec4 colour_1 : source_color = vec4(0.871, 0.267, 0.231, 1.0);
+uniform vec4 colour_2 : source_color = vec4(0.0, 0.42, 0.71, 1.0);
+uniform vec4 colour_3 : source_color = vec4(0.086, 0.137, 0.145, 1.0);
+uniform float contrast : hint_range(0.0, 10.0) = 3.5;
+uniform float spin_amount : hint_range(0.0, 2.0) = 0.25;
 
-// 调色板函数
-vec3 palette(float t) {
-	vec3 a = vec3(0.40, 0.15, 0.55);
-	vec3 b = vec3(0.95, 0.20, 0.60);
-	vec3 c = vec3(0.15, 0.70, 0.95);
-	vec3 d = vec3(1.00, 0.85, 0.30);
-	return a + b * cos(6.28318 * (c * t + d));
-}
+uniform float pixel_size_fac : hint_range(40.0, 1500.0) = 180.0;
+uniform float color_levels : hint_range(2.0, 32.0) = 5.0;
+uniform float quantize_mix : hint_range(0.0, 1.0) = 0.7;
 
-// 背景底色（深藏蓝，与 COL_BG 一致）
-const vec3 BG_COLOR = vec3(0.08, 0.08, 0.10);
+const float SPIN_EASE = 0.5;
 
 void fragment() {
-	// UV(0..1) 映射到 Shadertoy 居中坐标系: x ∈ [-aspect, +aspect], y ∈ [-1, +1]
-	// u_resolution 由脚本每帧传入节点像素尺寸，避免依赖不可用的 SCREEN_PIXEL_SIZE
-	float aspect = u_resolution.x / u_resolution.y;
-	vec2 uv = vec2((UV.x - 0.5) * 2.0 * aspect, (UV.y - 0.5) * 2.0);
+	vec2 screen_size = 1.0 / SCREEN_PIXEL_SIZE;
+	float pixel_size = length(screen_size) / pixel_size_fac;
 
-	float t = TIME;
-	float d = length(uv);
+	// 像素块坐标：同一 block 内所有像素 uv 完全相同 → 无毛刺
+	vec2 block_coord = floor(FRAGCOORD.xy / pixel_size) * pixel_size + pixel_size * 0.5;
 
-	// 旋涡拧紧：距离扭曲系数 8，外圈绕更多圈才消隐
-	float angle = d * 8.0 + t * 0.5;
-	float c = cos(angle), s = sin(angle);
-	uv = mat2(c, -s, s, c) * uv;
+	vec2 uv = (block_coord - 0.5 * screen_size) / length(screen_size)
+	          - vec2(0.12, 0.0);
 
-	// 黏糊感：4 轮迭代，振幅 0.45
-	for (int i = 0; i < 4; i++) {
-		uv += sin(uv.yx * 6.0 + t * 0.7) * 0.45;
+	float uv_len = length(uv);
+
+	float speed = (spin_time * SPIN_EASE * 0.2) + 302.2;
+	float new_pixel_angle = atan(uv.y, uv.x) + speed
+	    - SPIN_EASE * 20.0 * (spin_amount * uv_len + (1.0 - spin_amount));
+
+	vec2 mid = (screen_size / length(screen_size)) / 2.0;
+	uv = vec2(uv_len * cos(new_pixel_angle) + mid.x,
+	          uv_len * sin(new_pixel_angle) + mid.y) - mid;
+
+	uv *= 30.0;
+	float spd = time_val * 2.0;
+	vec2 uv2 = vec2(uv.x + uv.y);
+	for (int i = 0; i < 5; i++) {
+		uv2 += sin(max(uv.x, uv.y)) + uv;
+		uv += 0.5 * vec2(
+			cos(5.1123314 + 0.353 * uv2.y + spd * 0.131121),
+			sin(uv2.x - 0.113 * spd)
+		);
+		uv -= cos(uv.x + uv.y) - sin(uv.x * 0.711 - uv.y);
 	}
 
-	// 像素感：grid=96，方块大一倍，边缘更硬
-	float grid = 96.0;
-	uv = floor(uv * grid) / grid;
+	float contrast_mod = 0.25 * contrast + 0.5 * spin_amount + 1.2;
+	float paint_res = min(2.0, max(0.0, length(uv) * 0.035 * contrast_mod));
+	float c1p = max(0.0, 1.0 - contrast_mod * abs(1.0 - paint_res));
+	float c2p = max(0.0, 1.0 - contrast_mod * abs(paint_res));
+	float c3p = 1.0 - min(1.0, c1p + c2p);
 
-	// 调色 + 时间微移
-	vec3 col = palette(uv.x * 0.25 + uv.y * 0.25 + t * 0.08);
+	vec4 col = (0.3 / contrast) * colour_1
+	         + (1.0 - 0.3 / contrast)
+	           * (colour_1 * c1p + colour_2 * c2p
+	              + vec4(c3p * colour_3.rgb, c3p * colour_1.a));
 
-	// 暗角淡出：外圈过渡到深底色
-	float vignette = smoothstep(1.2, 0.1, d);
-	col = mix(BG_COLOR, col, vignette);
+	// 颜色量化：阶梯色带
+	vec3 quantized = floor(col.rgb * color_levels + 0.5) / color_levels;
+	col.rgb = mix(col.rgb, quantized, quantize_mix);
 
-	COLOR = vec4(col, 1.0);
+	COLOR = col;
 }

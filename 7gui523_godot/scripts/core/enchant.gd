@@ -5,7 +5,7 @@ extends RefCounted
 # Enchant — 附魔数据模型（从 Shop 迁出的纯数据层）
 #
 # Shop 负责商品/库存/存档/价格；本文件只定义附魔的类型与数据载体，
-# 供 Shop、战斗结算（EnchantEffect）与 UI 共享，不再反向依赖商店。
+# 供 Shop 与 UI 共享，不再反向依赖商店。
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -29,20 +29,20 @@ class Enchantment:
 	var level: int = 1
 	var cost_chips: int = 0
 
+
+	const LEVEL_TABLE := {
+		EnchantType.SCORE_UP:   [0, 3, 5, 8],
+		EnchantType.LIFESTEAL:  [0, 2, 4, 6],
+		EnchantType.LUCKY:      [0, 4, 7, 10],
+		EnchantType.RANK_UP:    [0, 1, 2, 3],
+		EnchantType.COMBO_DRAW: [0, 1, 1, 2],
+	}
+
+
 	func effect_value() -> int:
-		match type:
-			EnchantType.SCORE_UP:
-				return [0, 3, 5, 8][level]
-			EnchantType.LIFESTEAL:
-				return [0, 2, 4, 6][level]
-			EnchantType.LUCKY:
-				return [0, 4, 7, 10][level]
-			EnchantType.RANK_UP:
-				return [0, 1, 2, 3][level]
-			EnchantType.COMBO_DRAW:
-				return [0, 1, 1, 2][level]
-			_:
-				return level
+		if LEVEL_TABLE.has(type):
+			return LEVEL_TABLE[type][level]
+		return level
 
 
 class EnchantItem:

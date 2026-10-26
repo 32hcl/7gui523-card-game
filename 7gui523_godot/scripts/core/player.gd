@@ -12,24 +12,41 @@ extends RefCounted
 # 普通区 上限5张 | 立刻补区 上限2张 | 两区补牌互不干扰
 # ═══════════════════════════════════════════════════════════════
 
-class PlayerData extends RefCounted:
-	const NORMAL_MAX  := 5        ## 普通区手牌上限
-	const INSTANT_MAX := 2        ## 立刻补区手牌上限
+enum CardSortMode { SAME_RANK = 0, FULL_SORT = 1, NO_SORT = 2 }
 
-	var normal_hand:  Array[Card] = []  ## 普通区手牌
-	var instant_hand: Array[Card] = []  ## 立刻补区手牌
+class PlayerData extends RefCounted:
+	var normal_hand:  Array[Card] = []  ## 普通区手牌（上限见 GameConfig.NORMAL_MAX）
+	var instant_hand: Array[Card] = []  ## 立刻补区手牌（上限见 GameConfig.INSTANT_MAX）
+	var card_sort_mode: int = CardSortMode.SAME_RANK  ## 补牌排序模式
 
 	## 兼容旧规则引擎：name / is_human / ai_level
 	var name: String = "32%Hcl"
 	var is_human := false
 	var ai_level := 0
 
-	## 兼容接口：hand 合并 normal_hand + instant_hand，AI/规则引擎统一读取
-	var hand: Array[Card]:
-		get:
-			return normal_hand + instant_hand
-		set(value):
-			normal_hand = value
+	## 合并手牌填入提供的数组（避免每次访问分配新数组）
+	func collect_hand_into(out: Array[Card]) -> void:
+		out.clear()
+		out.append_array(normal_hand)
+		out.append_array(instant_hand)
+
+	func hand_size() -> int:
+		return normal_hand.size() + instant_hand.size()
+
+	func is_hand_empty() -> bool:
+		return normal_hand.is_empty() and instant_hand.is_empty()
+
+
+	## 同 id 卡牌的下一个副本标记（初始牌0，商店第一张1，以此类推）
+	func next_copy_mark(card_id: int) -> int:
+		var max_mark := 0
+		for c in normal_hand:
+			if c.id == card_id and c.copy_mark > max_mark:
+				max_mark = c.copy_mark
+		for c in instant_hand:
+			if c.id == card_id and c.copy_mark > max_mark:
+				max_mark = c.copy_mark
+		return max_mark + 1
 
 
 	## 普通区补牌：从牌堆抽至 5 张（上限）
@@ -65,7 +82,30 @@ class PlayerData extends RefCounted:
 				return ra > rb
 			return a.suit < b.suit)
 
+	## 抽牌归位：新牌插入同点牌的右侧；无同点则追加到末尾（相同大小的牌聚在一起）
+	func insert_same_rank_together(hand: Array[Card], new_cards: Array[Card]) -> void:
+		for card in new_cards:
+			var inserted := false
+			for i in range(hand.size() - 1, -1, -1):
+				if hand[i].point == card.point:
+					hand.insert(i + 1, card)
+					inserted = true
+					break
+			if not inserted:
+				hand.append(card)
+
+	## 统一补牌入口：根据 card_sort_mode 分发到不同的排序策略
+	func insert_cards(hand: Array[Card], new_cards: Array[Card]) -> void:
+		match card_sort_mode:
+			CardSortMode.FULL_SORT:
+				hand.append_array(new_cards)
+				sort_hand()
+			CardSortMode.NO_SORT:
+				hand.append_array(new_cards)
+			_:
+				insert_same_rank_together(hand, new_cards)
+
 
 	func _to_string() -> String:
 		return "普通区:%d/%d张  立刻补区:%d/%d张" % \
-			[normal_hand.size(), NORMAL_MAX, instant_hand.size(), INSTANT_MAX]
+			[normal_hand.size(), GameConfig.NORMAL_MAX, instant_hand.size(), GameConfig.INSTANT_MAX]

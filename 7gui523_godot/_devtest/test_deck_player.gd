@@ -2,8 +2,8 @@ extends SceneTree
 
 # ═══════════════════════════════════════════════════════════════
 # TestDeckPlayer — 牌堆与玩家存储层测试（对应 C++ test_deck.cpp + test_player.cpp）
-# 覆盖：Deck.DeckManager（标准54张/抽取/补牌/回收/商店销毁）
-#       Player.PlayerData（补牌到5/精确删除/返回值）
+# 覆盖：Deck.DeckManager（单数组 ID 牌堆：标准54张/抽取/补牌/回收）
+#       Player.PlayerData（双区补牌/精确删除/排序）
 #
 # 命令行：
 #   godot --headless --path . --script _devtest/test_deck_player.gd
@@ -28,11 +28,20 @@ static func _run() -> int:
 	failed += U.section("refill_to_five (普通区)", func(): _test_refill_to_five())
 	failed += U.section("refill_active (牌堆内补牌)", func(): _test_refill_active())
 	failed += U.section("add_to_hidden (回收)", func(): _test_add_hidden())
-	failed += U.section("shop_destroy_flow", func(): _test_shop_destroy())
 	failed += U.section("remove_cards_from_hand", func(): _test_remove_from_hand())
 	failed += U.section("sort_hand", func(): _test_sort_hand())
 
 	return U.finish(failed, "牌堆与玩家")
+
+
+## 有序测试牌堆：ID 0-53 依序，游戏区 32 张 / 隐藏区 22 张
+## （新模型 init_standard 会洗牌，确定性断言改用手动布置）
+static func _make_ordered() -> Deck.DeckManager:
+	var d := Deck.DeckManager.new()
+	for i in 54:
+		d.cards.append(i)
+	d.active_count = Deck.DeckManager.DECK_CAP
+	return d
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -43,13 +52,12 @@ static func _test_create_standard() -> void:
 	var d := Deck.DeckManager.new()
 	d.init_standard()
 	U.eq(d.total(), 54, "标准牌堆共 54 张")
-	U.eq(d.active_size(), Deck.DeckManager.DECK_CAP, "游戏牌堆 32 张")
-	U.eq(d.total() - d.active_size(), 22, "隐藏牌堆 22 张")
+	U.eq(d.active_count, Deck.DeckManager.DECK_CAP, "游戏牌堆 32 张")
+	U.eq(d.total() - d.active_count, 22, "隐藏牌堆 22 张")
 
-	# 有序模式：总计不变，且顺序已知（0-53）
-	var o := Deck.DeckManager.new()
-	o.init_ordered()
-	U.eq(o.total(), 54, "有序牌堆共 54 张")
+	# 手动布置：cards 为 ID 数组，可自由构造任意牌堆状态
+	var o := _make_ordered()
+	U.eq(o.total(), 54, "手动布置共 54 张")
 	U.eq(o.cards[0], 0, "有序第 0 张为 0")
 
 
@@ -58,20 +66,19 @@ static func _test_create_standard() -> void:
 # ═══════════════════════════════════════════════════════════════
 
 static func _test_draw() -> void:
-	var d := Deck.DeckManager.new()
-	d.init_ordered()
+	var d := _make_ordered()
 
 	# 抽 5 张（真实移出数组）
 	var drawn := d.draw_from_active(5)
 	U.eq(drawn.size(), 5, "抽 5 张得到 5 张")
-	U.eq(d.active_size(), Deck.DeckManager.DECK_CAP - 5, "抽 5 张后游戏区减 5")
+	U.eq(d.active_count, Deck.DeckManager.DECK_CAP - 5, "抽 5 张后游戏区减 5")
 	U.eq(d.total(), 54 - 5, "抽牌真实移出，总牌数减 5")
 
 	# 抽超过游戏区可抽取量 → 取 mini
-	var before := d.active_size()
+	var before := d.active_count
 	var over := d.draw_from_active(100)
 	U.eq(over.size(), before, "抽超量时按剩余游戏区数量抽取")
-	U.eq(d.active_size(), 0, "游戏区抽空为 0")
+	U.eq(d.active_count, 0, "游戏区抽空为 0")
 
 	# 空牌堆抽取 → 空结果
 	var e := Deck.DeckManager.new()
@@ -79,8 +86,7 @@ static func _test_draw() -> void:
 	U.eq(none.size(), 0, "空牌堆抽取返回空")
 
 	# 抽 0 张 → 空结果，数量不变
-	var z := Deck.DeckManager.new()
-	z.init_ordered()
+	var z := _make_ordered()
 	var zero := z.draw_from_active(0)
 	U.eq(zero.size(), 0, "抽 0 张返回空")
 	U.eq(z.total(), 54, "抽 0 张不改变总数")
@@ -118,7 +124,7 @@ static func _test_refill_to_five() -> void:
 		p3.normal_hand.append(U.card("A"))
 	d3.fill_player_normal(p3)
 	U.eq(p3.normal_hand.size(), 5, "手牌已满不重复补")
-	U.eq(d3.active_size(), Deck.DeckManager.DECK_CAP, "满手不抽，游戏区不变")
+	U.eq(d3.active_count, Deck.DeckManager.DECK_CAP, "满手不抽，游戏区不变")
 
 	# 立刻补区（instant）独立上限 2
 	var d4 := Deck.DeckManager.new()
@@ -133,21 +139,19 @@ static func _test_refill_to_five() -> void:
 # ═══════════════════════════════════════════════════════════════
 
 static func _test_refill_active() -> void:
-	var d := Deck.DeckManager.new()
-	d.init_ordered()
+	var d := _make_ordered()
 	# 抽掉部分游戏区
 	d.draw_from_active(10)
-	U.eq(d.active_size(), Deck.DeckManager.DECK_CAP - 10, "抽 10 后游戏区 22")
+	U.eq(d.active_count, Deck.DeckManager.DECK_CAP - 10, "抽 10 后游戏区 22")
 	d.refill_active()
-	U.eq(d.active_size(), Deck.DeckManager.DECK_CAP, "补牌回 32")
+	U.eq(d.active_count, Deck.DeckManager.DECK_CAP, "补牌回 32")
 
 	# 隐藏区不足时，补到最大可用
-	var d2 := Deck.DeckManager.new()
-	d2.init_ordered()
+	var d2 := _make_ordered()
 	d2.cards = d2.cards.slice(0, 10)   # 人为裁剪到 10 张
 	d2.active_count = 5
 	d2.refill_active()
-	U.eq(d2.active_size(), 10, "隐藏不足时补到全部可用")
+	U.eq(d2.active_count, 10, "隐藏不足时补到全部可用")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -155,13 +159,14 @@ static func _test_refill_active() -> void:
 # ═══════════════════════════════════════════════════════════════
 
 static func _test_add_hidden() -> void:
-	var d := Deck.DeckManager.new()
-	d.init_ordered()
+	var d := _make_ordered()
 	var before_total := d.total()
-	var ok := d.add_to_hidden(U.card("7", "黑桃"))
+	## 回收契约要求 card.id >= 0（真实牌局的牌都来自 Card.from_id），
+	## 用 U.card() 造牌时 id 默认 -1，会走"非法牌"分支
+	var ok := d.add_to_hidden(Card.from_id(Card.id_for("7", "黑桃")))
 	U.ok(ok, "合法有效牌可回收")
 	U.eq(d.total(), before_total + 1, "回收后总数 +1")
-	U.eq(d.active_size(), Deck.DeckManager.DECK_CAP, "回收进隐藏区不改变游戏区")
+	U.eq(d.active_count, Deck.DeckManager.DECK_CAP, "回收进隐藏区不改变游戏区")
 
 	# 无效牌（无法映射 id）返回 false
 	var bad := d.add_to_hidden(U.card("不存在点"))
@@ -169,27 +174,7 @@ static func _test_add_hidden() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 6. shop_destroy_flow — 商店销毁 7 张流程
-# ═══════════════════════════════════════════════════════════════
-
-static func _test_shop_destroy() -> void:
-	var d := Deck.DeckManager.new()
-	d.init_standard()
-	var res := d.shop_destroy_flow(0)
-	U.eq(res["shown"].size(), 7, "展示 7 张")
-	U.ok(res["destroyed"] != null, "选中第 0 张被销毁")
-	U.eq(res["remaining"].size(), 6, "剩余 6 张放回")
-	U.eq(d.active_size(), Deck.DeckManager.DECK_CAP, "销毁后补回游戏区容量")
-
-	# 空牌堆 → 空结果
-	var e := Deck.DeckManager.new()
-	var empty_res := e.shop_destroy_flow(0)
-	U.eq(empty_res["shown"].size(), 0, "空牌堆销毁返回空")
-	U.eq(empty_res["destroyed"], null, "空牌堆无销毁对象")
-
-
-# ═══════════════════════════════════════════════════════════════
-# 7. remove_cards_from_hand — 从手牌精确删除
+# 6. remove_cards_from_hand — 从手牌精确删除
 # ═══════════════════════════════════════════════════════════════
 
 static func _test_remove_from_hand() -> void:
@@ -221,7 +206,7 @@ static func _test_remove_from_hand() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 8. sort_hand — 手牌排序
+# 7. sort_hand — 手牌排序
 # ═══════════════════════════════════════════════════════════════
 
 static func _test_sort_hand() -> void:

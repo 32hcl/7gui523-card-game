@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="AIWeights" format=3]
+
+[ext_resource type="Script" path="res://scripts/ai/ai_weights.gd" id="1_h2tsw"]
+
+[resource]
+script = ExtResource("1_h2tsw")
+finish_hand_reward = 116963.58680725099
+play_card_count_cost = 1.7982917
+rank_cost = 18.532103776931763
+high_card_cost = 25.0
+low_card_release_reward = 1.0049030542373658
+break_pair_cost = 2111.514372825623
+break_triple_cost = 1574.4666386528097
+break_bomb_cost = 1800.0
+break_five_kind_cost = 1800.0
+break_rocket_cost = 1800.0
+beat_same_type_reward = 4253.064602613449
+beat_bomb_reward = -2269.042428773281
+opponent_low_hand_reward = 9000.0
+counter_risk_cost = 1.681093102088579
+table_score_reward = 1.6835550715451963
+score_card_reward = 7.814003453525225
+exhausted_point_reward = 25.0

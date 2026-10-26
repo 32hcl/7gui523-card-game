@@ -26,7 +26,7 @@ static func _run() -> int:
 		var result := campaign.finish_level(true, 0, 0)
 		U.ok(not result.player_won, "第9关不接受玩家胜利")
 		U.ok(not result.boss_cleared, "第9关不标记Boss被击败")
-		U.ok(not campaign.is_victory(), "最终挑战不产生全部通关状态")
+		U.eq(campaign.cleared_level, 0, "最终挑战不推进通关进度")
 	)
 
 	failed += U.section("新战役重置门票资格", func():

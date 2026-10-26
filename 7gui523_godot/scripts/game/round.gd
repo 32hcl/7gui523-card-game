@@ -50,8 +50,6 @@ var table_score := 0            ## 桌面全部落牌的原始分累积（结算
 ## Boss 特殊规则（来自 Campaign.LevelRule）；为 null 表示无特殊规则
 var level_rule = null   ## Campaign.LevelRule
 var _boss: Player.PlayerData = null   ## 哪一方是 Boss（用于判断规则触发方）
-
-
 # ═══════════════════════════════════════════════════════════════
 # 生命周期
 # ═══════════════════════════════════════════════════════════════
@@ -84,7 +82,8 @@ func whose_turn() -> Player.PlayerData:
 ## 返回 Dictionary: {state, winner, table_cards, table_bonus, reason}
 ##   "continue"    → 已轮换，该下一位出
 ##   "round_win"   → 有人"不要"了，上家赢
-##   "instant_win" → Gui523 或手牌+牌堆双空，直接赢
+##   "instant_win" → Gui523 或玩家手牌+牌堆双空，直接赢
+##   "boss_finish" → BOSS 手牌+牌堆双空，等待 UI 结算 3N 伤害
 ##   "invalid"     → 牌型非法（已轮换，current 变了）
 ##   "cannot_beat" → 压不过上家（已轮换，current 变了）
 func process_play(play: Array[Card]) -> Dictionary:
@@ -93,7 +92,7 @@ func process_play(play: Array[Card]) -> Dictionary:
 	if play.is_empty():
 		if last_play == null or last_play.cards.is_empty():
 			# 自由局：不能空过（空=非法牌型）
-			if current.hand.is_empty():
+			if current.hand_size() < 1:
 				error_invalid_play.emit("没有手牌，只能不要")
 			else:
 				error_invalid_play.emit("不能空过！")
@@ -102,17 +101,17 @@ func process_play(play: Array[Card]) -> Dictionary:
 		else:
 			# 有人出过牌 → "不要" → 上家赢，双方补牌到 5
 			card_passed.emit(current)
-			var old_size := current.hand.size()
-			current_deck.fill_to_five(current)
-			var drawn := current.hand.size() - old_size
+			var old_size := current.hand_size()
+			current_deck.fill_player_normal(current)
+			var drawn := current.hand_size() - old_size
 			if drawn > 0:
 				deck_refill.emit(current, drawn)
 
-			old_size = opponent.hand.size()
-			opponent_deck.fill_to_five(opponent)
-			drawn = opponent.hand.size() - old_size
-			if drawn > 0:
-				deck_refill.emit(opponent, drawn)
+			var old_size2 := opponent.hand_size()
+			opponent_deck.fill_player_normal(opponent)
+			var drawn2 := opponent.hand_size() - old_size2
+			if drawn2 > 0:
+				deck_refill.emit(opponent, drawn2)
 
 			return _round_win(last_player)
 
@@ -165,6 +164,8 @@ func process_play(play: Array[Card]) -> Dictionary:
 
 	# ── ⑥ 从手牌删除 → 放桌上（桌面只保留当前一手；落牌分另累加）──
 	current.remove_cards_from_hand(play)
+	if current_deck:
+		current_deck.recycle_played(play)
 	table_cards.clear()
 	table_cards.append_array(play)
 	table_score += Score.calculate_score(play)
@@ -177,8 +178,10 @@ func process_play(play: Array[Card]) -> Dictionary:
 	if current_deck:
 		current_deck.fill_player_instant(current)
 
-	# ── ⑦ 手牌打空了？（不补牌，补牌只在"不要"时触发） ──
-	if current.hand.is_empty() and current_deck.cards.is_empty():
+	# ── ⑦ BOSS 手牌与牌堆都空：交给 UI 等最后一张牌动画完成后结算 ──
+	if current.is_hand_empty() and current_deck.cards.is_empty():
+		if _boss and current == _boss:
+			return {"state": "boss_finish", "winner": current}
 		deck_emptied.emit(current.name)
 		return _instant_win(current)
 
@@ -208,7 +211,7 @@ func _round_win(winner: RefCounted) -> Dictionary:
 	# 赢家成为下一小局先手：若赢家不是 current（上家），轮换使其先出
 	if winner != current:
 		_swap()
-	var damage := table_score + table_bonus
+	var damage: int = Score.score_to_damage(table_score + table_bonus)
 	table_cards.clear()
 	table_score = 0
 	table_bonus = 0
@@ -242,7 +245,7 @@ func ghost_force_play(boss_hand: Array[Card]) -> Array[Card]:
 	return level_rule.ghost_force_play(boss_hand, last_play)
 
 
-## 直接赢：Gui523 或手牌+牌堆双空
+## 直接赢：Gui523 或玩家手牌+牌堆双空；BOSS 清空牌堆由 boss_finish 处理
 func _instant_win(winner: RefCounted) -> Dictionary:
 	## 黑老大：Boss 先出完时，强制弃掉玩家（输家）手中最大的一张牌
 	## _instant_win 固定 winner==current，所以 winner==_boss → current==_boss → loser=opponent

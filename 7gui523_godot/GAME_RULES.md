@@ -2,6 +2,121 @@
 
 ---
 
+## 〇、项目目录结构
+
+```
+7gui523_godot/                  # Godot 4.7 项目根目录
+├── project.godot               # 引擎配置：游戏名"七鬼523"、v1.0.0、主场景入口、
+│                               #   竖屏 680×1020 (canvas_items/expand)、黑体字体
+├── GAME_RULES.md               # 本文件：游戏规则与设定
+│
+├── scenes/                     # 场景文件 (.tscn) — 主管全局屏幕分区布局，不含运行时逻辑
+│   ├── play/play.tscn          #   主游戏场景，屏幕分为 6 个区：
+│   │                           #     [顶栏]      标题"七鬼523"、牌堆余量、HP 文字、回合数
+│   │                           #     [Boss区]    头像、Boss手牌(牌背)、分隔线、Boss补牌
+│   │                           #     [绿毡桌面]  打出的牌、桌面分数字、HP 条(玩家/Boss)、牌堆显示
+│   │                           #     [手牌区]    上排补牌区 + 下排主力区、商店按钮、重新开始
+│   │                           #     [GameOver]  遮罩层 → 标题/原因/再来一局按钮
+│   │                           #     [信号连线]  NewGameBtn.pressed / AgainBtn.pressed → _on_reset_pressed
+│   └── shop/shop_panel.tscn    #   商店面板，全屏覆盖层分为 4 个区：
+│                               #     [遮罩]      半透明暗色 ColorRect（防误触下层）
+│                               #     [顶栏]      标题"关末商店"、筹码余额、关闭按钮
+│                               #     [可滚区]    固定区(FixedItems)、刷新区(RefreshItems)、附魔区(EnchantItems)
+│                               #     [底栏]      关闭按钮、进入下一关按钮
+│
+├── scripts/                    # 脚本 (.gd) — 全部 class_name 全局可访问，无 class 环依赖
+│   ├── core/                   # 核心数据层（6 个文件，均 extends RefCounted）
+│   │   ├── card.gd             #   Card：id(0-53不可变身份锚)、copy_mark(副本标记)、RANK_MAP(15级)、score_from_point、from_id、revert、sorted_order
+│   │   ├── cardtype.gd         #   CardTypeResult：11 种枚举(SINGLE..GUI523)、TYPE_RANK、parse_any_card_type / can_beat
+│   │   ├── deck.gd             #   Deck(含 DeckManager)：54 张牌、单数组 + active_count 分界线、抽牌/回收/补牌/商店插入
+│   │   ├── player.gd           #   Player(含 PlayerData)：normal_hand(5)+instant_hand(2)、collect_hand_into/hand_size/is_hand_empty/next_copy_mark、名字"32%Hcl"
+│   │   ├── enchant.gd          #   Enchant：9 种 EnchantType、Enchantment/EnchantedCard 数据模型
+│   │   └── score.gd            #   Score：calculate_score(桌面分) + calculate_pressure_bonus(压迫加分)
+│   │
+│   ├── game/                   # 游戏逻辑层（2 个文件，均 extends RefCounted）
+│   │   ├── round.gd            #   Round：process_play 状态机（invalid/continue/round_win/boss_finish/instant_win）、轮换、补牌、信号
+│   │   └── campaign.gd         #   Campaign：9 关 HP/筹码/入场费、胜利/失败结算、关卡规则（引用 GameConfig）
+│   │
+│   ├── shop/                   # 商店系统（独立目录，后续扩展卡组构建核心玩法）
+│   │   └── shop.gd             #   Shop：商品数据拼装(_card)、FIXED区(关末补货)、REFRESHABLE区(30筹码刷新)、附魔商店(≥32筹码解锁)、save/load
+│   │
+│   ├── ui/                     # UI 表现层（7 个文件：5 层单继承 + 2 个独立组件）
+│   │   ├── play_base.gd        #   extends Control [第1层] 色板常量、@onready 节点引用、响应式布局、装饰构建
+│   │   ├── play_anim.gd        #   extends play_base [第2层] _render_hand_row(BottomHand/TopHand)、牌桌动画、溶解/幽灵卡、_spawn_floating_damage
+│   │   ├── play_ui.gd          #   extends play_anim [第3层] ShopPanel 接入、商品行渲染、购买/刷新/血量回复
+│   │   ├── play_input.gd       #   extends play_ui [第4层] 拖拽出牌(_drag_indices)、双击桌面(不要)、弃牌计数、选牌高亮
+│   │   ├── play.gd             #   extends play_input [第5层] _start_new 开局、Round 信号回调、AI 调度(_schedule_ai_if_needed)、玩法帮助
+│   │   ├── shop_panel.gd       #   extends Control 商店面板独立组件（不参与 play 继承链）
+│   │   └── card_visual.gd      #   extends Control 单牌渲染：着色器溶解(DISSOLVE_AMT)、伪 3D 倾斜(QUICK_TILT)、SUIT_DIR 花色路径映射
+│   │
+│   └── ai/                     # AI 决策层（3 个文件）
+│       ├── ai.gd               #   AICore(extends RefCounted)：AI1 规则(最小压过)、AI2 贪心(8维评分)、CardTracker 记牌器
+│       ├── ai_weights.gd       #   AIWeights(extends Resource)：8 维 base/score_card/special/endgame/combo_break/table_score/defensive/tracker 权重
+│       └── boss_ai.gd          #   BossAI(extends RefCounted)：关卡特殊行为入口 — 当前全部委托 AI1(Rule)
+│
+├── global/                     # 全局配置（class_name 全局访问，不注册 autoload）
+│   ├── card_type_names.gd      #   CardTypeNames(extends RefCounted)：CardType 枚举 → 中文名(PASS→"不出", SINGLE→"单张"...)
+│   ├── game_config.gd          #   GameConfig(extends RefCounted)：NORMAL_MAX=5、INSTANT_MAX=2、PLAYER_INIT_HP=140、BOSS_NAMES[1-9]、ENTRY/REWARD_CHIPS
+│   ├── save_manager.gd         #   SaveManager(extends RefCounted)：save_json/load_json/file_exists/delete_file — 纯 I/O 不涉及序列化
+│   ├── event_bus.gd            #   EventBus(extends RefCounted)：15 个 signal — ROUND_START/TURN_CHANGED/ROUND_WIN/CARD_PLAYED/GAME_OVER...
+│   ├── game_state.gd           #   GameState(extends RefCounted)：campaign/shop/round/hp/ai/decks/tracker 等 16 个属性、is_player_turn/is_ai_turn/reset_round_state
+│   └── audio_manager.gd        #   AudioManager(extends RefCounted)：BGM/SFX/音量接口空壳，已注册 EventBus 事件钩子
+│
+├── data/                       # 运行时/训练数据
+│   └── ai/                     #   2 个 .tres 权重文件：
+│       ├── ai4_weights.tres    #     AI4 预训练权重（AIWeights Resource 实例）
+│       └── best_weights.tres   #     最优权重快照
+│
+├── art/                        # 美术资源
+│   ├── fonts/                  #   字体（1 个 ttf）：simhei.ttf — 黑体中文字体
+│   ├── Top-Down/Cards/         #   扑克牌正面（4 花色 × 13 张 = 52 张 PNG）
+│   │   ├── Spades/{00-12}.png  #     黑桃：00=A, 01=2, ..., 12=K
+│   │   ├── Hearts/{00-12}.png  #     红桃
+│   │   ├── Clubs/{00-12}.png   #     梅花
+│   │   ├── Diamonds/{00-12}.png#    方块
+│   │   ├── joker_black.png     #     小鬼（card_visual.gd 引用）
+│   │   ├── joker_red.png       #     大鬼
+│   │   └── Card_Back-Red-88x124.png  #  牌背（Boss 手牌显示）
+│   ├── Top-Down/Chips/         #   筹码贴图（ChipsA/B Flat + Outline × 2 色 + Template 8 种尺寸）
+│   ├── ui/                     #   UI 矢量图（chip_black_500/red_100/green_25.svg、corner_gold.svg、lantern_red.svg、xiangyun_gold.svg）
+│   └── effects/                #   特效：gloden_glow.tres — 金色发光渐变（card_visual.gd 流光闪光引用）
+│
+├── _devtest/                   # 开发测试工具（不对玩家暴露）
+│   ├── test_util.gd            #   共享断言 + 造牌辅助（CardTestHelper）
+│   ├── test_cardtype.gd        #   牌型解析 / canBeat / typeRank 全覆盖
+│   ├── test_score.gd           #   压迫加分 / calculateScore / tableScore
+│   ├── test_deck_player.gd     #   54张牌堆 / 抽取补牌回收 / 商店销毁 / 手牌排序删除
+│   ├── test_ai_round.gd        #   AI 枚举首出 / 自由局不空过 / 非法牌型 / 压不过 / PASS / GUI523
+│   ├── test_campaign.gd        #   Campaign + 商店 + 伤害结算
+│   ├── test_sort.gd            #   手牌排序（rank 降序 → 花色 Unicode 升序）
+│   ├── test_main.gd            #   汇总入口：依次运行以上 6 个测试，打印 FAIL/PASS 汇总，exit_code=0/1
+│   ├── card_lab.tscn + .gd     #   卡牌实验室：可视化调试牌型
+│   ├── battle.tscn + .gd       #   战斗调试场景：集成实战模拟
+│   ├── test_main_output.txt    #   最近一次 test_main 控制台输出
+│   ├── test_main_err.txt       #   最近一次 test_main 错误日志
+│   ├── test_sort_output.txt    #   最近一次 test_sort 输出
+│   ├── test_sort_err.txt       #   最近一次 test_sort 错误日志
+│   └── ai_training/            #   AI 训练器（7 个文件）
+│       ├── ai_trainer.gd       #     训练主循环
+│       ├── ai_eval.gd          #     评估器
+│       ├── ai_metrics.gd       #     指标统计
+│       ├── ai_battle.gd        #     对战模拟
+│       ├── ai4_weights.tres    #     训练中间权重快照
+│       ├── best_weights.tres   #     训练最优权重
+│       └── README.md           #     训练器使用说明
+│
+└── .godot/                     # Godot 引擎自动生成（编辑器缓存、导入缓存、着色器缓存）
+```
+
+> **关键配置**（来自 `project.godot`）：  
+> - 入口场景：`scenes/play/play.tscn`  
+> - 窗口尺寸：680 × 1020（竖屏手游比例）  
+> - 缩放模式：`canvas_items` + `expand`  
+> - 自定义字体：`art/fonts/simhei.ttf`（黑体，支持中文）  
+> - global/ 下 6 个文件全部通过 `class_name` 全局访问，不注册 autoload
+
+---
+
 ## 一、牌库
 
 ### 1.1 标准牌库（54 张）
@@ -76,7 +191,8 @@ A(9) > K(8) > Q(7) > J(6) > 10(5) > 9(4) > 8(3) > 6(2) > 4(1)
 | **自由局** | 无历史出牌时 → 空出 = 非法（不能空过），必须出手牌 |
 | **不要（Pass）** | 有历史出牌时 → 空出 = "不要" → 上家赢下本手 → 双方补牌至 5 张 |
 | **出牌后** | 不自动补牌。补牌只在"不要"时触发 |
-| **手牌+牌堆双空** | 打出最后一手 → 直接获胜（牌局结束） |
+| **玩家手牌+牌堆双空** | 打出最后一手 → 玩家直接获胜 |
+| **BOSS 手牌+牌堆双空** | 返回 `boss_finish`，最后一张牌完成后按玩家剩余牌数结算 `3N` |
 | **7gui523** | 打出即获胜（无视当前桌面状态） |
 
 ### 3.3 压迫（反压）
@@ -101,8 +217,8 @@ A(9) > K(8) > Q(7) > J(6) > 10(5) > 9(4) > 8(3) > 6(2) > 4(1)
 
 | 结局 | 条件 | 结算 |
 |------|------|------|
-| **玩家先出完** | 玩家手牌+牌堆双空 | 获胜 → 剩余牌总数 × 3 回复 HP |
-| **BOSS 先出完** | BOSS 手牌+牌堆双空 | 失败 → 剩余牌总数 × 3 扣除 HP |
+| **玩家先出完** | 玩家手牌+牌堆双空 | 按现有玩家胜利流程结算 |
+| **BOSS 先出完** | BOSS 手牌+牌堆双空 | 等最后一张牌动画完成，玩家剩余牌数 N × 3 扣除玩家 HP |
 | **HP > 0** | 结算后玩家 HP > 0 | 进入下一关 |
 | **HP ≤ 0** | 结算后玩家 HP ≤ 0 | 游戏结束 |
 
@@ -125,7 +241,7 @@ A(9) > K(8) > Q(7) > J(6) > 10(5) > 9(4) > 8(3) > 6(2) > 4(1)
 | 关 | 入场费 | 获胜奖励 |
 |----|--------|----------|
 | 1 新手 | 1 | 3 |
-| 2 换牌虫 | 5 | 12 |
+| 2 抹牌虫 | 5 | 12 |
 | 3 急眼雀 | 10 | 25 |
 | 4 疯狗 | 20 | 50 |
 | 5 赖账鬼 | 50 | 120 |
@@ -139,13 +255,13 @@ A(9) > K(8) > Q(7) > J(6) > 10(5) > 9(4) > 8(3) > 6(2) > 4(1)
 | 关 | BOSS | 特殊规则 |
 |----|------|----------|
 | 1 | 新手 | 无 |
-| 2 | 换牌虫 | 无 |
+| 2 | 抹牌虫 | 无 |
 | 3 | **急眼雀** | 每轮 BOSS 必定先手 |
 | 4 | **疯狗** | BOSS 每张出牌附带 ×3 额外伤害 |
 | 5 | **赖账鬼** | 同花色可无视点数压过（仅对 J 以下单张）；禁止玩家出相同点数 |
 | 6 | **不识数** | 50% 概率蒙混过关（同牌型即算压过） |
 | 7 | **黑老大** | BOSS 先出完时，强制弃掉玩家手中最大的一张牌 |
-| 8 | 千里眼 | 无特殊规则 |
+| 8 | 换牌鬼 | 无特殊规则 |
 | 9 | **赌场老板** | 禁止打出 7gui523；不可通关的最终挑战，Boss 不掉血 |
 
 ### 5.4 赌场门票与关卡筹码
@@ -265,6 +381,8 @@ A(9) > K(8) > Q(7) > J(6) > 10(5) > 9(4) > 8(3) > 6(2) > 4(1)
 
 ### 8.2 AI2（贪心评分）
 
+> AI2 保留用于兼容和测试，不接入当前正式关卡。当前正式 BOSS 使用 AI1。
+
 8 维加权评分选择最优出牌：
 
 | 维度 | 逻辑 |
@@ -339,18 +457,17 @@ cards[0 .......... active_count ........... 末尾]
 | BIG_CARD_COUNTERED | 炸弹/王炸/五同点被更大反压 |
 | SPECIAL_VICTORY | 7gui523 直接获胜 |
 | DECK_REFILL | 手牌从牌堆补回 5 张 |
-| DECK_EMPTIED | 牌堆抽空 |
+| DECK_EMPTIED | 玩家牌堆抽空；BOSS 双空由 `boss_finish` 处理 |
 | GAME_OVER | 游戏结束 |
 
 ---
 
 ## 十一、常用 UI 反馈
 
-### 浮动文字（FloatingText）
-
-- 错误提示：1.2 秒上浮 + 淡出自动消失
-- 三色预设：红色（错误）、黄色（警告）、蓝色（信息）
-- 不阻塞游戏流程
+提示与反馈内联在 UI 层，无独立模块：
+- **底部状态文字**（`play.gd::_refresh_status`）：红色（非法牌型/无法压过）、黄色（首出不能弃牌）、蓝色（普通信息）
+- **浮动伤害数字**（`play_anim.gd::_spawn_floating_damage`）：桌面伤害/压迫加分/弃牌扣血，上浮淡出 1.2 秒
+- **拖拽落点高亮**（`play.gd::_drop_hint`）：手牌拖到桌面时绿色高亮目标区
 
 ---
 
@@ -358,18 +475,18 @@ cards[0 .......... active_count ........... 末尾]
 
 ### 12.0 UI 继承链
 
-对战场面按关注点拆分为 4 层单继承：
+对战场面按关注点拆分为 5 层单继承：
 
 ```
-play_base.gd  →  常量 / 节点引用 / 单卡构建 / 主题装饰
-play_anim.gd  →  手牌渲染 / 桌面动画 / 溶解与幽灵卡
-play_ui.gd    →  商店面板 / 商品渲染 / 购买刷新
-play.gd       →  入口 / 关卡流程 / Round 信号 / AI / 拖拽
+play_base.gd   →  [第1层] 常量 / 节点引用 / 单卡构建 / 主题装饰
+play_anim.gd   →  [第2层] 手牌渲染 / 桌面动画 / 溶解与幽灵卡 / 浮动伤害数字
+play_ui.gd     →  [第3层] 商店面板 / 商品渲染 / 购买刷新
+play_input.gd  →  [第4层] 拖拽出牌 / 双击/单击 / 弃牌 / 选牌
+play.gd        →  [第5层] 入口 / 关卡流程 / Round 信号 / AI 调度
 ```
 
 终端常驻组件独立：
 - `card_visual.gd` — 单牌渲染节点（着色器溶解、伪 3D）
-- `floating_text.gd` — 浮动文字
 
 
 ### 12.1 对局详细流程
@@ -381,10 +498,10 @@ play.gd       →  入口 / 关卡流程 / Round 信号 / AI / 拖拽
 1. 创建两副独立牌堆 `Deck.DeckManager`（各 54 张，双牌堆）
    - `_human_deck.init_standard()` / `_ai_deck.init_standard()`（各洗牌、Active 区 + 隐藏区）
 2. 创建两名玩家 `Player.PlayerData`
-   - 玩家：`is_human=true`、`ai_level=AI1_RULE`（用于可能接管的换手 AI）
-   - AI：`is_human=false`、`ai_level=AI2_GREEDY`
+   - 玩家：`is_human=true`、`ai_level=AI1_RULE`（仅作为玩家数据默认等级）
+   - BOSS：`is_human=false`、`ai_level=AI1_RULE`（当前正式关卡使用）
 3. 各自 `refill_normal_hand(deck)` 抽满 **普通区 5 张**
-4. 双方 HP 初始化为 `PLAYER_HP = 100`
+4. 双方 HP 从战役配置读取：玩家初始 HP 140、最大 HP 210，BOSS HP 110
 5. `Round.new(human, ai, human_deck, ai_deck)` 挂接信号
 6. `_schedule_ai_if_needed()` 确定先手
 
@@ -392,7 +509,7 @@ play.gd       →  入口 / 关卡流程 / Round 信号 / AI / 拖拽
 人类(真实玩家)         AI(发狂AI)
   ├─ 手牌 5 张          ├─ 手牌 5 张
   └─ 牌堆 54 张          └─ 牌堆 54 张
-HP=100   current=玩家     HP=100   opponent=AI
+HP=140/210 current=玩家   HP=110 opponent=BOSS
 ```
 
 ### 12.2 一手牌的判定（核心状态机）
@@ -408,7 +525,8 @@ HP=100   current=玩家     HP=100   opponent=AI
 | **非空** | `parse_any_card_type` → 非法牌型 | `invalid` | `_swap()` 轮换 |
 | **非空 但压不过上家** | `CardTypeResult.can_beat==false` | `cannot_beat` | `_swap()` 轮换 |
 | **非空 且是 7gui523** | 直接获胜 | `instant_win` | 结束 |
-| **非空 且合法且压过** | 手牌+牌堆双空 → 直接赢 | `instant_win` | 结束 |
+| **非空 且 BOSS 手牌+牌堆双空** | 保留最后一张牌动画，进入 3N 伤害结算 | `boss_finish` | 结算后结束本关 |
+| **非空 且玩家手牌+牌堆双空** | 直接获胜 | `instant_win` | 结束 |
 | **非空 且合法且压过（正常）** | 从手牌移除 → 上桌 → 记 `last_play/last_player` | `continue` | `_swap()` 轮换 |
 
 > 注：出牌后**不自动补牌**。补牌仅在「不要」触发时双方同时补回 5 张。
@@ -430,24 +548,30 @@ HP=100   current=玩家     HP=100   opponent=AI
 
 `play.gd::_on_round_won` 扣血：winner==human → `_ai_hp -= damage`；否则 `_human_hp -= damage`。
 
-### 12.4 直接获胜（instant_win）
+### 12.4 直接获胜与 BOSS 清空牌堆
 
 代码：`round.gd::_instant_win(winner)`
 
-触发条件：
-1. 打出 **7gui523**（7 + 任一鬼 + 5 + 2 + 3）
-2. 出牌后 **手牌空 且 牌堆空**（打出最后一手）
+`instant_win` 仅处理 7gui523，或玩家正常打空手牌与牌堆。
+
+BOSS 打空手牌与牌堆不再直接触发 `instant_win`，而是返回 `boss_finish`：
+
+1. 保留 BOSS 最后一张牌的桌面动画。
+2. 统计玩家剩余牌数：普通手牌 + 即时手牌 + 玩家牌堆。
+3. 造成 `3N` 点玩家伤害。
+4. 播放桌面白色延迟条后才扣除 HP。
+5. 只根据结算后玩家 HP 判断：HP > 0 进入下一关，HP ≤ 0 游戏结束。
 
 第 9 关例外：玩家不能打出 7gui523；即使正常打空手牌与牌堆，`instant_win` 也不会转化为玩家通关，Boss 仍不会掉血，随后结束最终挑战。
 
-`play.gd::_take_round_result` 将胜方 HP 归零 → `_game_over()`。
+`play.gd::_resolve_boss_finish` 负责 BOSS 清空后的延迟结算与关卡推进。
 
 ### 12.5 回合轮换与 AI
 
 代码：`round.gd::_swap`、`play.gd::_schedule_ai_if_needed`
 
 - 每次有效行动后 `_swap()` 交换 `current ↔ opponent`（连同各自的牌堆）
-- current 为 AI 时 `_schedule_ai_if_needed` 启动 0.7s 定时器 → `_ai_think` → `AICore.choose` → `process_play`
+- current 为 BOSS 时 `_schedule_ai_if_needed` 启动 0.7s 定时器 → `_ai_think` → `BossAI.choose` → `AICore.choose_ai1` → `process_play`
 - AI 自由局若意外返回空数组：兜底强制出一张最小单张，避免"非法空过"
 
 ### 12.6 伤害与 HP 流向总图
@@ -457,7 +581,8 @@ HP=100   current=玩家     HP=100   opponent=AI
         ↓ 上家"不要"时一次性结算
 伤害分 → winner(上家) → opponent 扣 HP
         ↓ 反复
-一方 HP ≤ 0 或手牌+牌堆双空   →  GAME_OVER
+玩家 HP ≤ 0   →  GAME_OVER
+BOSS 先出完   →  结算 3N 伤害后按玩家 HP 进入下一关或结束
 ```
 
 ### 12.7 数据接线汇总（阶段 C 实际做法）

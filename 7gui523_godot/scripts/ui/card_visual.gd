@@ -22,18 +22,15 @@ const JOKER_RED := "res://art/Top-Down/Cards/joker_red.png"
 
 const SHADOW_OFFSET := Vector2(6, 10)   ## 阴影偏移（右下，模拟左上光源）
 const SHADOW_ALPHA := 0.42              ## 阴影浓度
-const SHADOW_ALPHA_SEL := 0.85          ## 选中时阴影浓度（边框冷光更浓更醒目）
+const SHADOW_ALPHA_SEL := 0.85          ## 选中时阴影浓度（金色阴影更浓更醒目）
 const SHADOW_INSET := 0.62              ## 阴影 inset（比牌面稍大，避免被矩形裁剪）
+const LIGHT_SHADOW_MAX := 20.0          ## 屏幕中心光源下阴影最大横向偏移（对齐 Demo card_UI.tscn）
 const FLASH_GRADIENT := "res://art/effects/gloden_glow.tres"  ## 闪光金色渐变（源自 Demo）
 
 ## 预加载着色器（避免运行时 load 开销）
 const SHD_DISSOLVE := preload("res://shaders/dissolve2d.gdshader")
 const SHD_FAKE3D := preload("res://shaders/fake3d_flash.gdshader")
 const SHD_SHADOW := preload("res://shaders/fake3d_shadow.gdshader")
-
-## 选中边框（垫在卡牌最底层的发光描边；非金色，用深靛蓝+冷光）
-const SEL_FRAME_COLOR := Color(0.32, 0.52, 0.88, 0.92)
-const SEL_FRAME_GLOW := Color(0.20, 0.38, 0.72, 0.25)
 
 ## 当前展示的 Card id（-1 表示非牌面图）
 var card_id: int = -1
@@ -78,8 +75,32 @@ func _notification(what: int) -> void:
 		_tex.size = size
 		if _shadow_tex:
 			_shadow_tex.size = size
-		if _sel_frame:
-			_sel_frame.size = size + Vector2(10, 10)
+
+
+## 屏幕中心光源：每帧让阴影横向偏移随卡牌离屏幕中心的距离变化，
+## 并让流光角度始终朝向屏幕中心（移植 Demo card_UI.gd::_handle_light_and_shadow）
+var _last_flash_angle := INF   ## 只回写变化的角度，避免静止卡牌每帧重传 uniform
+func _process(_delta: float) -> void:
+	if not _fake3d:
+		return
+	_update_light_and_shadow()
+
+
+func _update_light_and_shadow() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var center: Vector2 = vp.get_visible_rect().size * 0.5
+	var card_center: Vector2 = global_position + size * scale * 0.5
+	var distance: float = card_center.x - center.x
+	if _shadow_tex:
+		var t: float = clampf(absf(distance / maxf(center.x, 1.0)), 0.0, 1.0)
+		_shadow_tex.position.x = lerpf(0.0, LIGHT_SHADOW_MAX * signf(distance), t)
+	if _tex.material:
+		var flash_angle: float = rad_to_deg(Vector2.UP.angle_to(card_center - center)) - rotation_degrees
+		if not is_equal_approx(flash_angle, _last_flash_angle):
+			_last_flash_angle = flash_angle
+			_tex.material.set_shader_parameter("angle", flash_angle)
 
 
 ## 逻辑→视觉唯一入口：按 Card id 显示牌面
@@ -139,18 +160,19 @@ func enable_fake3d(with_shadow: bool = true) -> void:
 	mat.set_shader_parameter("intensity", 1.0)
 	mat.set_shader_parameter("angle", 45.0)
 	_tex.material = mat
+	_last_flash_angle = INF   ## 新材质需要重新写入一次角度
 
 	if with_shadow:
 		_enable_shadow()
 
 
-## 切换选中态（上浮/放大由布局处理；这里保留阴影金色高亮 + 牌面流光闪光）
+## 切换选中态（上浮/放大由布局处理；这里负责阴影金色高亮 + 牌面流光闪光）
 ## 不再绘制金框描边
 func set_selected(selected: bool) -> void:
 	set_flash(selected)
 	set_shadow_alpha(SHADOW_ALPHA_SEL if selected else SHADOW_ALPHA)
-	if _sel_frame:
-		_sel_frame.visible = false
+	if _shadow_enabled and _shadow_tex and _shadow_tex.material:
+		_shadow_tex.material.set_shader_parameter("selected", selected)
 
 
 ## 开关牌面流光闪光（需先 enable_fake3d）
@@ -187,8 +209,6 @@ func dissolve(duration: float = 0.5) -> Tween:
 	if _shadow_tex:
 		var stw := create_tween()
 		stw.tween_property(_shadow_tex, "modulate:a", 0.0, duration * 0.5)
-	if _sel_frame:
-		_sel_frame.visible = false
 
 	var tw := create_tween()
 	tw.tween_property(mat, "shader_parameter/dissolve_value", 0.0, duration)
@@ -214,26 +234,6 @@ static func _get_dissolve_noise() -> ImageTexture:
 	_dissolve_noise = ImageTexture.create_from_image(img)
 	return _dissolve_noise
 
-
-## 内部：确保选中金框存在（垫在最底层，比卡大一圈的圆角描边）
-var _sel_frame: Panel = null
-
-func _ensure_sel_frame() -> void:
-	if _sel_frame:
-		return
-	_sel_frame = Panel.new()
-	_sel_frame.name = "SelFrame"
-	_sel_frame.position = Vector2(-5, -5)
-	_sel_frame.size = size + Vector2(10, 10)
-	_sel_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var st := StyleBoxFlat.new()
-	st.bg_color = SEL_FRAME_GLOW
-	st.border_color = SEL_FRAME_COLOR
-	st.set_border_width_all(3)
-	st.set_corner_radius_all(10)
-	_sel_frame.add_theme_stylebox_override("panel", st)
-	add_child(_sel_frame)
-	move_child(_sel_frame, 0)
 
 
 ## 设置假 3D 旋转（x_rot 上下翻仰、y_rot 左右转），0,0 即平铺原样
@@ -279,14 +279,7 @@ func _apply_rot() -> void:
 		_shadow_tex.material.set_shader_parameter("y_rot", _rot_y)
 
 
-## 切换选中高亮阴影（选中时阴影变为金色高亮色）
-func set_shadow_selected(selected: bool) -> void:
-	if not _shadow_enabled or not _shadow_tex or not _shadow_tex.material:
-		return
-	_shadow_tex.material.set_shader_parameter("selected", selected)
-
-
-## 调整阴影偏移量（默认右下 6,10）
+## 调整阴影偏移量（默认右下 6,10；伪3D 卡的 x 由屏幕中心光源每帧接管）
 func set_shadow_offset(offset: Vector2) -> void:
 	if not _shadow_enabled or not _shadow_tex:
 		return

@@ -2,8 +2,10 @@ extends SceneTree
 
 # ═══════════════════════════════════════════════════════════════
 # TestScore — 计分与压迫加分层（对应 C++ tests/test_score.cpp）
-# 覆盖：AllOrNothing压迫加分 / calculateScore / tableScore /
+# 覆盖：AllOrNothing压迫加分 / calculateScore /
 #       pressureBonus原始版（对照 C++ test_pressureBonus）
+# 注：原 tableScore 静态函数已并入 Round（table_score 累积 + table_bonus），
+#     其行为由 test_ai_round.gd 的回合链路断言覆盖。
 # 依赖 Card + CardTypeResult + Score，纯逻辑。
 #
 # 命令行：
@@ -26,7 +28,6 @@ static func _run() -> int:
 
 	failed += U.section("pressureBonus AllOrNothing", func(): _test_pressure_bonus())
 	failed += U.section("calculateScore", func(): _test_calculate_score())
-	failed += U.section("tableScore", func(): _test_table_score())
 	failed += U.section("pressureBonus original", func(): _test_pressure_bonus_original())
 
 	return U.finish(failed, "计分")
@@ -73,18 +74,7 @@ static func _test_calculate_score() -> void:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 3. tableScore
-# ═══════════════════════════════════════════════════════════════
-
-static func _test_table_score() -> void:
-	U.eq(Score.calculate_table_score([U.card("5")], 0), 5, "单5=5")
-	U.eq(Score.calculate_table_score([U.card("5")], 10), 15, "单5+10奖励=15")
-	U.eq(Score.calculate_table_score([], 20), 20, "空+20=20")
-	U.eq(Score.calculate_table_score([U.card("5"), U.card("10"), U.card("K")], 0), 35, "集合=35")
-
-
-# ═══════════════════════════════════════════════════════════════
-# 4. pressureBonus（原始版，对照 C++ test_pressureBonus）
+# 3. pressureBonus（原始版，对照 C++ test_pressureBonus）
 # ═══════════════════════════════════════════════════════════════
 
 static func _test_pressure_bonus_original() -> void:

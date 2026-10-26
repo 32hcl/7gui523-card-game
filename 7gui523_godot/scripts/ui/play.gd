@@ -1,18 +1,16 @@
-extends "res://scripts/ui/play_ui.gd"
+extends "res://scripts/ui/play_input.gd"
 
-## — 第 4 层 play：入口 · 关卡流程 · Round 信号 · AI · 拖拽
+const BOSS_AI := preload("res://scripts/ai/boss_ai.gd")
+
+## — 第 4 层 play：入口 · 关卡流程 · Round 信号 · AI · 交互调度
 ##
 ## 继承链顶层的正式对战主场景。
 ## 双牌堆 + Round 引擎 + AI，玩家选牌出牌，桌面伤害结算。
 
-## 双击桌面 = 不要（移动端 touchstart 兼容）
-const DOUBLE_CLICK_MSEC := 300
-var _last_table_click_msec := 0
-var _last_table_click_pos := Vector2.ZERO
-
-
 func _ready() -> void:
+	_setup_damage_delay_bar()
 	setup_responsive()
+	get_viewport().size_changed.connect(setup_responsive)
 	_setup_ui_theme()
 	_anim_overlay = Control.new()
 	_anim_overlay.name = "AnimOverlay"
@@ -34,12 +32,26 @@ func _ready() -> void:
 	hint_sb.set_corner_radius_all(8)
 	_drop_hint.add_theme_stylebox_override("panel", hint_sb)
 	add_child(_drop_hint)
+	_discard_hint = Panel.new()
+	_discard_hint.name = "DiscardHint"
+	_discard_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_discard_hint.z_index = 40
+	_discard_hint.visible = false
+	var discard_sb := StyleBoxFlat.new()
+	discard_sb.bg_color = Color(COL_CRIMSON, 0.10)
+	discard_sb.border_color = Color(COL_CRIMSON, 0.75)
+	discard_sb.set_border_width_all(2)
+	discard_sb.set_corner_radius_all(8)
+	_discard_hint.add_theme_stylebox_override("panel", discard_sb)
+	add_child(_discard_hint)
 
 	## 连接额外按钮信号（场景中未预置 connection）
 	_shop_btn.pressed.connect(_on_shop_pressed)
 
+	_state = GameState.new()
 	_campaign = Campaign.new()
 	_campaign.player_chips = 50   ## 起始筹码
+
 	_campaign.cleared_level = 0
 	_shop = Shop.new()
 	_tracker = AICore.CardTracker.new()
@@ -120,6 +132,12 @@ func _show_main_menu() -> void:
 	style_button_balatro(start_btn, COL_GREEN, Color(0.95, 0.95, 0.93))
 	box.add_child(start_btn)
 
+	var settings_btn := Button.new()
+	settings_btn.text = "⚙ 设置"
+	settings_btn.custom_minimum_size = Vector2(220, 52)
+	style_button_balatro(settings_btn, Color(0.18, 0.17, 0.19), Color(0.88, 0.86, 0.83))
+	box.add_child(settings_btn)
+
 	var rules_btn := Button.new()
 	rules_btn.text = "阅读规则"
 	rules_btn.custom_minimum_size = Vector2(220, 52)
@@ -129,6 +147,7 @@ func _show_main_menu() -> void:
 	start_btn.pressed.connect(func():
 		overlay.queue_free()
 		_enter_casino_then_start(_campaign.current_level))
+	settings_btn.pressed.connect(func(): SettingsDialog.show(overlay, self))
 	rules_btn.pressed.connect(func(): _show_rules_dialog(overlay))
 
 
@@ -182,11 +201,77 @@ func _show_rules_dialog(menu: Control) -> void:
 
 
 func _on_reset_pressed() -> void:
+
+	_phase = "battle"
+	_finished = true
+	_ai_busy = false
+	_last_boss_play_count = 0
+	if _shop_panel:
+		_shop_panel.visible = false
+	var old_guess := get_node_or_null("MainVBox/TableArea/GuessOverlay")
+	if old_guess:
+		old_guess.queue_free()
 	_teardown_round()
+	_table_anim_running = false
+	_table_anim_pending = false
+	_table_cards_anim.clear()
+	_table_render_sig = "@init"
+	_play_src_global = Vector2.ZERO
+	_selected.clear()
+	_player_discard_count = 0
+	_player_discarded_this_round = false
+	_player_can_discard = false
+	for row: HBoxContainer in [_top_hand, _bottom_hand, _boss_hand, _boss_hand_instant]:
+		for slot in row.get_children():
+			row.remove_child(slot)
+			slot.queue_free()
+	for child in _table_cards.get_children():
+		_table_cards.remove_child(child)
+		child.queue_free()
+	for child in _anim_overlay.get_children():
+		child.queue_free()
 	_campaign.start_new()
 	_campaign.player_chips = 50
 	_shop.reset_stock()
 	_enter_casino_then_start(_campaign.current_level)
+
+
+func _on_back_to_menu() -> void:
+	_phase = "battle"
+	_finished = true
+	_ai_busy = false
+	if _shop_panel:
+		_shop_panel.visible = false
+	var old_guess := get_node_or_null("MainVBox/TableArea/GuessOverlay")
+	if old_guess:
+		old_guess.queue_free()
+	_teardown_round()
+	_table_anim_running = false
+	_table_anim_pending = false
+	_table_cards_anim.clear()
+	_table_render_sig = "@init"
+	_play_src_global = Vector2.ZERO
+	_selected.clear()
+	_player_discard_count = 0
+	_player_discarded_this_round = false
+	_player_can_discard = false
+	for row: HBoxContainer in [_top_hand, _bottom_hand, _boss_hand, _boss_hand_instant]:
+		for slot in row.get_children():
+			row.remove_child(slot)
+			slot.queue_free()
+	for child in _table_cards.get_children():
+		_table_cards.remove_child(child)
+		child.queue_free()
+	for child in _anim_overlay.get_children():
+		child.queue_free()
+	_campaign.start_new()
+	_campaign.player_chips = 50
+	_shop.reset_stock()
+	# 清除旧主菜单覆盖层，重新显示
+	var old_menu := get_node_or_null("MainMenuOverlay")
+	if old_menu:
+		old_menu.queue_free()
+	_show_main_menu()
 
 
 ## 进入赌场前购买一次金币门票；门票不替代每关的筹码消耗。
@@ -195,26 +280,84 @@ func _enter_casino_then_start(level: int) -> void:
 		_start_level(level)
 		return
 
-	if _campaign.dollar < Campaign.ENTRY_TICKET_DOLLARS:
+	if _campaign.dollar < GameConfig.ENTRY_TICKET_DOLLARS:
 		_show_game_over(
 			"金币不足",
-			"进入赌场需要 %d 金币\n当前金币：%d" % [Campaign.ENTRY_TICKET_DOLLARS, _campaign.dollar])
+			"进入赌场需要 %d 金币\n当前金币：%d" % [GameConfig.ENTRY_TICKET_DOLLARS, _campaign.dollar])
 		return
 
-	var dialog := ConfirmationDialog.new()
-	dialog.title = "鸿运赌场 · 入场"
-	dialog.dialog_text = "入场需要 %d 金币。\n购买门票后，另需每关消耗筹码。\n当前金币：%d\n\n是否购买赌场门票？" % [Campaign.ENTRY_TICKET_DOLLARS, _campaign.dollar]
-	dialog.ok_button_text = "购买门票"
-	dialog.cancel_button_text = "暂不进入"
-	add_child(dialog)
-	dialog.confirmed.connect(func():
+	var panel := Panel.new()
+	panel.add_theme_stylebox_override("panel", flat_border(
+		COL_PANEL, COL_GOLD.darkened(0.3), 2, 10, Color(0, 0, 0, 0.55), 12, 4))
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.offset_left = -230
+	panel.offset_top = -150
+	panel.offset_right = 230
+	panel.offset_bottom = 150
+	panel.z_index = 5
+	add_child(panel)
+
+	var vb := VBoxContainer.new()
+	vb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vb.offset_left = 22; vb.offset_top = 18; vb.offset_right = -22; vb.offset_bottom = -18
+	vb.add_theme_constant_override("separation", 12)
+	panel.add_child(vb)
+
+	var title := Label.new()
+	title.text = "鸿运赌场 · 入场"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", COL_GOLD)
+	vb.add_child(title)
+
+	var sep := HSeparator.new()
+	sep.add_theme_constant_override("separation", 8)
+	vb.add_child(sep)
+
+	var body := Label.new()
+	body.text = "入场需要 %d 金币。购买门票后，另需每关消耗筹码。\n\n当前金币：%d\n\n是否购买赌场门票？" % [GameConfig.ENTRY_TICKET_DOLLARS, _campaign.dollar]
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_theme_font_size_override("font_size", 13)
+	body.add_theme_color_override("font_color", Color(0.88, 0.86, 0.83))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vb.add_child(body)
+
+	var sep2 := HSeparator.new()
+	vb.add_child(sep2)
+
+	var btns := HBoxContainer.new()
+	btns.alignment = BoxContainer.ALIGNMENT_CENTER
+	btns.add_theme_constant_override("separation", 16)
+	vb.add_child(btns)
+
+	var buy_btn := Button.new()
+	buy_btn.text = "购买门票"
+	buy_btn.custom_minimum_size = Vector2(130, 40)
+	style_button_balatro(buy_btn, COL_GOLD, Color(0.10, 0.08, 0.06))
+	btns.add_child(buy_btn)
+
+	var cancel_btn := Button.new()
+	cancel_btn.text = "暂不进入"
+	cancel_btn.custom_minimum_size = Vector2(110, 40)
+	style_button_balatro(cancel_btn, Color(0.18, 0.17, 0.19), Color(0.88, 0.86, 0.83))
+	btns.add_child(cancel_btn)
+
+	var back_btn := Button.new()
+	back_btn.text = "回到主界面"
+	back_btn.custom_minimum_size = Vector2(110, 40)
+	style_button_balatro(back_btn, Color(0.18, 0.17, 0.19), Color(0.88, 0.86, 0.83))
+	btns.add_child(back_btn)
+
+	buy_btn.pressed.connect(func():
 		if _campaign.purchase_entry_ticket():
-			_log("已购买赌场门票（-%d 金币）" % Campaign.ENTRY_TICKET_DOLLARS)
 			_start_level(level)
-		dialog.queue_free()
+		panel.queue_free()
 	)
-	dialog.canceled.connect(func(): dialog.queue_free())
-	dialog.popup_centered()
+	cancel_btn.pressed.connect(func(): panel.queue_free())
+	back_btn.pressed.connect(func():
+		_on_back_to_menu()
+		panel.queue_free()
+	)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -222,6 +365,7 @@ func _enter_casino_then_start(level: int) -> void:
 # ═══════════════════════════════════════════════════════════════
 
 func _start_level(level: int) -> void:
+	var generation := _flow_generation
 	_phase = "battle"
 	_game_over_layer.visible = false
 
@@ -232,6 +376,7 @@ func _start_level(level: int) -> void:
 	_campaign.player_chips -= entry_chips
 
 	_campaign.start_level(level)
+	_shop.current_level = level
 	_tracker.reset()
 
 	_human_deck = Deck.DeckManager.new()
@@ -240,21 +385,27 @@ func _start_level(level: int) -> void:
 	_ai_deck.init_standard()
 
 	_human = Player.PlayerData.new()
-	_human.name = "真神"
+	_human.name = "32%Hcl"
 	_human.is_human = true
 	_human.ai_level = AICore.Level.AI1_RULE
+	_human.card_sort_mode = _card_sort_mode
 	_human_deck.fill_player_normal(_human)
 	_human_deck.fill_player_instant(_human)
 
 	_ai = Player.PlayerData.new()
 	_ai.name = Campaign.get_boss_name(level) + "·BOSS"
 	_ai.is_human = false
-	_ai.ai_level = AICore.Level.AI2_GREEDY
+	_ai.ai_level = AICore.Level.AI1_RULE
+	_ai.card_sort_mode = _card_sort_mode
 	_ai_deck.fill_player_normal(_ai)
 	_ai_deck.fill_player_instant(_ai)
 
+	_apply_pixelation()
+
 	_human_hp = _campaign.player_hp
 	_ai_hp = _campaign.boss_hp
+	_last_player_hp = -1
+	_last_boss_hp = -1
 	_finished = false
 	_ai_busy = false
 	## 重置桌面/手牌动画状态：若上一关动画协程因关卡切换中断，会残留 running=true，
@@ -266,11 +417,27 @@ func _start_level(level: int) -> void:
 	_table_render_sig = "@init"   ## 强制新关卡首次 _refresh_table 全量重建（含旧桌面溶解）
 	_play_src_global = Vector2.ZERO
 	_selected.clear()
+	_player_can_discard = false
+	## 新关卡必须清空上一关桌面牌；Round 尚未创建时不会触发信号刷新旧节点。
+	for child in _table_cards.get_children():
+		_table_cards.remove_child(child)
+		child.queue_free()
+	for child in _anim_overlay.get_children():
+		child.queue_free()
 
 	var rule = Campaign.level_rule(level)
+	_mask_player_draws = rule.mask_player_draws
+	_initial_deal_finished = false
+	_set_player_hp_visible(false)
+	_masked_player_cards.clear()
+	var ai_hand_buf: Array[Card] = []
+	_ai.collect_hand_into(ai_hand_buf)
+	rule.mutate_boss_hand(ai_hand_buf)
 	## 猜牌决定先手；猜先期间隔离操作按钮
 	_set_op_buttons_enabled(false)
 	var player_first := await _run_guess_phase()
+	if generation != _flow_generation:
+		return
 	_set_op_buttons_enabled(true)
 	var first := _human if player_first else _ai
 	var second := _ai if player_first else _human
@@ -282,13 +449,10 @@ func _start_level(level: int) -> void:
 	_round.round_won.connect(_on_round_won)
 	_round.card_played.connect(_on_card_played)
 	_round.card_passed.connect(func(who): _refresh_status("%s 不要" % who.name))
-	_round.pressure_bonus.connect(func(who, bonus): _refresh_status("%s 压迫加分 %d" % [who.name, bonus]))
+	_round.pressure_bonus.connect(_on_pressure_bonus)
 	_round.game_over.connect(func(): _finished = true)
 
 	_title_lbl.text = _ai.name
-	_log("—— 第 %d 关 · %s ——" % [level, Campaign.get_boss_name(level)])
-	_log("入场筹码 -%d，奖励 +%d" % [entry_chips, Campaign.get_level_reward_chips(level)])
-	_log("猜牌决定先手：" + ("你先手" if player_first else "电脑先手"))
 
 	## 开局发牌动画：先清空，再逐张飞入
 	for row: HBoxContainer in [_top_hand, _bottom_hand, _boss_hand, _boss_hand_instant]:
@@ -304,9 +468,14 @@ func _start_level(level: int) -> void:
 	## 延迟一帧，让容器布局稳定后再开启动画
 	await get_tree().process_frame
 	_setup_deck_display()
+	_play_deck_shuffle()   ## 新关洗牌：牌背抬起再落回
 	_refresh_top()
 	_refresh_hand_with_animation(true)
 	_refresh_boss_hand_with_animation(true)
+	await get_tree().create_timer(INITIAL_DEAL_DURATION + INITIAL_DEAL_DELAY * 6.0).timeout
+	_initial_deal_finished = true
+	_set_player_hp_visible(true)
+	_play_initial_hp_reveal()
 	_schedule_ai_if_needed()
 
 
@@ -460,6 +629,8 @@ func _teardown_round() -> void:
 
 func _on_card_played(who: RefCounted, cards: Array) -> void:
 	_tracker.record_played(cards)
+	if who == _ai:
+		_last_boss_play_count = cards.size()
 	## 只登记出牌动画来源，不在此立刻 _refresh：
 	## process_play 是同步发射，human(_do_play) 与 AI(_ai_think) 在返回后都会紧跟一次 _refresh，
 	## 若这里也 _refresh 会与上游重复、二次 _refresh_hand_smooth kill 掉补牌动画（"补牌不飞"）。
@@ -472,7 +643,18 @@ func _on_card_played(who: RefCounted, cards: Array) -> void:
 	_table_anim_pending = true
 
 
+func _on_pressure_bonus(who: RefCounted, bonus: int) -> void:
+	if bonus > 0:
+		_spawn_floating_damage(bonus, "压迫")
+	_refresh_status("%s 压迫加分 %d" % [who.name, bonus])
+
+
 func _on_round_won(winner: RefCounted, damage: int) -> void:
+	## 先锁定规则状态，再播放结算动画；动画不能阻塞下一回合的输入资格。
+	_player_discarded_this_round = false
+	_player_can_discard = (winner == _ai)
+	await _play_damage_delay()
+	## 弃牌窗口：若本回合是玩家"不要"结束的（赢家=BOSS），下回合玩家可弃牌
 	var boss_won := winner == _ai
 	_campaign.apply_round_damage(damage, boss_won)
 	_human_hp = _campaign.player_hp
@@ -483,16 +665,14 @@ func _on_round_won(winner: RefCounted, damage: int) -> void:
 		msg = "★ 你 赢得小局 (伤害 %d)，对方剩 %d 血" % [damage, _ai_hp]
 	else:
 		msg = "★ %s 赢得小局 (伤害 %d)，你剩 %d 血" % [winner.name, damage, _human_hp]
-	_log(msg)
 
 	## 疯狗：Boss 出牌立刻咬噬玩家（规则体在 LevelRule.bite_damage）
 	var lr: Campaign.LevelRule = _round.level_rule
-	if boss_won and lr != null and lr.boss_bite_damage and _round.last_play:
-		var bite_dmg: int = lr.bite_damage(_round.last_play.cards.size())
+	if boss_won and lr != null and lr.boss_bite_damage and _last_boss_play_count > 0:
+		var bite_dmg: int = lr.bite_damage(_last_boss_play_count)
 		_campaign.apply_round_damage(bite_dmg, true)
 		_human_hp = _campaign.player_hp
 		msg += " · 疯狗咬噬 %d · 剩 %d HP" % [bite_dmg, _human_hp]
-		_log("疯狗咬噬！额外伤害 %d，剩 %d HP" % [bite_dmg, _human_hp])
 
 	_refresh_status(msg)
 
@@ -503,6 +683,9 @@ func _on_round_won(winner: RefCounted, damage: int) -> void:
 func _end_level(player_won: bool) -> void:
 	_phase = "level_end"
 	_finished = true
+	## 关末清空双方不可见回收缓冲区，残余批次打乱后进入各自隐藏牌堆。
+	_human_deck.flush_recycle_buffer()
+	_ai_deck.flush_recycle_buffer()
 
 	var player_remain := _human.normal_hand.size() + _human_deck.total()
 	var boss_remain := _ai.normal_hand.size() + _ai_deck.total()
@@ -510,6 +693,8 @@ func _end_level(player_won: bool) -> void:
 	_human_hp = _campaign.player_hp
 	_ai_hp = _campaign.boss_hp
 	var accepted_player_won := result.player_won
+	## 本关已分出胜负（一方先出完）：输家的整套牌背燃烧溶解
+	_update_deck_empty(_player_deck if not accepted_player_won else _boss_deck, true)
 
 	var msg: String
 	if accepted_player_won:
@@ -518,21 +703,17 @@ func _end_level(player_won: bool) -> void:
 	else:
 		msg = "☠ 第 %d 关失败… HP %+d" % [_campaign.current_level, result.player_hp_delta]
 
-	_log(msg)
 	_round_lbl.text = msg
 	_round_lbl.add_theme_color_override("font_color", COL_GOLD)
 
 	if _campaign.is_game_over():
 		_show_game_over("挑战失败", "你被击败了… 筹码 %d" % _campaign.player_chips)
-	elif _campaign.is_victory():
-		_show_game_over("全部通关！", "恭喜击败所有 BOSS，最终筹码 %d" % _campaign.player_chips)
 	elif _campaign.current_level >= _campaign.config.total_levels:
 		_show_game_over("最终挑战结束", "赌场老板未被击败，无法通关。最终筹码 %d" % _campaign.player_chips)
 	else:
 		## 进入关末商店：自动弹出面板（此前只设 phase 不弹窗，表现为"胜利后不进商店"）
 		_shop.on_level_end()
 		_phase = "shop"
-		_log("关末商店开启（消费 ≥32 筹码解锁附魔）")
 		_refresh("关末商店")
 		_show_shop_panel()
 
@@ -569,24 +750,90 @@ func _do_play(indices: Array[int]) -> bool:
 	play.sort_custom(func(a: Card, b: Card): return Card.get_rank(a.point) < Card.get_rank(b.point))
 	var parsed := CardTypeResult.parse_any_card_type(play)
 	if parsed.type == CardTypeResult.CardType.INVALID:
-		_log("非法牌型：你选的牌不构成合法牌型")
 		_refresh_status("非法牌型")
+		return false
+	## 赌场老板（第 9 关）禁止 7gui523。这里先拦一手，避免提交后才被 Round 判非法并白丢回合
+	var lr: Campaign.LevelRule = _round.level_rule
+	if lr != null and lr.ban_gui523 and parsed.type == CardTypeResult.CardType.GUI523:
+		_refresh_status("本关禁止打出 7gui523")
 		return false
 	## 赖账鬼：禁止玩家用相同点数压牌（不轮换，重新选）
 	if _round.player_blocked_by_ghost(parsed):
-		_log("赖账鬼禁止你出相同点数的牌！试试换一种牌型或更大点数")
 		_refresh_status("赖账鬼禁同点")
 		return false
 	var lp := _round.last_play
 	if lp != null and not lp.cards.is_empty() and not CardTypeResult.can_beat(parsed, lp):
-		_log("无法压过：你选的牌压不过上一手")
 		_refresh_status("无法压过")
 		return false
 	var result: Dictionary = _round.process_play(play)
 	_take_round_result(result)
 	_refresh("你出 %d 张" % play.size())
+	if result.get("state", "") == "boss_finish":
+		_resolve_boss_finish()
+		return true
 	_schedule_ai_if_needed()
 	return true
+
+
+## 弃牌（两种代价方案）
+## immediate_draw=true  → 方式一：拖到牌堆，每张扣 1 筹码，立即从牌堆补等量
+## immediate_draw=false → 方式二：选中+双击桌面，免费，下回合正常补牌
+func _discard_cards(indices: Array[int], immediate_draw: bool) -> bool:
+	if _finished or not is_instance_valid(_round) or _round.whose_turn() != _human:
+		return false
+	if not _player_can_discard:
+		_refresh_status("当前不可弃牌")
+		return false
+	if _player_discarded_this_round:
+		_refresh_status("本小回合已经弃过牌")
+		return false
+	if _player_discard_count >= PLAYER_DISCARD_LIMIT:
+		_refresh_status("本关弃牌额度已用完（%d 张）" % PLAYER_DISCARD_LIMIT)
+		return false
+	if indices.is_empty() or indices.size() > PLAYER_DISCARD_LIMIT - _player_discard_count:
+		_refresh_status("弃牌数量超出本关剩余额度")
+		return false
+	var discard_cards: Array[Card] = []
+	for index in indices:
+		if index < 0 or index >= _human.normal_hand.size():
+			_refresh_status("只能弃普通手牌")
+			return false
+		discard_cards.append(_human.normal_hand[index])
+	if discard_cards.is_empty():
+		return false
+
+	## 方式一：先校验筹码够不够，再执行
+	if immediate_draw:
+		var cost: int = discard_cards.size()
+		if _campaign.player_chips < cost:
+			_refresh_status("筹码不足（弃 %d 张需要 %d 筹码）" % [discard_cards.size(), cost])
+			return false
+		_campaign.player_chips -= cost
+
+	_human.remove_cards_from_hand(discard_cards)
+	_human_deck.recycle_played(discard_cards)
+	_player_discard_count += discard_cards.size()
+	_player_discarded_this_round = true
+
+	if immediate_draw:
+		_human_deck.fill_player_normal(_human)
+		_refresh("你弃掉 %d 张，花费 %d 筹码，已补牌" % [discard_cards.size(), discard_cards.size()])
+	else:
+		_refresh("你弃掉 %d 张（免费，下回合补牌）" % discard_cards.size())
+	return true
+
+
+func _has_legal_human_play() -> bool:
+	var previous := _round.last_play
+	for candidate in AICore.enumerate_legal_plays(_human):
+		var parsed := CardTypeResult.parse_any_card_type(candidate)
+		if parsed.type == CardTypeResult.CardType.INVALID:
+			continue
+		if _round.player_blocked_by_ghost(parsed):
+			continue
+		if previous == null or previous.cards.is_empty() or CardTypeResult.can_beat(parsed, previous):
+			return true
+	return false
 
 
 func _on_pass_pressed() -> void:
@@ -594,12 +841,16 @@ func _on_pass_pressed() -> void:
 	if _round == null or not is_instance_valid(_round):
 		return
 	if _round.whose_turn() != _human:
-		_log("还没轮到你")
+		return
+	## 方式二：弃牌窗口 + 有选中牌 → 免费弃牌，不立即补牌
+	if _player_can_discard and not _selected.is_empty():
+		var indices := _selected.duplicate()
+		if _discard_cards(indices, false):
+			_selected.clear()
 		return
 	# 官方流程：无上一手牌（首出）时不能"不要"
 	var lp := _round.last_play
 	if lp == null or lp.cards.is_empty():
-		_log("首出不能不要")
 		_refresh_status("首出不能不要")
 		return
 	_selected.clear()
@@ -628,38 +879,61 @@ func _ai_think() -> void:
 	if _finished or _round == null:
 		return
 	var cur := _round.whose_turn()
+	if cur == _ai:
+		var buf: Array[Card] = []
+		_ai.collect_hand_into(buf)
+		_round.level_rule.mutate_boss_hand(buf)
+	var opp := _human if cur == _ai else _ai
+	var deck := _human_deck if cur == _human else _ai_deck
 	var lp := _round.last_play
 	var table_score := _round.table_score
-	var play := AICore.choose(_ai, _human, lp, _ai_deck, table_score, _tracker)
+	var play: Array[Card] = BOSS_AI.choose(cur, lp, table_score)
 	## 赖账鬼强压：AI Pass 前，同花色任意单张强压玩家 J 以下单张
-	if play.is_empty() and lp != null and not lp.cards.is_empty() and not _ai.hand.is_empty():
-		var forced := _round.ghost_force_play(_ai.hand)
+	if play.is_empty() and lp != null and not lp.cards.is_empty() and not cur.is_hand_empty():
+		var cur_hand_buf: Array[Card] = []
+		cur.collect_hand_into(cur_hand_buf)
+		var forced := _round.ghost_force_play(cur_hand_buf)
 		if not forced.is_empty():
 			play = forced
-			_log("赖账鬼耍赖！用同花色牌强行压过")
 	var result: Dictionary = _round.process_play(play)
 	_take_round_result(result)
 	_refresh("AI 出 %d 张" % play.size())
+	if result.get("state", "") == "boss_finish":
+		await _resolve_boss_finish()
+		return
 	_schedule_ai_if_needed()
 
 
-## 统一处理 Round 返回字典（alignment：continue 轮换 / round_win / instant_win）
+func _resolve_boss_finish() -> void:
+	if _finished:
+		return
+	var remaining_cards := _human.normal_hand.size() + _human.instant_hand.size() + _human_deck.total()
+	var damage := remaining_cards * 3
+	await _play_damage_delay()
+	_campaign.apply_round_damage(damage, true)
+	_human_hp = _campaign.player_hp
+	_ai_hp = _campaign.boss_hp
+	_refresh("BOSS 出完牌，造成 %d 伤害" % damage)
+	_end_level(_human_hp > 0)
+
+
+## 统一处理 Round 返回字典（continue / round_win / instant_win）；
+## boss_finish 由 _resolve_boss_finish 等待动画后单独结算。
 func _take_round_result(result: Dictionary) -> void:
 	var state: String = result.get("state", "")
 	var reason: String = result.get("reason", state)
 	match state:
 		"invalid":
-			_log("操作被拒绝：%s" % reason)
+			_refresh_status("操作被拒绝：%s" % reason)
 		"cannot_beat":
-			_log("操作被拒绝：%s" % reason)
+			_refresh_status("操作被拒绝：%s" % reason)
 		"instant_win":
-			# 7gui523 或手牌+牌堆双空 → 直接获胜
+			# 7gui523 或玩家手牌+牌堆双空 → 直接获胜；BOSS 双空走 boss_finish。
 			var winner: RefCounted = result.get("winner")
 			if winner != null:
 				var player_won := winner == _human
 				## 第 9 关是不可通关的最终挑战；玩家正常出完牌也不算胜利。
 				if player_won and _campaign.current_level >= _campaign.config.total_levels:
-					_log("★ 最终挑战结束：赌场老板未被击败，无法通关。")
 					_human_hp = _campaign.player_hp
 					_ai_hp = _campaign.boss_hp
 					_refresh("")
@@ -667,10 +941,8 @@ func _take_round_result(result: Dictionary) -> void:
 					return
 				if player_won:
 					_campaign.boss_hp = 0
-					_log("★ 你打出致命组合，直接获胜！")
 				else:
 					_campaign.player_hp = 0
-					_log("★ %s 直接获胜！" % winner.name)
 				_human_hp = _campaign.player_hp
 				_ai_hp = _campaign.boss_hp
 				_refresh("")
@@ -681,20 +953,6 @@ func _take_round_result(result: Dictionary) -> void:
 # 手牌交互
 # ═══════════════════════════════════════════════════════════════
 
-func _on_card_clicked(index: int) -> void:
-	if _finished: return
-	if _round.whose_turn() != _human:
-		return
-	var total := _human.normal_hand.size() + _human.instant_hand.size()
-	if total <= index:
-		return
-	if _selected.has(index):
-		_selected.erase(index)
-	else:
-		_selected.append(index)
-	_refresh_hand()
-
-
 # ═══════════════════════════════════════════════════════════════
 # 按钮：商店 / 返回 / HP 互换
 # ═══════════════════════════════════════════════════════════════
@@ -703,7 +961,7 @@ func _on_shop_pressed() -> void:
 	if _phase == "shop":
 		_show_shop_panel()
 	elif _phase == "battle":
-		_log("战斗中无法打开商店，请在关末进入")
+		_refresh_status("战斗中无法打开商店，请在关末进入")
 	else:
 		_show_shop_panel()
 
@@ -716,246 +974,5 @@ func _on_next_level() -> void:
 	_start_level(_campaign.current_level + 1)
 
 
-## 拖拽输入路由：点击 vs 拖拽判定、松手出牌、右键/Esc 取消
-## 双击桌面触发"不要"（移动端 touchstart 兼容，间隔 < 300ms）
-func _input(event: InputEvent) -> void:
-	## — 桌面双击 = 不要（Pointer Event 兼容触屏+鼠标）—
-	if event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT \
-			and not _dragging and not _drag_pending:
-		var table_rect: Rect2 = _drop_target.get_global_rect()
-		if table_rect.has_point(event.global_position) \
-				and not _point_over_table_controls(event.global_position):
-			var now: int = Time.get_ticks_msec()
-			var dist: float = event.global_position.distance_to(_last_table_click_pos)
-			if (now - _last_table_click_msec) < DOUBLE_CLICK_MSEC and dist < 44.0:
-				get_viewport().set_input_as_handled()
-				_last_table_click_msec = 0
-				_last_table_click_pos = Vector2.ZERO
-				_on_pass_pressed()
-				return
-			_last_table_click_msec = now
-			_last_table_click_pos = event.global_position
-
-	if not _drag_pending and not _dragging:
-		return
-	if event is InputEventMouseMotion:
-		if _drag_pending and not _dragging:
-			if get_global_mouse_position().distance_to(_drag_press_pos) > DRAG_THRESHOLD:
-				_drag_start(_drag_first_index)
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
-			and not event.pressed:
-		if _dragging:
-			get_viewport().set_input_as_handled()
-			_drag_drop()
-		elif _drag_pending:
-			_drag_pending = false
-			_on_card_clicked(_drag_first_index)
-	elif event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_RIGHT and _dragging:
-		get_viewport().set_input_as_handled()
-		_drag_cancel()
-	elif event.is_action_pressed("ui_cancel") and _dragging:
-		_drag_cancel()
-
-
 ## 点击点是否落在桌面覆盖控件上（牌堆/商店/重新开始）。
 ## 这些控件位于出牌区上方，_input 先于 gui 消费，命中时应跳过双击"不要"判定。
-func _point_over_table_controls(p: Vector2) -> bool:
-	for c: Control in [_boss_deck, _player_deck, _shop_btn, _new_game_btn]:
-		if is_instance_valid(c) and c.visible and c.get_global_rect().has_point(p):
-			return true
-	return false
-
-
-func _process(_delta: float) -> void:
-	if not _dragging or _drag_visuals.is_empty():
-		return
-	## 回合已变（兜底）：取消拖拽
-	if _finished or not is_instance_valid(_round) or _round.whose_turn() != _human:
-		_drag_cancel()
-		return
-	var mouse := get_global_mouse_position()
-	## 落点高亮：鼠标悬在桌面区时显示
-	var over := _drop_target.get_global_rect().has_point(mouse)
-	if _drop_hint.visible != over:
-		_drop_hint.visible = over
-	if over:
-		_drop_hint.global_position = _drop_target.global_position - Vector2(10, 10)
-		_drop_hint.size = _drop_target.size + Vector2(20, 20)
-	## 被拖卡跟随鼠标：单张居中；多张水平展开 + 弧形上拱 + 微旋转
-	var n := _drag_visuals.size()
-	for i in n:
-		var v := _drag_visuals[i]
-		if not is_instance_valid(v):
-			continue
-		var off := Vector2.ZERO
-		var rot := 0.0
-		if n > 1:
-			var t := float(i) / float(n - 1)
-			off.x = (t - 0.5) * DRAG_SPREAD
-			off.y = -absf(sin(t * PI)) * DRAG_ARC_Y
-			rot = lerpf(-DRAG_ROT, DRAG_ROT, t)
-		## 视觉中心 = position + size*0.5（pivot 居中，scale/rotation 不改变此偏移）
-		v.global_position = mouse + off - v.size * 0.5
-		v.rotation = deg_to_rad(rot)
-
-
-## 开始拖拽：抓的卡在选中集合且选中数>1 → 整组拖；否则单张
-func _drag_start(index: int) -> void:
-	_drag_pending = false
-	if _finished or not is_instance_valid(_round) or _round.whose_turn() != _human:
-		return
-	## 全局索引覆盖普通区 + 立刻补区（双方都可拖出牌）
-	var total := _human.normal_hand.size() + _human.instant_hand.size()
-	if index < 0 or total <= index:
-		return
-	_dragging = true
-	_drag_indices.clear()
-	_drag_visuals.clear()
-	_drag_origin.clear()
-	if _selected.has(index) and _selected.size() > 1:
-		var sorted := _selected.duplicate()
-		sorted.sort()
-		_drag_indices = sorted
-	else:
-		_drag_indices = [index]
-	## 记录原始 transform，reparent 到 overlay（保留全局位置）
-	## 卡位于槽位内：遍历两手牌行槽位，按 hand_index meta 精确命中对应卡
-	for idx in _drag_indices:
-		var v: CardVisual = null
-		for row: HBoxContainer in [_bottom_hand, _top_hand]:
-			for slot in row.get_children():
-				if slot.is_queued_for_deletion() or slot.get_child_count() == 0:
-					continue
-				var ch := slot.get_child(0) as CardVisual
-				if ch != null and ch.get_meta("hand_index", -1) == idx:
-					v = ch
-					break
-			if v != null:
-				break
-		if v == null:
-			continue
-		_drag_origin.append({
-			"parent": v.get_parent(),
-			"pos": v.position,
-			"rot": v.rotation,
-			"scale": v.scale,
-			"z": v.z_index,
-		})
-		## 杀掉残留弹回/布局动画（弹回 tween 存于 _layout_tween 槽位），
-		## 防止 0.18s 弹回期间再次拖拽时 tween 与 _process 跟随互相覆盖
-		v.kill_layout_tween()
-		v.reparent(_anim_overlay)
-		v.z_index = 60
-		v.set_fake3d_rot(0.0, 0.0)
-		_drag_visuals.append(v)
-
-
-## 松手：在桌面区 → 出牌；在手牌区 → 排序；否则弹回
-func _drag_drop() -> void:
-	var mouse := get_global_mouse_position()
-	if _drop_target.get_global_rect().has_point(mouse):
-		_drag_drop_play()
-		return
-	## 手牌区松手 → 拖拽排序（仅单张，横向拖动交换位置）
-	if _hand_area.get_global_rect().has_point(mouse) and _drag_indices.size() == 1:
-		_drag_sort(mouse.x)
-		return
-	_drag_cancel()
-
-
-## 拖拽到桌面区 → 出牌
-func _drag_drop_play() -> void:
-	var indices := _drag_indices.duplicate()
-	var saved := _selected.duplicate()
-	_selected.clear()
-	if not _do_play(indices):
-		_selected = saved
-		_drag_cancel()
-		return
-	_dismiss_drag_visuals()
-
-
-## 手牌内横向拖动 → 交换位置（splice + 平滑刷新）
-func _drag_sort(mouse_x: float) -> void:
-	var idx: int = _drag_indices[0]
-	if idx >= _human.normal_hand.size():
-		_drag_cancel()
-		return
-
-	## 收集手牌区中其余卡牌的中心 x（它们位置未变，因为拖拽卡已被 reparent）
-	var refs: Array[Dictionary] = []
-	for slot in _bottom_hand.get_children():
-		if slot.is_queued_for_deletion() or slot.get_child_count() == 0:
-			continue
-		var ch := slot.get_child(0) as CardVisual
-		if ch == null:
-			continue
-		var ci: int = ch.get_meta("hand_index", -1)
-		if ci < 0 or ci >= _human.normal_hand.size() or ci == idx:
-			continue
-		refs.append({"index": ci, "cx": ch.global_position.x + ch.size.x * 0.5})
-	refs.sort_custom(func(a, b): return a.cx < b.cx)
-
-	if refs.is_empty():
-		_drag_cancel()
-		return
-
-	## 槽位法：鼠标越过几张余牌的中心，就插入到第几个槽位。
-	## refs 已排除拖拽卡，槽位号即 remove_at(idx) 后的插入下标，左右拖都不错位。
-	var slot := 0
-	for r in refs:
-		if mouse_x > r.cx:
-			slot += 1
-
-	if slot == idx:
-		_drag_cancel()
-		return
-
-	## splice 重排
-	var card: Card = _human.normal_hand[idx]
-	_human.normal_hand.remove_at(idx)
-	_human.normal_hand.insert(slot, card)
-
-	_selected.clear()
-	_dismiss_drag_visuals()
-	_refresh_hand()
-
-
-## 释放所有拖拽视觉（丢弃 overlay 上的卡并重置状态）
-func _dismiss_drag_visuals() -> void:
-	_dragging = false
-	_drop_hint.visible = false
-	for v in _drag_visuals:
-		if is_instance_valid(v):
-			v.queue_free()
-	_drag_visuals.clear()
-	_drag_indices.clear()
-	_drag_origin.clear()
-
-
-## 取消拖拽：逐张弹回原位（tween 并行；期间手牌若被重建则随节点释放，无残留）
-func _drag_cancel() -> void:
-	_dragging = false
-	_drop_hint.visible = false
-	for i in _drag_visuals.size():
-		var v := _drag_visuals[i]
-		if not is_instance_valid(v):
-			continue
-		var o: Dictionary = _drag_origin[i]
-		var cur_global := v.global_position
-		if is_instance_valid(o["parent"]):
-			v.reparent(o["parent"])
-		v.global_position = cur_global
-		v.z_index = o["z"]
-		var tw := v.create_tween()
-		v._layout_tween = tw  ## 存入布局槽位：_drag_start 可 kill，重拖不打架
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-		tw.set_parallel(true)
-		tw.tween_property(v, "position", o["pos"], DRAG_RETURN_DUR)
-		tw.tween_property(v, "rotation", o["rot"], DRAG_RETURN_DUR)
-		tw.tween_property(v, "scale", o["scale"], DRAG_RETURN_DUR)
-	_drag_visuals.clear()
-	_drag_indices.clear()
-	_drag_origin.clear()
