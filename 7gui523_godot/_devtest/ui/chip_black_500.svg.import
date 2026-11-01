@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bfn3ve3w7ggyy"
-path="res://.godot/imported/chip_black_500.svg-ed3ca95801a629821aa634dfebd6bb0e.ctex"
+path="res://.godot/imported/chip_black_500.svg-1c3073e044f0eb8cce5c079c1c8bee43.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/ui/chip_black_500.svg"
-dest_files=["res://.godot/imported/chip_black_500.svg-ed3ca95801a629821aa634dfebd6bb0e.ctex"]
+source_file="res://_devtest/ui/chip_black_500.svg"
+dest_files=["res://.godot/imported/chip_black_500.svg-1c3073e044f0eb8cce5c079c1c8bee43.ctex"]
 
 [params]
 

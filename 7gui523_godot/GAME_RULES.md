@@ -1,5 +1,11 @@
 # 7鬼523 — 游戏规则与设定
 
+> **2026-10-30 数值统一**：HP / 得分 / 筹码 已合并为筹码（1:1），双方初始 500；血条与回复药水已移除。
+> 每小回合开局双方各缴 10 筹码底注（上一小回合赢家额外 +5）；出牌按「基础筹码 + 压牌筹码 + 立刻补区加注」下注，
+> 小回合结束桌面归赢家（第 9 关归 BOSS）、双方各自双倍偿还负债；
+> 付不起双倍时不能借钱还贷，直接结束；结算后筹码仍为负也结束（负数即负债）。
+> 本文第四、五、六、十一、十二.4 节仍保留旧 HP 描述，待逐节改写；当前以 README 与代码为准。
+
 ---
 
 ## 〇、项目目录结构
@@ -58,9 +64,11 @@
 │   ├── card_type_names.gd      #   CardTypeNames(extends RefCounted)：CardType 枚举 → 中文名(PASS→"不出", SINGLE→"单张"...)
 │   ├── game_config.gd          #   GameConfig(extends RefCounted)：NORMAL_MAX=5、INSTANT_MAX=2、PLAYER_INIT_HP=140、BOSS_NAMES[1-9]、ENTRY/REWARD_CHIPS
 │   ├── save_manager.gd         #   SaveManager(extends RefCounted)：save_json/load_json/file_exists/delete_file — 纯 I/O 不涉及序列化
-│   ├── event_bus.gd            #   EventBus(extends RefCounted)：15 个 signal — ROUND_START/TURN_CHANGED/ROUND_WIN/CARD_PLAYED/GAME_OVER...
+│   ├── audio_manager.gd        #   AudioManager(extends RefCounted)：AudioStreamGenerator 合成音效（出牌/胜利/伤害/不要/结束），随时可替换为 .wav
 │   ├── game_state.gd           #   GameState(extends RefCounted)：campaign/shop/round/hp/ai/decks/tracker 等 16 个属性、is_player_turn/is_ai_turn/reset_round_state
-│   └── audio_manager.gd        #   AudioManager(extends RefCounted)：BGM/SFX/音量接口空壳，已注册 EventBus 事件钩子
+│
+├── _planned/
+│   └── event_bus.gd            #   ⚠️ 已隔离：全局事件总线预留设计，当前未接入。事件走 Round 实例信号。
 │
 ├── data/                       # 运行时/训练数据
 │   └── ai/                     #   2 个 .tres 权重文件：
@@ -179,7 +187,7 @@ A(9) > K(8) > Q(7) > J(6) > 10(5) > 9(4) > 8(3) > 6(2) > 4(1)
 
 ### 3.1 基本流程
 
-1. 双方从各自牌堆顶摸 5 张手牌（最大手牌数 = 5）
+1. 双方从各自牌堆顶摸满 **5 张普通手牌 + 2 张立刻补牌**（共 7 张）
 2. 轮流出牌（双指针轮换）
 3. 必须出合法牌型，且必须压过对方上一手牌
 4. 可以"不要"（Pass）跳过
@@ -189,16 +197,54 @@ A(9) > K(8) > Q(7) > J(6) > 10(5) > 9(4) > 8(3) > 6(2) > 4(1)
 | 规则 | 说明 |
 |------|------|
 | **自由局** | 无历史出牌时 → 空出 = 非法（不能空过），必须出手牌 |
-| **不要（Pass）** | 有历史出牌时 → 空出 = "不要" → 上家赢下本手 → 双方补牌至 5 张 |
-| **出牌后** | 不自动补牌。补牌只在"不要"时触发 |
-| **玩家手牌+牌堆双空** | 打出最后一手 → 玩家直接获胜 |
-| **BOSS 手牌+牌堆双空** | 返回 `boss_finish`，最后一张牌完成后按玩家剩余牌数结算 `3N` |
-| **7gui523** | 打出即获胜（无视当前桌面状态） |
+| **不要（Pass）** | 有历史出牌时 → 空出 = "不要" → 上家赢下本手 → 双方**普通手牌**补至 5 张 |
+| **出牌后** | 普通手牌不自动补牌；**立刻补区**立刻补满 2 张。普通区补牌只在"不要"时触发 |
+| **玩家手牌+游戏牌堆双空** | 打出最后一手且游戏牌堆（active 区）已抽完 → 玩家直接获胜 |
+| **BOSS 手牌+游戏牌堆双空** | 返回 `boss_finish`，最后一张牌完成后按玩家剩余牌数结算 `3N` |
+| **7gui523** | 打出即赢下当前小回合（不直接通关，无视当前桌面状态） |
 
 ### 3.3 压迫（反压）
 
 当你用**同牌型同点数**压过对方上一手，且对方那手牌全是伤害牌时：
 → 触发"大牌反压"，额外获得压迫加分（累计到桌面 bonus）
+
+### 3.4 双区手牌（普通区 + 立刻补区）
+
+每位玩家的手牌分为**两个独立区域**，补牌机制互不干扰：
+
+```
+┌──────────────────────────────────┐
+│  普通区 (normal_hand)  上限 5 张  │  ← 出牌优先从这里删除
+├──────────────────────────────────┤
+│  立刻补区 (instant_hand) 上限 2 张 │  ← 出牌后立刻补满
+└──────────────────────────────────┘
+```
+
+| 区域 | 上限 | 开局 | 补牌时机 |
+|------|------|------|----------|
+| **普通区** | 5 张 | 从牌堆摸满 5 张 | 仅在"不要"时双方同时补至 5 张 |
+| **立刻补区** | 2 张 | 从牌堆摸满 2 张 | 每次**出牌后立即**补满至 2 张 |
+
+#### 出牌删除顺序
+出牌时优先从**普通区**删除，不足再从立刻补区删除。
+```
+出牌 3 张 → 普通区删满 3 张（普通区有足够的牌）
+出牌 6 张 → 普通区删 5 张 + 立刻补区删 1 张（普通区不够才动立刻补区）
+```
+
+#### 商店购买 TO_HAND
+商店购买的 `TO_HAND` 卡牌统一进入**普通区**（上限 5 张）。普通区满时自动降级流入隐藏牌堆。
+
+#### 补牌流向总览
+```
+        开局 → 普通区(5) + 立刻补区(2)  ← 牌堆一次摸满
+           │
+    玩家出牌 → 删牌(普通优先) → 立刻补区补满(2)  ← 普通区不动
+           │
+    有人"不要" → 双方普通区补满(5)            ← 立刻补区不动
+           │
+  商店TO_HAND → 普通区(≤5) ；满则入隐藏牌堆
+```
 
 ---
 
@@ -440,25 +486,35 @@ cards[0 .......... active_count ........... 末尾]
 
 ### 9.4 隐藏牌堆
 
-商店购买的 `TO_HIDDEN` 卡牌进入隐藏牌堆，不立即使用，等待后续触发。
+隐藏牌堆是**游戏牌堆的储备区**：关内不参与抽牌，游戏牌堆（active 区）抽干后不再补牌，抽完即止。
+
+新关卡开始时重建牌堆，游戏牌堆恢复为 `DECK_CAP = 32`（`init_standard`）；关内不会把隐藏区并入游戏牌堆。
+
+商店购买的 `TO_HIDDEN` 卡牌进入隐藏牌堆；当前每关重建牌堆，跨关保留尚未接线。
 
 ## 十、事件系统
 
-| 事件 | 触发时机 |
-|------|----------|
-| ROUND_START | 新的一手开始 |
-| TURN_CHANGED | 轮到下一个人出牌 |
-| ROUND_WIN | 有人"不要"，上家赢下这一手 |
-| CARD_PLAYED | 正常出牌成功 |
-| CARD_PASSED | 选择"不要" |
-| PRESSURE_BONUS | 压迫加分触发 |
-| ERROR_INVALID_PLAY | 牌型非法 |
-| ERROR_CANNOT_BEAT | 打不过上家 |
-| BIG_CARD_COUNTERED | 炸弹/王炸/五同点被更大反压 |
-| SPECIAL_VICTORY | 7gui523 直接获胜 |
-| DECK_REFILL | 手牌从牌堆补回 5 张 |
-| DECK_EMPTIED | 玩家牌堆抽空；BOSS 双空由 `boss_finish` 处理 |
-| GAME_OVER | 游戏结束 |
+> **所有游戏事件走 Round 实例信号**（`scripts/game/round.gd`），共 13 个。
+> Play 层通过 `_round.xxx.connect()` 监听，实现逻辑层 → UI 层解耦。
+> 原全局 `EventBus` 已隔离至 `_planned/`，留待未来多模块监听时启用。
+
+| 信号 | 触发时机 | emit | connect |
+|------|----------|------|---------|
+| `round_started` | 新的一手开始 | ✅ | ✅ |
+| `turn_changed` | 轮到下一个人出牌 | ✅ | ✅ |
+| `round_won` | 有人"不要"，上家赢下这一手 | ✅ | ✅ |
+| `card_played` | 正常出牌成功 | ✅ | ✅ |
+| `card_passed` | 选择"不要" | ✅ | ✅ |
+| `pressure_bonus` | 压迫加分触发 | ✅ | ✅ |
+| `error_invalid_play` | 牌型非法 | ✅ | ❌ 预留 |
+| `error_cannot_beat` | 打不过上家 | ✅ | ❌ 预留 |
+| `big_card_countered` | 炸弹/王炸/五同点被更大反压 | ✅ | ❌ 预留 |
+| `special_victory` | 7gui523 小回合强制胜利 | ✅ | ❌ 预留 |
+| `deck_refill` | 手牌从牌堆补牌 | ✅ | ❌ 预留 |
+| `deck_emptied` | 牌堆抽空 | ✅ | ❌ 预留 |
+| `game_over` | 游戏结束 | ✅ | ✅ |
+
+> 已删除的废弃信号：`error_hand_full`、`error_not_your_turn`（从未 emit）。
 
 ---
 
@@ -524,7 +580,7 @@ HP=140/210 current=玩家   HP=110 opponent=BOSS
 | **空数组 且 有人出过牌** | =「不要」→ 上家赢，双方补牌到 5 | `round_win` | 赢家成为下一小局先手 |
 | **非空** | `parse_any_card_type` → 非法牌型 | `invalid` | `_swap()` 轮换 |
 | **非空 但压不过上家** | `CardTypeResult.can_beat==false` | `cannot_beat` | `_swap()` 轮换 |
-| **非空 且是 7gui523** | 直接获胜 | `instant_win` | 结束 |
+| **非空 且是 7gui523** | 小回合强制胜利 | `round_win` | 继续 |
 | **非空 且 BOSS 手牌+牌堆双空** | 保留最后一张牌动画，进入 3N 伤害结算 | `boss_finish` | 结算后结束本关 |
 | **非空 且玩家手牌+牌堆双空** | 直接获胜 | `instant_win` | 结束 |
 | **非空 且合法且压过（正常）** | 从手牌移除 → 上桌 → 记 `last_play/last_player` | `continue` | `_swap()` 轮换 |
@@ -552,12 +608,12 @@ HP=140/210 current=玩家   HP=110 opponent=BOSS
 
 代码：`round.gd::_instant_win(winner)`
 
-`instant_win` 仅处理 7gui523，或玩家正常打空手牌与牌堆。
+`instant_win` 仅处理玩家正常打空手牌与游戏牌堆（active 区）；7gui523 改为小回合强制胜利，返回 `round_win` 并继续本关。
 
-BOSS 打空手牌与牌堆不再直接触发 `instant_win`，而是返回 `boss_finish`：
+BOSS 打空手牌与游戏牌堆（active 区）不再直接触发 `instant_win`，而是返回 `boss_finish`：
 
 1. 保留 BOSS 最后一张牌的桌面动画。
-2. 统计玩家剩余牌数：普通手牌 + 即时手牌 + 玩家牌堆。
+2. 统计玩家剩余牌数：普通手牌 + 立刻补区 + 玩家游戏牌堆（active 区，不含隐藏区）。
 3. 造成 `3N` 点玩家伤害。
 4. 播放桌面白色延迟条后才扣除 HP。
 5. 只根据结算后玩家 HP 判断：HP > 0 进入下一关，HP ≤ 0 游戏结束。
@@ -590,11 +646,15 @@ BOSS 先出完   →  结算 3N 伤害后按玩家 HP 进入下一关或结束
 ```
 双牌堆：
   玩家牌堆  Deck.DeckManager(54)          AI 牌堆  Deck.DeckManager(54)
-       │ refill_normal_hand                    │
+       │ refill_normal_hand(5)                  │
+       │ refill_instant_hand(2)                 │
 玩家手牌  PlayerData.normal_hand(5)          AI 手牌  PlayerData.normal_hand(5)
+           PlayerData.instant_hand(2)                 PlayerData.instant_hand(2)
        └────────────── Round(current, opponent) ──────────────┘
                               │ process_play(play)
+                              │   └→ 出牌后立刻 fill_player_instant
                               ├ round_won → HP 结算
+                              │   └→ 双方 fill_player_normal
                               ├ card_played / card_passed → UI 刷新
                               └ turn_changed → _schedule_ai_if_needed
 ```
@@ -644,3 +704,171 @@ Godot 控制台路径：`D:\app\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stabl
 
 - 任一用例失败 → 打印 `✗ FAIL` 并记录失败数
 - 退出码 `0` = 全部通过；`1` = 存在失败
+
+---
+
+## 十四、OOP 架构设计
+
+> 本项目从头至尾使用「**类与继承**」构建，无全局单例污染，所有模块通过 `class_name` 注册为全局可访问的类。
+
+### 14.1 继承体系总览
+
+```
+                  ┌──────────────┐
+                  │   RefCounted  │  ← Godot 内置引用计数基类
+                  └──────┬───────┘
+       ┌─────────────────┼─────────────────────┐
+       │                 │                     │
+  ┌────┴────┐    ┌───────┴───────┐     ┌──────┴──────┐
+  │ 核心层   │    │  游戏/全局层   │     │   UI 系统   │
+  └─────────┘    └───────────────┘     └─────────────┘
+                                                    │
+                                         ┌──────────┴──────────┐
+                                         │      Control         │  ← Godot 节点基类
+                                         └──────────┬───────────┘
+                                          ┌─────────┴──────────┐
+                                          │    PlayBase          │  第1层
+                                          └─────────┬───────────┘
+                                           ┌────────┴──────────┐
+                                           │    PlayAnim         │  第2层
+                                           └────────┬──────────┘
+                                            ┌───────┴──────────┐
+                                            │    PlayUI          │  第3层
+                                            └───────┬──────────┘
+                                             ┌──────┴──────────┐
+                                             │    PlayInput       │  第4层
+                                             └──────┬──────────┘
+                                              ┌─────┴──────────┐
+                                              │    Play           │  第5层
+                                              └────────────────┘
+```
+
+### 14.2 类清单与职责
+
+#### RefCounted 体系（数据/逻辑层，19 个类）
+
+| 类 | 继承 | 职责 |
+|----|------|------|
+| `Card` | RefCounted | 卡牌数据（id、point、suit、花色比较） |
+| `CardTypeResult` | RefCounted | 牌型解析（11种牌型识别 + canBeat + 压迫检测） |
+| `Deck` | RefCounted | 命名空间宿主（仅作为 `DeckManager` 的容器） |
+| `Deck.DeckManager` | RefCounted | 单数组双区牌堆（游戏区 / 隐藏区 / 回收缓冲区） |
+| `Player` | RefCounted | 命名空间宿主（存放 `PlayerData` 及 `CardSortMode` 枚举） |
+| `Player.PlayerData` | RefCounted | 双区手牌存储 + 增删改查 + HP + 筹码 |
+| `Score` | RefCounted | 桌面分计算（5/10/K + 压迫 bonus） |
+| `Enchant` | RefCounted | 附魔数据（9 种效果 + 触发条件） |
+| `Round` | RefCounted | 回合状态机（首出/接续/结束 + process_play） |
+| `Campaign` | RefCounted | 战役管理（9关 + `LevelRule` 嵌套类） |
+| `Campaign.LevelRule` | RefCounted | 单关 BOSS 特殊规则 |
+| `Shop` | RefCounted | 关末商店逻辑 |
+| `AICore` | RefCounted | AI 核心（枚举 / AI1规则 / AI2贪心 / AI3训练） |
+| `BossAI` | RefCounted | BOSS 特殊牌型生成（对应 9 关） |
+| `GameConfig` | RefCounted | 纯常量配置（手牌上限 / HP / 筹码表 / BOSS 名称） |
+| `GameState` | RefCounted | 运行时状态（当前关卡 / 玩家筹码 / 金币） |
+| `SaveManager` | RefCounted | JSON 存档 I/O |
+| `AudioManager` | RefCounted | 音频管理（AudioStreamGenerator 合成，监听 Round 信号自动播放） |
+
+> ⚠️ `EventBus` 已隔离至 `_planned/event_bus.gd`，当前所有事件走 `Round` 实例信号（13 个）。
+
+#### Control 体系（UI 层，8 个类）
+
+| 类 | 继承 | 职责 |
+|----|------|------|
+| **PlayBase** | Control | 节点引用 / 主题常量 / 着色器（涡旋 + 像素化） |
+| **PlayAnim** | PlayBase | 手牌渲染 / 出牌动画 / 飞牌溶解 |
+| **PlayUI** | PlayAnim | 商店按钮 / 购买 / 刷新接入 |
+| **PlayInput** | PlayUI | 拖拽选牌 / 双击不要 / 弃牌计数 / 高亮 |
+| **Play** | PlayInput | 开局流程 / 关卡切换 / AI 调度 / 游戏闭环 |
+| `CardVisual` | Control | 独立卡牌视觉组件（`instantiate()` 工厂） |
+| `CardMenu` | Control | 扇形卡牌菜单（5 牌扇形排列 + 悬停动画） |
+| `ShopPanel` | Control | 商店面板 UI |
+| `SettingsDialog` | RefCounted | 设置弹窗（动态创建 Panel 节点） |
+
+#### 其他体系
+
+| 类 | 继承 | 职责 |
+|----|------|------|
+| `AIWeights` | **Resource** | 8 维权重资源（可 `.tres` 序列化保存/加载） |
+| `CardTypeNames` | RefCounted | 牌型名称枚举 ↔ 中文映射 |
+
+### 14.3 UI 5 层单继承链（关注点分离）
+
+```
+第1层 PlayBase    → 常量、节点、着色器、公用工具方法
+                     （play.gd 的第1/10体积）
+第2层 PlayAnim    → _render_hand 手牌渲染、桌面动画、飞牌溶解
+                     （play.gd 的第2-3/10体积）
+第3层 PlayUI      → 商店接入、购买按钮、刷新逻辑
+                     （play.gd 的第4-5/10体积）
+第4层 PlayInput   → 拖拽交互 _drag_indices、双击不要、弃牌计数
+                     （play.gd 的第6-7/10体积）
+第5层 Play        → _start_new 开局、关卡流程、AI调度
+                     （play.gd 的第8-10/10体积）
+```
+
+**设计原则**：
+- 每一层只 `extends` 上一层，不跨层调用父类私有方法
+- 每层新增的职责不会污染下层
+- 如果做不含动画的简化版，只需 `extends PlayBase` 即可
+
+### 14.4 嵌套类（组合 + 命名空间内聚）
+
+```gdscript
+# Player 命名空间
+class_name Player extends RefCounted
+    enum CardSortMode { FULL_SORT, SAME_RANK, NO_SORT }
+    class PlayerData extends RefCounted:
+        var normal_hand: Array[Card]
+        var instant_hand: Array[Card]
+        var hp: int
+        var chips: int
+
+# Deck 命名空间
+class_name Deck extends RefCounted
+    class DeckManager extends RefCounted:
+        var cards: Array[int]
+        var active_count: int
+```
+
+**为什么不拆成独立文件？**
+- `PlayerData` 离开 `Player` 没有独立存在的意义
+- `DeckManager` 离开 `Deck` 同样失去上下文
+- 嵌套保证了**强内聚**，外部只通过 `Player.PlayerData`、`Deck.DeckManager` 访问
+
+### 14.5 组合关系（非继承的跨层协作）
+
+```
+Play(Control)  ──持有──→  Round(RefCounted)     ← 回合逻辑
+                ──持有──→  Campaign(RefCounted)   ← 关卡/BOSS
+                ──持有──→  Shop(RefCounted)       ← 商店
+                ──持有──→  CardVisual(Control)    ← 卡牌视觉（工厂生产）
+
+Round           ──持有──→  Player.PlayerData ×2   ← 玩家 + BOSS 数据
+                ──持有──→  Deck.DeckManager ×2    ← 玩家牌堆 + BOSS 牌堆
+                ──持有──→  Score                  ← 桌面计分
+
+Campaign        ──持有──→  LevelRule ×9           ← BOSS 特殊规则
+```
+
+### 14.6 OOP 概念覆盖矩阵
+
+| 概念 | 实现位置 | 示例 |
+|------|----------|------|
+| **单继承** | UI 5 层链 | `PlayInput extends PlayUI` |
+| **多态** | `CardTypeResult.canBeat()` | 不同牌型各自实现压制逻辑 |
+| **封装** | 所有 `class_name` 类 | 公开 API + 私有 `_method` |
+| **嵌套类** | `Player.PlayerData`、`Deck.DeckManager` | 命名空间内聚 |
+| **枚举** | `CardSortMode`、`CardType`、`Enchant.Type` | 类型安全 |
+| **静态工厂** | `Card.from_id()`、`CardVisual.instantiate()` | 无需 new + 初始化两步 |
+| **信号** | `Round` 13 个实例信号 + `CardMenu.card_selected` | 观察者模式 |
+| **Resource 继承** | `AIWeights extends Resource` | 可序列化到 `.tres` 文件 |
+| **RefCounted 组合** | `Play` 持有 `Round`/`Campaign`/`Shop` | 组合优于继承 |
+
+### 14.7 类注册策略：class_name vs autoload
+
+| 方案 | 使用 | 原因 |
+|------|------|------|
+| `class_name` | **全部 21 个活跃类**（+1 隔离中） | 无运行时开销，按需 import，避免全局污染 |
+| autoload | 0 个 | 项目完全不依赖 autoload 单例 |
+
+> 事件通信：Round 实例信号（13 个）→ Play 直接 connect。如需全局解耦，可启用 `_planned/event_bus.gd`。

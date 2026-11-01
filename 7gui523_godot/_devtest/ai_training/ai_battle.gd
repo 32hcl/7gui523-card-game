@@ -32,13 +32,20 @@ static func simulate(player_a: Player.PlayerData, player_b: Player.PlayerData) -
 	deck_a.init_standard()
 	deck_b.init_standard()
 
+	var instant_a := Deck.DeckManager.new()
+	var instant_b := Deck.DeckManager.new()
+	instant_a.init_instant()
+	instant_b.init_instant()
+
 	deck_a.fill_player_normal(a)
 	deck_b.fill_player_normal(b)
+	instant_a.fill_player_instant(a)
+	instant_b.fill_player_instant(b)
 
 	var tracker_a := AICore.CardTracker.new()
 	var tracker_b := AICore.CardTracker.new()
 
-	var round := Round.new(a, b, deck_a, deck_b)
+	var round := Round.new(a, b, deck_a, deck_b, instant_a, instant_b)
 	var result := BattleResult.new()
 	result.winner_ai_level = 0
 	result.loser_ai_level = 0
@@ -58,7 +65,7 @@ static func simulate(player_a: Player.PlayerData, player_b: Player.PlayerData) -
 		var ts := round.table_score
 
 		var play: Array[Card] = AICore.choose(cur, opp, prev, cur_deck, ts, tracker)
-		var res: Dictionary = round.process_play(play)
+		var res: Round.PlayResult = round.process_play(play)
 
 		if not play.is_empty():
 			tracker.record_played(play)
@@ -67,15 +74,35 @@ static func simulate(player_a: Player.PlayerData, player_b: Player.PlayerData) -
 		match res.get("state", ""):
 			"round_win":
 				result.total_tricks += 1
+				var pot: int = res.get("pot", 0)
 				if res["winner"] == a:
-					result.winner_damage += res["damage"]
+					result.winner_damage += pot
 				else:
-					result.loser_damage += res["damage"]
+					result.loser_damage += pot
+				if not round.failed_players.is_empty():
+					var failed := round.failed_players[0] as Player.PlayerData
+					result.winner = b if failed == a else a
+					result.loser = failed
+					result.winner_ai_level = result.winner.ai_level
+					result.loser_ai_level = result.loser.ai_level
+					result.winner_remaining = result.winner.hand_size()
+					result.loser_remaining = result.loser.hand_size()
+					return result
 				continue
 
 			"instant_win":
 				var winner = res["winner"] as Player.PlayerData
 				result.win_by_instant = true
+				result.winner = winner
+				result.loser = b if winner == a else a
+				result.winner_ai_level = result.winner.ai_level
+				result.loser_ai_level = result.loser.ai_level
+				result.winner_remaining = result.winner.hand_size()
+				result.loser_remaining = result.loser.hand_size()
+				return result
+
+			"boss_finish":
+				var winner = res["winner"] as Player.PlayerData
 				result.winner = winner
 				result.loser = b if winner == a else a
 				result.winner_ai_level = result.winner.ai_level

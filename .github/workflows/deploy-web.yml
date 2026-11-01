@@ -48,6 +48,10 @@ jobs:
           mkdir -p ~/.local/share/godot/export_templates/4.7.2.stable
           cp -r _ci/templates/templates/* ~/.local/share/godot/export_templates/4.7.2.stable/
 
+      - name: Run tests
+        run: |
+          bash 7gui523_godot/_devtest/run_tests.sh _ci/godot_executable 7gui523_godot
+
       - name: Export Web (HTML5)
         run: |
           mkdir -p 7gui523_godot/build/web

@@ -3,14 +3,14 @@ extends RefCounted
 
 # ═══════════════════════════════════════════════════════════════
 # AICore — AI 核心模块
-# 包含: enumerateLegalPlays, AI1(规则), AI2(贪心)
+# 包含: enumerateLegalPlays, AI1(规则驱动), AI2(训练权重输出), AI3(权重评分引擎)
 # ═══════════════════════════════════════════════════════════════
-
-const COUNTER_RISK_WEIGHT := 2
 
 
 # ═══════════════════════════════════════════════════════════════
-# 枚举所有合法出牌组合
+# 枚举所有合法出牌组合  O(2^n) — 所有子集遍历
+#   n = 手牌数，当前上限 7 张 (2^7 = 128)，性能安全。
+#   若未来手牌上限增加（商店扩容），需改为剪枝遍历或位DP。
 # ═══════════════════════════════════════════════════════════════
 
 static func enumerate_legal_plays(player: Player.PlayerData) -> Array[Array]:
@@ -18,6 +18,9 @@ static func enumerate_legal_plays(player: Player.PlayerData) -> Array[Array]:
 	var hand_buf: Array[Card] = []
 	player.collect_hand_into(hand_buf)
 	var n := hand_buf.size()
+	if n > 10:    ## 手牌超限防护：回退空结果，避免 2^n 爆炸
+		push_warning("enumerate_legal_plays: hand size %d exceeds safe limit 10" % n)
+		return result
 	for mask in range(1, 1 << n):
 		var subset: Array[Card] = []
 		for i in n:
@@ -27,31 +30,6 @@ static func enumerate_legal_plays(player: Player.PlayerData) -> Array[Array]:
 		if parsed.type != CardTypeResult.CardType.INVALID and parsed.type != CardTypeResult.CardType.PASS:
 			result.append(subset)
 	return result
-
-
-# ═══════════════════════════════════════════════════════════════
-# 检查是否拆对/拆三/拆四
-# ═══════════════════════════════════════════════════════════════
-
-static func breaks_combo(play: Array[Card], player: Player.PlayerData) -> bool:
-	var hand_count := {}
-	var hand_buf: Array[Card] = []
-	player.collect_hand_into(hand_buf)
-	for c in hand_buf:
-		hand_count[c.point] = hand_count.get(c.point, 0) + 1
-
-	var play_count := {}
-	for c in play:
-		play_count[c.point] = play_count.get(c.point, 0) + 1
-
-	for pt in play_count:
-		var in_hand: int = hand_count.get(pt, 0)
-		var in_play: int = play_count.get(pt, 0)
-		if in_hand >= 2 and in_play == 1: return true
-		if in_hand >= 3 and in_play == 2: return true
-		if in_hand >= 4 and in_play == 3: return true
-
-	return false
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -86,69 +64,6 @@ static func estimate_counter_risk(play: Array[Card], player: Player.PlayerData,
 
 	var weight := 1 + table_score / 10
 	return opp_beats * weight
-
-
-# ═══════════════════════════════════════════════════════════════
-# 单步评分
-# ═══════════════════════════════════════════════════════════════
-
-static func evaluate_play(play: Array[Card], player: Player.PlayerData, opponent: Player.PlayerData,
-		deck: Deck.DeckManager, previous: CardTypeResult, table_score: int, tracker: CardTracker) -> Dictionary:
-	var bd := {
-		"base": 0, "score_card": 0, "special": 0, "endgame": 0,
-		"combo_break": 0, "table_score": 0, "defensive": 0, "tracker": 0, "total": 0,
-	}
-
-	bd["table_score"] = table_score * 2
-	bd["base"] = play.size() * 10
-	if play.size() == player.hand_size():
-		bd["base"] += 1000
-
-	var rank_penalty := 0
-	for c in play:
-		var r := Card.get_rank(c.point)
-		if r >= 13:
-			rank_penalty -= r * 3
-		elif r >= 10:
-			rank_penalty -= r * 2
-		else:
-			rank_penalty -= r
-	bd["endgame"] = rank_penalty
-
-	for c in play:
-		if c.score > 0 and table_score > 0:
-			bd["score_card"] += c.score * 2
-
-	bd["combo_break"] = -17 if breaks_combo(play, player) else 0
-
-	var parsed := CardTypeResult.parse_card_type(play)
-	if parsed.type == CardTypeResult.CardType.BOMB:
-		bd["special"] -= 92
-	elif parsed.type == CardTypeResult.CardType.ROCKET:
-		bd["special"] -= 459
-
-	if opponent.hand_size() <= 2:
-		if parsed.type == CardTypeResult.CardType.BOMB:
-			bd["special"] += 236
-		elif parsed.type == CardTypeResult.CardType.ROCKET:
-			bd["special"] += 223
-
-	if tracker:
-		for c in play:
-			if tracker.is_exhausted(c.point):
-				bd["tracker"] += 30
-		var risk := estimate_counter_risk(play, player, opponent, tracker, parsed, table_score, deck)
-		bd["defensive"] = -risk * COUNTER_RISK_WEIGHT
-
-	bd["total"] = bd["base"] + bd["score_card"] + bd["special"] + bd["endgame"] \
-		+ bd["combo_break"] + bd["table_score"] + bd["defensive"] + bd["tracker"]
-
-	return bd
-
-
-static func play_gain(play: Array[Card], player: Player.PlayerData, opponent: Player.PlayerData,
-		deck: Deck.DeckManager, previous: CardTypeResult, table_score: int, tracker: CardTracker) -> int:
-	return evaluate_play(play, player, opponent, deck, previous, table_score, tracker)["total"]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -399,7 +314,7 @@ static func _weighted_gain(play: Array[Card], player: Player.PlayerData,
 	return gain
 
 
-## 本手拆散的最大同点组尺寸（0=未拆；出整组不罚，部分拆按原组尺寸罚）
+## 本手拆散的最大同点组尺寸（0=未拆；出整组不罚，部分拆按组尺寸罚）
 static func _broken_combo_size(play: Array[Card], player: Player.PlayerData) -> int:
 	var hand_count := {}
 	var hand_buf: Array[Card] = []
@@ -471,74 +386,6 @@ static func try_endgame_intercept(player: Player.PlayerData, all_plays: Array[Ar
 	return []
 
 
-static func choose_ai2(player: Player.PlayerData, opponent: Player.PlayerData, prev: CardTypeResult,
-		deck: Deck.DeckManager, table_score: int, tracker: CardTracker = null) -> Array[Card]:
-	var all_plays := enumerate_legal_plays(player)
-	if all_plays.is_empty():
-		return []
-
-	var finish := try_finish_play(player, all_plays, prev)
-	if not finish.is_empty():
-		return finish
-
-	var intercept := try_endgame_intercept(player, all_plays, prev, opponent.hand_size())
-	if not intercept.is_empty():
-		return intercept
-
-	var best: Array[Card] = []
-	var best_gain := -INF
-	for play in all_plays:
-		var parsed := CardTypeResult.parse_any_card_type(play)
-		if prev != null and not prev.cards.is_empty() and not CardTypeResult.can_beat(parsed, prev):
-			continue
-		## 跟牌时只用“刚好压过”的最小组合；炸弹/火箭只在没有普通解时使用。
-		var gain := _greedy_gain(play, player, opponent, parsed, prev, deck, table_score, tracker)
-		if gain > best_gain:
-			best_gain = gain
-			best = play
-
-	return best
-
-
-## 可解释的运行时贪心评分：先保证能结束/能救场，再减少拆组和高牌浪费。
-static func _greedy_gain(play: Array[Card], player: Player.PlayerData,
-		opponent: Player.PlayerData, parsed: CardTypeResult, previous: CardTypeResult,
-		deck: Deck.DeckManager, table_score: int, tracker: CardTracker) -> float:
-	var gain := 0.0
-	var has_previous := previous != null and not previous.cards.is_empty()
-	var is_bomb := parsed.type == CardTypeResult.CardType.BOMB \
-		or parsed.type == CardTypeResult.CardType.ROCKET \
-		or parsed.type == CardTypeResult.CardType.FIVE_OF_A_KIND
-
-	## 直接清空手牌是最高优先级。
-	if play.size() == player.hand_size():
-		gain += 100000.0
-
-	if has_previous:
-		## 普通牌型优先于炸弹；炸弹只在对手快空牌或无普通解时使用。
-		gain += 5000.0 if not is_bomb else -2500.0
-		if opponent.hand_size() <= 2 and is_bomb:
-			gain += 9000.0
-		gain -= float(Card.get_rank(parsed.key_point)) * 20.0
-	else:
-		## 首出尽量出小牌并保留对子/三条/炸弹。
-		gain -= float(Card.get_rank(parsed.key_point)) * 25.0
-		gain -= 1800.0 if breaks_combo(play, player) else 0.0
-
-	## 桌面有分时优先带走计分牌，但不要因此拆掉强组合。
-	for c in play:
-		gain += float(c.score) * (8.0 if table_score > 0 else 1.0)
-
-	if tracker != null:
-		for c in play:
-			if tracker.is_exhausted(c.point):
-				gain += 25.0
-
-	## 少出一张通常优于多拆一张；清空手牌的奖励已单独覆盖。
-	gain -= float(play.size()) * 2.0
-	return gain
-
-
 # ═══════════════════════════════════════════════════════════════
 # AI 调度入口
 # ═══════════════════════════════════════════════════════════════
@@ -556,6 +403,9 @@ static var weights: AIWeights = null
 ## 第 4 代权重槽（与 AI3 的 weights 隔离，训练期并行对比）
 static var weights4: AIWeights = null
 
+## AI2 训练权重（由 GA 训练产出）
+static var _ai2_trained_weights: AIWeights = null
+
 static func choose(player: Player.PlayerData, opponent: Player.PlayerData, prev: CardTypeResult,
 		deck: Deck.DeckManager, table_score: int, tracker: CardTracker) -> Array[Card]:
 	var play: Array[Card] = []
@@ -563,7 +413,11 @@ static func choose(player: Player.PlayerData, opponent: Player.PlayerData, prev:
 		Level.AI1_RULE:
 			play = choose_ai1(player, prev)
 		Level.AI2_GREEDY:
-			play = choose_ai2(player, opponent, prev, deck, table_score, tracker)
+			if _ai2_trained_weights == null:
+				_ai2_trained_weights = load("res://data/ai/ai2_weights.tres") as AIWeights
+				if _ai2_trained_weights == null:
+					_ai2_trained_weights = AIWeights.default_weights()
+			play = choose_ai3(player, opponent, prev, deck, table_score, tracker, _ai2_trained_weights)
 		Level.AI3_TRAINED:
 			if weights == null:
 				weights = AIWeights.default_weights()

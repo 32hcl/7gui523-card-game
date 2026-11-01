@@ -15,17 +15,18 @@ const NORMAL_MAX  := 5    ## 普通区手牌上限
 const INSTANT_MAX := 2    ## 立刻补区手牌上限
 
 
-# ── 玩家 / Boss 血量 ──────────────────────────────────────────
+# ── 筹码（HP / 得分 / 筹码 已统一为同一货币，1:1） ────────────
 
-const PLAYER_INIT_HP := 140
-const PLAYER_MAX_HP  := 210
-const BOSS_MAX_HP    := 110
+const INITIAL_CHIPS := 500        ## 玩家初始筹码
+const BOSS_INITIAL_CHIPS := 500   ## 每关 BOSS 初始筹码
+const DEBT_REPAY_MULTIPLIER := 2  ## 小回合结束：双倍偿还本局负债
+const BITE_CHIPS_PER_CARD := 3    ## 疯狗：每张出牌额外扣玩家筹码
+const BOSS_FINISH_CHIPS_PER_CARD := 3  ## BOSS 先出完：玩家每张剩余牌额外扣 3 筹码
 
 
 # ── 关卡配置 ──────────────────────────────────────────────────
 
 const TOTAL_LEVELS  := 9
-const HEAL_PER_CARD := 2
 
 
 # ── 筹码 & 金币 ───────────────────────────────────────────────
@@ -51,23 +52,3 @@ const BOSS_NAMES := [
 	"换牌鬼",
 	"赌场老板",
 ]
-
-
-# ── 工具方法 ──────────────────────────────────────────────────
-
-static func get_entry_chips(level: int) -> int:
-	if level < 1 or level > TOTAL_LEVELS:
-		return 0
-	return ENTRY_CHIPS[level]
-
-
-static func get_reward_chips(level: int) -> int:
-	if level < 1 or level > TOTAL_LEVELS:
-		return 0
-	return REWARD_CHIPS[level]
-
-
-static func get_boss_name(level: int) -> String:
-	if level < 1 or level > TOTAL_LEVELS:
-		return "???"
-	return BOSS_NAMES[level]

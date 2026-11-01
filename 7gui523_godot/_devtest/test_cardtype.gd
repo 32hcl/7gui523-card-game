@@ -225,13 +225,13 @@ static func _test_pass_and_empty() -> void:
 	# 空牌（默认构造）= 上家空 → 能压
 	var empty := CardTypeResult.new()
 	U.ok(CardTypeResult.can_beat(single7, empty), "上家空→能压")
-	U.eq(CardTypeResult.calculate_pressure_bonus(single7, empty), 0, "上空无压迫加分")
+	U.eq(CardTypeResult.calculate_pressure_chips(single7, empty), 0, "上空无压牌筹码")
 
 	# 显式 PASS
 	var pass_res := CardTypeResult.new()
 	pass_res.type = CardTypeResult.CardType.PASS
 	U.ok(CardTypeResult.can_beat(single7, pass_res), "上家PASS→能压")
-	U.eq(CardTypeResult.calculate_pressure_bonus(single7, pass_res), 0, "上家PASS无加分")
+	U.eq(CardTypeResult.calculate_pressure_chips(single7, pass_res), 0, "上家PASS无压牌筹码")
 
 	# 空牌不能压任何牌
 	U.ok(not CardTypeResult.can_beat(empty, single7), "空牌不压单张")

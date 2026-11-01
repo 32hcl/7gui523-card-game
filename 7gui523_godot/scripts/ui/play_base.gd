@@ -8,13 +8,13 @@ class_name PlayBase
 
 const CARD_W := 64
 const CARD_H := 90
-const HAND_W := 88   ## 手牌卡显示尺寸
-const HAND_H := 124
+const HAND_W := 82   ## 手牌卡显示尺寸（与桌面牌统一）
+const HAND_H := 116
 
 const BOSS_CARD_W := 72
 const BOSS_CARD_H := 100
-const TABLE_CARD_W := 76
-const TABLE_CARD_H := 108
+const TABLE_CARD_W := 88  ## 桌面出牌区（比手牌大，保证台上清晰可见）
+const TABLE_CARD_H := 124
 const SELECTED_LIFT := 30.0
 const SELECTED_SCALE := 1.12
 const INSTANT_ROW_GAP := 46.0  ## 上下排净距：覆盖选中上浮+缩放，保证上排底边不被遮挡
@@ -25,7 +25,8 @@ const INITIAL_DEAL_DELAY := 0.13
 const INITIAL_DEAL_DURATION := 0.58
 const ROUND_DAMAGE_DELAY := 0.90
 const PLAYER_DISCARD_LIMIT := 10
-const DISCARD_DAMAGE_PER_CARD := 3
+const DISCARD_CHIP_COST := 3      ## 弃牌代价：每张 3 筹码（两条弃牌入口统一）
+const INVALID_PLAY_PENALTY := 2   ## 非法出牌扣 2 筹码（回合内允许扣成负数）
 const LAYOUT_TWEEN := 0.2
 
 const PLAY_ANIM_DURATION := 0.30
@@ -38,6 +39,15 @@ const DRAG_SPREAD := 150.0
 const DRAG_ARC_Y := 18.0
 const DRAG_ROT := 4.0
 const DRAG_RETURN_DUR := 0.18
+const DRAG_RETURN_TAIL := 0.05           ## 飞回动画后额外停留
+const INVALID_SHAKE_FLY := 0.22          ## 非法出牌飞到桌面停留
+const INVALID_SHAKE_DURATION := 0.45     ## 非法出牌桌面晃动时长
+const TABLE_ANIM_TAIL := 0.02            ## 桌牌动画额外余量
+const AI_THINK_DELAY := 0.7              ## AI思考到实际执行的间隔
+const HINT_BG_ALPHA := 0.10              ## 拖拽/弃牌提示背景透明度
+const HINT_BORDER_ALPHA := 0.65          ## 出牌落点提示边框透明度
+const HINT_DISCARD_BORDER_ALPHA := 0.75  ## 弃牌提示边框透明度
+const FAN_EXPAND_FACTOR := 0.15         ## 牌堆点击判定扩展系数
 
 const _TILT_MAX := 15.0   ## 悬停伪3D 倾斜上限（对齐 Demo card_UI.tscn angle_x_max/angle_y_max）
 
@@ -61,7 +71,9 @@ const COL_GOLD := Color(1.0, 0.84, 0.42)
 
 ## 手机端自适应
 const MOBILE_MAX_WIDTH := 540.0
-var _is_mobile := false
+const TABLET_MAX_WIDTH := 1024.0          ## 平板最大宽度，超出即为桌面
+enum DeviceClass { DESKTOP, TABLET, PHONE }
+var _device_class := DeviceClass.DESKTOP
 
 var _mobile_card_w: float = 0.0
 var _mobile_card_h: float = 0.0
@@ -74,8 +86,8 @@ var _mobile_boss_h: float = 0.0
 @onready var _title_lbl: Label = $MainVBox/TopBar/TitleLabel
 @onready var _round_lbl: Label = $MainVBox/TopBar/RoundLabel
 @onready var _deck_count_lbl: Label = $MainVBox/TopBar/DeckCountLabel
-@onready var _hp_player_lbl: Label = $MainVBox/TopBar/PlayerHP
-@onready var _hp_boss_lbl: Label = $MainVBox/TopBar/BossHP
+@onready var _chips_player_lbl: Label = $MainVBox/TopBar/PlayerChips
+@onready var _chips_boss_lbl: Label = $MainVBox/TopBar/BossChips
 
 ## Boss 区
 @onready var _boss_hand: HBoxContainer = $MainVBox/BossZone/BossRow/BossHand
@@ -87,10 +99,6 @@ var _mobile_boss_h: float = 0.0
 @onready var _drop_target: VBoxContainer = $MainVBox/TableArea/CenterBox
 @onready var _boss_deck: Control = $MainVBox/TableArea/BossDeck
 @onready var _player_deck: Control = $MainVBox/TableArea/PlayerDeck
-@onready var _boss_hp_bar: ProgressBar = $MainVBox/TableArea/BossHPBar
-@onready var _player_hp_bar: ProgressBar = $MainVBox/TableArea/PlayerHPBar
-@onready var _boss_hp_text: Label = $MainVBox/TableArea/BossHPText
-@onready var _player_hp_text: Label = $MainVBox/TableArea/PlayerHPText
 @onready var _shop_btn: Button = $MainVBox/HandArea/ShopBtn
 @onready var _new_game_btn: Button = $MainVBox/HandArea/NewGameBtn
 
@@ -103,104 +111,35 @@ var _mobile_boss_h: float = 0.0
 @onready var _game_over_layer: Control = $GameOver
 @onready var _game_over_msg: Label = $GameOver/Center/Box/V/Message
 
-## 游戏状态容器：setget 属性转发，所有旧代码引用不变
-## 初始化为空壳；play.gd _ready() 中赋值 _state = GameState.new()
+## 游戏状态容器：所有游戏运行时状态集中于此。
+## play.gd _ready() 中赋值 _state = GameState.new()
+## 访问方式：_state.round, _state.human, _state.phase 等
 var _state: GameState
-
-var _round: Round:
-	set(v): _state.round = v
-	get:     return _state.round
-
-var _human: Player.PlayerData:
-	set(v): _state.human = v
-	get:     return _state.human
-
-var _ai: Player.PlayerData:
-	set(v): _state.ai = v
-	get:     return _state.ai
-
-var _human_deck: Deck.DeckManager:
-	set(v): _state.human_deck = v
-	get:     return _state.human_deck
-
-var _ai_deck: Deck.DeckManager:
-	set(v): _state.ai_deck = v
-	get:     return _state.ai_deck
-
-## 战役 / 商店 / 记牌器
-var _campaign: Campaign:
-	set(v): _state.campaign = v
-	get:     return _state.campaign
-
-var _shop: Shop:
-	set(v): _state.shop = v
-	get:     return _state.shop
-
-var _tracker: AICore.CardTracker:
-	set(v): _state.tracker = v
-	get:     return _state.tracker
-
-var _human_hp: int:
-	set(v): _state.human_hp = v
-	get:     return _state.human_hp
-
-var _ai_hp: int:
-	set(v): _state.ai_hp = v
-	get:     return _state.ai_hp
-
-## 保存 BOSS 最近一次实际出牌张数；Round 结算时会清空 last_play。
-var _last_boss_play_count: int:
-	set(v): _state.last_boss_play_count = v
-	get:     return _state.last_boss_play_count
-
-var _selected: Array:
-	set(v): _state.selected = v
-	get:     return _state.selected
-
-var _player_discard_count: int:
-	set(v): _state.player_discard_count = v
-	get:     return _state.player_discard_count
-
-var _player_discarded_this_round: bool:
-	set(v): _state.player_discarded_this_round = v
-	get:     return _state.player_discarded_this_round
-
-## 弃牌窗口：玩家上一回合"不要"过 → 本回合可弃牌（方式一/二）
-var _player_can_discard: bool = false
-
-var _ai_busy: bool = false
-var _finished: bool:
-	set(v): _state.finished = v
-	get:     return _state.finished
-
-var _phase: String:
-	set(v): _state.phase = v
-	get:     return _state.phase
-
-## 每次重新开始递增；旧的 await 流程返回后必须立即失效，不能继续推进阶段。
-var _flow_generation: int:
-	set(v): _state.flow_generation = v
-	get:     return _state.flow_generation
-var _mask_player_draws := false
-var _initial_deal_finished := false
-## 以 Card 实例为键；同一牌再次摸回时是新实例，不继承旧隐藏状态。
-var _masked_player_cards: Dictionary = {}
 
 ## 手牌随机抖动（拟真）：按 card_id 稳定存储旋转角与垂直偏移
 var _hand_jitter: Dictionary = {}
 
 ## 拖拽出牌
-var _drag_pending: bool = false
 var _dragging: bool = false
+## 拖拽牌卡的槽位快照：记录拖拽前的位置、旋转、缩放、层级与父节点，
+## 用于合法出牌失败时的飞回动画或拖拽取消时原样复归。
+class DragOrigin extends RefCounted:
+	var parent: Node = null
+	var pos: Vector2 = Vector2.ZERO
+	var rot: float = 0.0
+	var scale: Vector2 = Vector2.ONE
+	var z: int = 0
+
+
 var _drag_press_pos := Vector2.ZERO
 var _drag_first_index := -1
 var _drag_visuals: Array[CardVisual] = []
 var _drag_indices: Array[int] = []
-var _drag_origin: Array[Dictionary] = []
+var _drag_origin: Array[DragOrigin] = []
 var _drop_hint: Panel = null
 var _discard_hint: Panel = null
 
-## 牌堆显示：玩家/BOSS 牌堆叠置牌背 + 剩余张数角标（也是发牌/抽卡动画的原点）
+## 牌堆显示：玩家/BOSS 牌堆叠置牌背 + 剩余张数角标（也是发牌/抽卡动画的起始位）
 var _player_deck_lbl: Label = null
 var _boss_deck_lbl: Label = null
 ## 牌堆是否已播过"抽空溶解"，避免每帧刷新重复触发
@@ -217,63 +156,54 @@ var _table_cards_anim: Array = []
 var _table_anim_pending := false
 ## 出牌动画是否进行中（期间禁止重建桌面，避免打断动画）
 var _table_anim_running := false
+## 非法出牌动画进行中（期间拒绝新的拖拽/出牌）
+var _invalid_anim_running := false
+## 最近一次出牌被拒的原因（_do_play 写入，_drag_drop_play 消费）
+var _invalid_reason := ""
 ## 当前已渲染桌面牌的签名（未变化时 _refresh_table 跳过溶解重建）
 var _table_render_sig := "@init"
 var _dream_materials: Array[ShaderMaterial] = []
 var _dream_time: float = 0.0
 
 ## — 设置 —
-var _pixelate_enabled: bool = true       ## 桌面特效像素化开关
+var _pixelate_enabled: bool = false      ## 桌面特效像素化开关（默认关闭）
 var _card_sort_mode: int = Player.CardSortMode.SAME_RANK  ## 补牌排序模式
-var _manual_hand_order := false  ## 拖拽重排后按数组顺序显示手牌，新一关发牌时复位
 var _settings_dialog: RefCounted = null                 ## 设置弹窗引用（防 GC）
+var _audio: AudioManager = null                         ## 音效管理器（_ready 中创建）
+
+## — 训练模式 —
+var _training := TrainingSession.new()
 
 
-## 检测并应用手机竖屏布局（纯容器布局，无坐标计算）
+## 检测并应用设备适配布局（手机/平板/桌面三档）
 func setup_responsive() -> void:
 	var vs := get_viewport().get_visible_rect().size
-	_is_mobile = vs.x < MOBILE_MAX_WIDTH
-	_calc_mobile_card_sizes(vs)
-	_layout_player_hp()
+	var short_side := minf(vs.x, vs.y)
+	var aspect := vs.x / maxf(vs.y, 1.0)
+	if short_side < MOBILE_MAX_WIDTH and aspect < 1.5:
+		_device_class = DeviceClass.PHONE
+	elif short_side < TABLET_MAX_WIDTH or (vs.x < TABLET_MAX_WIDTH and aspect < 1.5):
+		_device_class = DeviceClass.TABLET
+	else:
+		_device_class = DeviceClass.DESKTOP
+	var compact := _device_class != DeviceClass.DESKTOP
+	_calc_mobile_card_sizes(vs, compact)
 	## 移动端手牌宽度公式允许牌槽重叠；同步收紧 HBox 间距，避免 5 张牌溢出。
 	## 桌面端保留场景中的 14px 间距。
-	var hand_gap := -_mobile_hand_w * 0.15 if _is_mobile else 14.0
+	var hand_gap := -_mobile_hand_w * 0.15 if compact else 14.0
 	_top_hand.add_theme_constant_override("separation", roundi(hand_gap))
 	_bottom_hand.add_theme_constant_override("separation", roundi(hand_gap))
 	## 手牌两行容器高度跟随卡牌尺寸，保证 BottomHand 完全在可视范围内
-	var card_h: float = _mobile_hand_h if _is_mobile else float(HAND_H)
+	var card_h: float = _mobile_hand_h if compact else float(HAND_H)
 	_top_hand.custom_minimum_size = Vector2(0, card_h)
 	_bottom_hand.custom_minimum_size = Vector2(0, card_h)
-	_hand_area.custom_minimum_size = Vector2(0, card_h * 2.0 + INSTANT_ROW_GAP + 12.0)
-	call_deferred("_layout_player_hp")
+	## 手牌区高度 = HandVBox 顶部留白(50) + 两行卡高 + 行距 + 底部留白(4)
+	_hand_area.custom_minimum_size = Vector2(0, card_h * 2.0 + INSTANT_ROW_GAP + 54.0)
 
 
-func _layout_player_hp() -> void:
-	## 等容器完成布局后读取牌堆的全局矩形，避免锚点坐标被误认为顶部坐标。
-	if not is_instance_valid(_player_deck) or not is_instance_valid(_player_hp_bar):
+func _calc_mobile_card_sizes(vs: Vector2, compact: bool) -> void:
+	if not compact:
 		return
-	var hp_size := Vector2(210.0, 20.0)
-	var table_area := $MainVBox/TableArea as Control
-	var deck_rect := _player_deck.get_global_rect()
-	var deck_pos: Vector2 = deck_rect.position - table_area.global_position
-	var hp_pos: Vector2 = deck_pos + Vector2(deck_rect.size.x + 10.0, (deck_rect.size.y - hp_size.y) * 0.5)
-	for node in [_player_hp_bar, _player_hp_text, $MainVBox/TableArea/PlayerDamageDelayBar]:
-		if is_instance_valid(node):
-			node.position = hp_pos
-			node.size = hp_size
-	var boss_delay := $MainVBox/TableArea/BossDamageDelayBar
-	if is_instance_valid(boss_delay) and is_instance_valid(_boss_hp_bar):
-		boss_delay.position = _boss_hp_bar.position
-		boss_delay.size = _boss_hp_bar.size
-
-
-func _set_player_hp_visible(visible: bool) -> void:
-	for node in [_player_hp_bar, _player_hp_text, _boss_hp_bar, _boss_hp_text, _hp_player_lbl, _hp_boss_lbl, $MainVBox/TableArea/PlayerDamageDelayBar, $MainVBox/TableArea/BossDamageDelayBar]:
-		if is_instance_valid(node):
-			node.visible = visible
-
-
-func _calc_mobile_card_sizes(vs: Vector2) -> void:
 	## 5张主力牌铺满90%宽度，牌间有微小重叠
 	var total := vs.x * 0.9
 	_mobile_hand_w = total / 4.4
@@ -303,21 +233,14 @@ func _setup_ui_theme() -> void:
 	$MainVBox/BossZone.add_theme_stylebox_override("panel", flat_border(COL_PANEL, panel_border, 1, 8))
 	_hand_area.add_theme_stylebox_override("panel", flat_border(Color(0.14, 0.13, 0.15, 0.52), panel_border, 1, 8))
 	## 桌面绿毡边框保留，填充透明让涡旋 shader 透出
-	$MainVBox/TableArea.add_theme_stylebox_override("panel", flat_border(Color.TRANSPARENT, COL_GREEN.darkened(0.30), 1, 8))
+	$MainVBox/TableArea.add_theme_stylebox_override(
+		"panel", flat_border(Color.TRANSPARENT, COL_GREEN.darkened(0.30), 1, 8))
 
-	## 信息层级：计分板金色强调（桌面视觉焦点），HP 绿/红双色
+	## 信息层级：计分板金色强调；玩家筹码绿色、BOSS 筹码红色
 	_deck_count_lbl.add_theme_color_override("font_color", COL_TEXT)
 	_table_score_lbl.add_theme_color_override("font_color", COL_GOLD)
-	_hp_player_lbl.add_theme_color_override("font_color", COL_GREEN.lightened(0.25))
-	_hp_boss_lbl.add_theme_color_override("font_color", COL_CRIMSON.lightened(0.15))
-	var hp_bg := flat_border(Color(0.08, 0.08, 0.08, 0.72), Color(0.02, 0.02, 0.02, 0.85), 1, 4)
-	var hp_fill := flat_border(Color(0.82, 0.08, 0.10, 0.95), Color(0.98, 0.22, 0.24, 1.0), 1, 4)
-	_player_hp_bar.add_theme_stylebox_override("background", hp_bg)
-	_player_hp_bar.add_theme_stylebox_override("fill", hp_fill)
-	_boss_hp_bar.add_theme_stylebox_override("background", hp_bg)
-	_boss_hp_bar.add_theme_stylebox_override("fill", hp_fill)
-	_player_hp_text.add_theme_color_override("font_color", Color(0.03, 0.03, 0.03, 1.0))
-	_boss_hp_text.add_theme_color_override("font_color", Color(0.03, 0.03, 0.03, 1.0))
+	_chips_player_lbl.add_theme_color_override("font_color", COL_GREEN.lightened(0.25))
+	_chips_boss_lbl.add_theme_color_override("font_color", COL_CRIMSON.lightened(0.15))
 
 	$GameOver/Center/Box.add_theme_stylebox_override("panel", balatro_panel_style())
 	$GameOver/Center/Box/V/Title.add_theme_color_override("font_color", COL_GOLD)
@@ -373,6 +296,7 @@ func _build_deck_visual(container: Control, deck_size: Vector2 = Vector2(56, 80)
 	lbl.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.85))
 	lbl.add_theme_constant_override("outline_size", 4)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.z_index = 10
 	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	container.add_child(lbl)
 	return lbl
@@ -440,7 +364,7 @@ func _setup_ambiance() -> void:
 	add_child(vortex)
 	move_child(vortex, 0)
 
-	## 手牌区只增加半透明蒙版，不再创建独立背景，保持全屏背景连续。
+	## 手牌区只增加半透明蒙版，保持全屏背景连续。
 	var hand_mask := ColorRect.new()
 	hand_mask.color = Color(0.03, 0.04, 0.08, 0.50)
 	hand_mask.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -461,15 +385,17 @@ func _make_vortex_bg() -> ColorRect:
 	mat.set_shader_parameter("spin_time", 0.0)
 	_dream_materials.append(mat)
 	rect.material = mat
+	## 创建时立即按当前设置写入像素化参数，避免开局前的首帧沿用 shader 默认值
+	_apply_pixelation()
 	return rect
 
 
 func _update_dream_speed() -> void:
-	if _campaign == null or _campaign.config == null:
+	if _state.human == null:
 		return
-	var player_ratio := clampf(float(_human_hp) / float(_campaign.config.player_max_hp), 0.0, 1.0)
-	var boss_ratio := clampf(float(_ai_hp) / float(_campaign.config.boss_max_hp), 0.0, 1.0)
-	var danger := 1.0 - minf(player_ratio, boss_ratio)
+	## 负筹码越多（负债越深），背景涡旋越快、对比越强
+	var debt := maxi(0, -_state.human.chips)
+	var danger := clampf(float(debt) / 500.0, 0.0, 1.0)
 	var sp := 0.25 + danger * 0.8
 	var ct := 3.5 + danger * 2.5
 	for mat in _dream_materials:
@@ -486,9 +412,35 @@ func _apply_pixelation() -> void:
 			mat.set_shader_parameter("pixel_size_fac", psf)
 			mat.set_shader_parameter("quantize_mix", qm)
 
+## 公共接口：开关像素化效果（供 SettingsDialog 调用）
+func set_pixelation(enabled: bool) -> void:
+	_pixelate_enabled = enabled
+	_apply_pixelation()
+
+## 公共接口：读取像素化开关状态
+func is_pixelation_enabled() -> bool:
+	return _pixelate_enabled
+
 
 func _hand_area_center() -> Vector2:
 	return _bottom_hand.global_position + _bottom_hand.size * 0.5
+
+
+## 按“稳定手牌索引”取牌：普通区在前、立刻补区在后（与点击/拖拽索引口径一致）
+func _hand_card_at(index: int) -> Card:
+	if index < 0:
+		return null
+	if index < _state.human.normal_hand.size():
+		return _state.human.normal_hand[index]
+	var ji := index - _state.human.normal_hand.size()
+	return _state.human.instant_hand[ji] if ji < _state.human.instant_hand.size() else null
+
+
+## 清空容器：先脱离父节点再释放，避免布局与动画残留
+func _clear_children(container: Node) -> void:
+	for child in container.get_children():
+		container.remove_child(child)
+		child.queue_free()
 
 
 func _boss_area_center() -> Vector2:
@@ -496,19 +448,21 @@ func _boss_area_center() -> Vector2:
 
 
 ## 根据 AI 实际打出的牌属于哪个手牌区（normal/instant），选对的 HBox 中心
-func _boss_src_center(cards: Array) -> Vector2:
+func _boss_src_center(cards: Array[Card]) -> Vector2:
 	if cards.is_empty():
 		return _boss_area_center()
 	var first_card: Card = cards[0]
-	var found_instant := _boss_hand_instant.get_child_count() > 0 and first_card in _ai.instant_hand
+	var found_instant := _boss_hand_instant.get_child_count() > 0 and first_card in _state.ai.instant_hand
 	var src_row: HBoxContainer = _boss_hand_instant if found_instant else _boss_hand
 	return src_row.global_position + src_row.size * 0.5
 
 
 func _face(card: Card) -> Control:
 	var table_size := Vector2(TABLE_CARD_W, TABLE_CARD_H)
-	if _is_mobile:
-		var visual := CardVisual.new(Vector2(minf(_mobile_card_w * 1.12, TABLE_CARD_W), minf(_mobile_card_h * 1.12, TABLE_CARD_H)))
+	if _device_class != DeviceClass.DESKTOP:
+		var visual := CardVisual.new(Vector2(
+			minf(_mobile_card_w * 1.12, TABLE_CARD_W),
+			minf(_mobile_card_h * 1.12, TABLE_CARD_H)))
 		visual.show_texture(CardVisual.texture_for_id(card.id))
 		visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		visual.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -524,12 +478,13 @@ func _face(card: Card) -> Control:
 
 ## 手牌卡（点击选中 / 假3D 悬停 / 拖拽）
 func _hand_card(card: Card, index: int, selected: bool, card_size: Vector2 = Vector2.ZERO) -> CardVisual:
-	var w: float = card_size.x if card_size.x > 0 else (_mobile_hand_w if _is_mobile else HAND_W)
-	var h: float = card_size.y if card_size.y > 0 else (_mobile_hand_h if _is_mobile else HAND_H)
+	var w: float = card_size.x if card_size.x > 0 else (_mobile_hand_w if _device_class != DeviceClass.DESKTOP else HAND_W)
+	var h: float = card_size.y if card_size.y > 0 else (_mobile_hand_h if _device_class != DeviceClass.DESKTOP else HAND_H)
 	var visual := CardVisual.new(Vector2(w, h))
 	visual.pivot_offset = Vector2(w * 0.5, h * 0.5)
 	visual.show_texture(CardVisual.texture_for_id(card.id))
 	visual.enable_fake3d(true)
+	visual.tooltip_text = "%s%s" % [card.point, (" " + card.suit) if not card.suit.is_empty() else ""]
 	## z_index / base_z / scale / selected 由 _render_hand_block 统一写入，不在此处预设
 	visual.mouse_entered.connect(func():
 		visual.set_meta("_hovered", true)
@@ -552,7 +507,7 @@ func _hand_card(card: Card, index: int, selected: bool, card_size: Vector2 = Vec
 
 ## 悬停弹性缩放：弹性缓动制造回弹（Demo 悬停 to_scale(1.2) 的手感来源）
 func _hover_scale_to(v: CardVisual, target: Vector2) -> void:
-	var old = v.get_meta("_hover_tween", null)
+	var old: Variant = v.get_meta("_hover_tween", false)
 	if old is Tween and (old as Tween).is_valid():
 		(old as Tween).kill()
 	var tw := v.create_tween()
@@ -580,49 +535,32 @@ func _tilt_visual(visual: CardVisual) -> void:
 
 func _on_gui(index: int, event: InputEvent, visual: CardVisual) -> void:
 	if event is InputEventMouseMotion:
-		if not _drag_pending and not _dragging:
+		if _drag_first_index < 0 and not _dragging:
 			_tilt_visual(visual)
 	elif event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT and not _dragging and not _drag_pending:
+			and event.button_index == MOUSE_BUTTON_LEFT and not _dragging and _drag_first_index < 0:
+		if _state.finished or _invalid_anim_running or not is_instance_valid(_state.round) or _state.round.whose_turn() != _state.human:
+			return
 		## 与 3D tilt 共用内圈判断：外层 12% 不响应点击
 		var local: Vector2 = visual.get_local_mouse_position()
 		var sx: float = visual.size.x
 		var sy: float = visual.size.y
 		if local.x < sx * 0.12 or local.x > sx * 0.88 or local.y < sy * 0.12 or local.y > sy * 0.88:
 			return
-		_drag_pending = true
 		_drag_press_pos = get_global_mouse_position()
 		_drag_first_index = index
 
 
+## 面板/按钮样式统一由 UIStyle 实现，此处仅保留薄委托以维持既有调用点
 func flat_border(bg_c: Color, border_c: Color, bw: int = 2, radius: int = 6,
-		shadow_c: Color = Color(0, 0, 0, 0), shadow_size: int = 0, shadow_off: int = 0, content_top: int = 0) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg_c
-	sb.border_color = border_c
-	sb.set_border_width_all(bw)
-	sb.set_corner_radius_all(radius)
-	if shadow_size > 0:
-		sb.shadow_color = shadow_c
-		sb.shadow_size = shadow_size
-		sb.shadow_offset = Vector2(0, shadow_off)
-	if content_top != 0:
-		sb.content_margin_top = content_top
-	return sb
+		shadow_c: Color = Color(0, 0, 0, 0), shadow_size: int = 0,
+		shadow_off: int = 0, content_top: int = 0) -> StyleBoxFlat:
+	return UIStyle.flat_border(bg_c, border_c, bw, radius, shadow_c, shadow_size, shadow_off, content_top)
 
 
-func style_button_balatro(btn: Button, bg: Color, text_col: Color = Color(0.95, 0.95, 0.93)) -> void:
-	var shadow_c := Color(0.0, 0.0, 0.0, 0.55)
-	var border_c := bg.darkened(0.18)
-	btn.add_theme_stylebox_override("normal", flat_border(bg, border_c, 1, 6, shadow_c, 4, 4, 2))
-	btn.add_theme_stylebox_override("hover", flat_border(bg.lightened(0.08), border_c.lightened(0.05), 1, 6, shadow_c, 5, 4, 2))
-	btn.add_theme_stylebox_override("pressed", flat_border(bg.darkened(0.12), border_c.darkened(0.08), 1, 6, shadow_c, 1, 1, 6))
-	btn.add_theme_stylebox_override("disabled", flat_border(Color(0.18, 0.18, 0.19), Color(0.22, 0.22, 0.23), 1, 6))
-	btn.add_theme_stylebox_override("focus", flat_border(Color(0, 0, 0, 0), Color(0.35, 0.35, 0.38), 1, 6))
-	btn.add_theme_color_override("font_color", text_col)
-	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.97))
-	btn.add_theme_color_override("font_pressed_color", text_col.darkened(0.12))
-	btn.add_theme_color_override("font_disabled_color", Color(0.45, 0.44, 0.43))
+func style_button_balatro(btn: Button, bg: Color,
+		text_col: Color = Color(0.95, 0.95, 0.93)) -> void:
+	UIStyle.style_button(btn, bg, text_col)
 
 
 func balatro_panel_style() -> StyleBoxFlat:

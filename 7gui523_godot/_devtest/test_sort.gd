@@ -153,7 +153,7 @@ static func _test_xpos_spread() -> void:
 	const CW := 100.0
 	const W := 600.0
 
-	## 同 rank 间距均匀一致，不再按点数分组
+	## 同 rank 间距均匀一致
 	var same_rank := [
 		U.card("7", "方块"),
 		U.card("7", "梅花"),
@@ -198,7 +198,7 @@ static func _test_xpos_spread() -> void:
 # ═══════════════════════════════════════════════════════════════
 
 static func _test_normal_by_pos() -> void:
-	## 验证 normal_by_pos 是原手牌下标的一个排列，且排序后的 x 单调递增
+	## 验证 normal_by_pos 是手牌下标的一个排列，且排序后的 x 单调递增
 	var hand := [
 		U.card("K", "黑桃"),   # idx 0, rank 8
 		U.card("7", "方块"),   # idx 1, rank 15
@@ -207,7 +207,7 @@ static func _test_normal_by_pos() -> void:
 	]
 	var bp := Card.sorted_order(hand)
 	# 排序结果: 7方块(1) > A红桃(2) > K黑桃(0) > 4梅花(3)
-	U.eq(bp, [1, 2, 0, 3], "sorted_order=[7,A,K,4]的原始下标")
+	U.eq(bp, [1, 2, 0, 3], "sorted_order=[7,A,K,4]的下标")
 
 	const CW := 100.0
 	var xp := _compute_xpos(hand, CW, 600.0)
@@ -219,9 +219,9 @@ static func _test_normal_by_pos() -> void:
 	U.ok(x_sorted[1] < x_sorted[2], "x 排序后递增 1→2")
 	U.ok(x_sorted[2] < x_sorted[3], "x 排序后递增 2→3")
 
-	## 验证 xp 按原始下标正确：原下标 1(7) 最左
-	U.ok(xp[1] < xp[2], "7(原idx1) 在 A(原idx2) 左边")
-	U.ok(xp[2] < xp[0], "A(原idx2) 在 K(原idx0) 左边")
+	## 验证 xp 按下标正确：下标 1(7) 最左
+	U.ok(xp[1] < xp[2], "7(idx1) 在 A(idx2) 左边")
+	U.ok(xp[2] < xp[0], "A(idx2) 在 K(idx0) 左边")
 
 
 # ═══════════════════════════════════════════════════════════════

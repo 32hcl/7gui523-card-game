@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://da4v580pey7c"
-path="res://.godot/imported/corner_gold.svg-6f377aa6ffb305ee55ca3210b5ef791b.ctex"
+path="res://.godot/imported/corner_gold.svg-12a8ea001d4620c1bd9f05c88eec9477.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/ui/corner_gold.svg"
-dest_files=["res://.godot/imported/corner_gold.svg-6f377aa6ffb305ee55ca3210b5ef791b.ctex"]
+source_file="res://_devtest/ui/corner_gold.svg"
+dest_files=["res://.godot/imported/corner_gold.svg-12a8ea001d4620c1bd9f05c88eec9477.ctex"]
 
 [params]
 

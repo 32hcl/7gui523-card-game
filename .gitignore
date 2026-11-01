@@ -24,3 +24,9 @@ tests/
 
 # User notes
 7gui523_godot/PROJECT_NOTES.txt
+
+# Python cache
+__pycache__/
+
+# Training intermediate artifacts
+7gui523_godot/_devtest/ai_training/ai2_weights.json

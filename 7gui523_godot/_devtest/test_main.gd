@@ -18,6 +18,8 @@ const TestDeckPlayer := preload("res://_devtest/test_deck_player.gd")
 const TestAIRound := preload("res://_devtest/test_ai_round.gd")
 const TestCampaign := preload("res://_devtest/test_campaign.gd")
 const TestSort := preload("res://_devtest/test_sort.gd")
+const TestChips := preload("res://_devtest/test_chips.gd")
+const TestIntegration := preload("res://_devtest/test_integration.gd")
 
 
 func _init() -> void:
@@ -42,9 +44,12 @@ static func _run() -> int:
 	failed += TestCampaign._run()
 	print("──── 调用 test_sort.gd ────")
 	failed += TestSort._run()
+	print("──── 调用 test_chips.gd ────")
+	failed += TestChips._run()
+	print("──── 调用 test_integration.gd ────")
+	failed += TestIntegration._run()
 
 	print("")
 	print("汇总 Result: %s failed" % failed)
 	print("=".repeat(60))
 	return failed
-	

@@ -19,10 +19,44 @@ class PlayerData extends RefCounted:
 	var instant_hand: Array[Card] = []  ## 立刻补区手牌（上限见 GameConfig.INSTANT_MAX）
 	var card_sort_mode: int = CardSortMode.SAME_RANK  ## 补牌排序模式
 
-	## 兼容旧规则引擎：name / is_human / ai_level
+	## 身份标识
 	var name: String = "32%Hcl"
 	var is_human := false
 	var ai_level := 0
+
+	## ── 筹码（HP / 得分 / 筹码已统一，1:1） ─────────────────
+	## 允许为负：负数就是负债，不单独标记 debt / bankrupt。
+	var chips: int = GameConfig.INITIAL_CHIPS
+
+	## 新关卡：用战役里的筹码重置本局筹码
+	func reset_battle_chips(amount: int) -> void:
+		chips = amount
+
+	## 往桌面下注：直接扣筹码，允许扣成负数（负数即负债）
+	func pay_stake(amount: int) -> void:
+		if amount > 0:
+			chips -= amount
+
+	## 当前负债额（筹码为负时取绝对值，否则 0）
+	func debt_amount() -> int:
+		return maxi(0, -chips)
+
+	## 双倍偿还指定负债；筹码不够时返回 false，且不继续扣成更多负债。
+	## “不可以借钱还贷”：付不起就停在这里，由 Round 记录结算失败。
+	func pay_debt(debt: int) -> bool:
+		if debt <= 0:
+			return true
+		var need := debt * GameConfig.DEBT_REPAY_MULTIPLIER
+		if chips >= need:
+			chips -= need
+			return true
+		# 付不起：不借新债补旧债，余额保持，直接记结算失败
+		return false
+
+	## 赢家收走桌面筹码
+	func receive_chips(amount: int) -> void:
+		if amount > 0:
+			chips += amount
 
 	## 合并手牌填入提供的数组（避免每次访问分配新数组）
 	func collect_hand_into(out: Array[Card]) -> void:
@@ -49,12 +83,6 @@ class PlayerData extends RefCounted:
 		return max_mark + 1
 
 
-	## 普通区补牌：从牌堆抽至 5 张（上限）
-	## 已下沉 → Deck.DeckManager.fill_player_normal(player)
-
-	## 立刻补区补牌：从牌堆抽至 2 张（上限）
-	## 已下沉 → Deck.DeckManager.fill_player_instant(player)
-
 	## 按 point + suit 精确匹配移除出牌（普通区优先，缺了再去立刻补区删）
 	## 规则层 process_play 出牌可能来自两个区，需双向删除
 	func remove_cards_from_hand(cards_to_remove: Array[Card]) -> void:
@@ -71,6 +99,23 @@ class PlayerData extends RefCounted:
 				if instant_hand[i].point == card.point and instant_hand[i].suit == card.suit:
 					instant_hand.remove_at(i)
 					break
+
+
+	## 统计本手牌中有多少张取自立刻补区
+	## 与 remove_cards_from_hand 一致：普通区优先匹配，匹配不到才算立刻补区
+	func count_instant_in_play(cards_to_play: Array[Card]) -> int:
+		var normal_keys: Array[String] = []
+		for c in normal_hand:
+			normal_keys.append(c.point + "|" + c.suit)
+		var used_instant := 0
+		for card in cards_to_play:
+			var key: String = card.point + "|" + card.suit
+			var idx: int = normal_keys.find(key)
+			if idx >= 0:
+				normal_keys.remove_at(idx)
+			else:
+				used_instant += 1
+		return used_instant
 
 
 	## 手牌排序：等级降序，同级花色升序

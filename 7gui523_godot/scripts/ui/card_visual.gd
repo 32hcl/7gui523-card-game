@@ -47,7 +47,7 @@ var _layout_tween: Tween = null  ## 布局/进出场动画槽位（由上层的�
 var base_z := 0                 ## 覆盖层级基准（由上层布局写入，hover 退出时恢复，保证重叠命中稳定）
 
 
-## 杀掉上层重排遗留的布局动画（不依赖 Node.kill_tweens/get_tweens，全版本兼容）
+## 杀掉上层重排遗留的布局动画
 func kill_layout_tween() -> void:
 	if _layout_tween and _layout_tween.is_valid():
 		_layout_tween.kill()
@@ -167,7 +167,6 @@ func enable_fake3d(with_shadow: bool = true) -> void:
 
 
 ## 切换选中态（上浮/放大由布局处理；这里负责阴影金色高亮 + 牌面流光闪光）
-## 不再绘制金框描边
 func set_selected(selected: bool) -> void:
 	set_flash(selected)
 	set_shadow_alpha(SHADOW_ALPHA_SEL if selected else SHADOW_ALPHA)
@@ -189,7 +188,6 @@ func set_flash(enabled: bool) -> void:
 ## 溶解消失：燃烧边框式（dissolve_value 1→0），结束时自动 queue_free
 ## 返回 Tween，调用方可 await 等待溶解完成
 func dissolve(duration: float = 0.5) -> Tween:
-	## 杀旧 tween，避免 _rot_tween/_layout_tween 持有已替换的材质引用
 	if _rot_tween and _rot_tween.is_valid():
 		_rot_tween.kill()
 		_rot_tween = null
@@ -204,7 +202,7 @@ func dissolve(duration: float = 0.5) -> Tween:
 	mat.set_shader_parameter("burn_border_size", 0.05)
 	mat.set_shader_parameter("burn_color", Color(1.0, 0.3, 0.0, 0.78))
 	_tex.material = mat
-	## 材质已替换，伪3D/选中态一并收尾
+	## 材质已切换，伪3D/选中态一并收尾
 	_fake3d = false
 	if _shadow_tex:
 		var stw := create_tween()
@@ -236,7 +234,7 @@ static func _get_dissolve_noise() -> ImageTexture:
 
 
 
-## 设置假 3D 旋转（x_rot 上下翻仰、y_rot 左右转），0,0 即平铺原样
+## 设置假 3D 旋转（x_rot 上下翻仰、y_rot 左右转），0,0 即平铺
 ## 同步应用到阴影层，保持透视一致
 ## 即时跳变；需要平滑/弹性过渡请用 to_rot()
 func set_fake3d_rot(x: float, y: float) -> void:

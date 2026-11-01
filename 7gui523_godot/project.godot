@@ -16,6 +16,10 @@ config/version="1.0.0"
 run/main_scene="res://scenes/play/play.tscn"
 config/features=PackedStringArray("4.7")
 
+[autoload]
+
+AudioSrv="*res://global/audio_manager.gd"
+
 [display]
 
 window/size/viewport_width=680

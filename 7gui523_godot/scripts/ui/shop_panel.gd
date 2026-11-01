@@ -27,7 +27,6 @@ signal next_level_requested
 @onready var _next_btn: Button = %NextLevelBtn
 
 var _chips: int = 0
-var _disabled := false
 
 
 func _ready() -> void:
@@ -43,14 +42,14 @@ func _ready() -> void:
 
 
 func _apply_theme() -> void:
-	_panel_bg.add_theme_stylebox_override("panel", _flat_style(
+	_panel_bg.add_theme_stylebox_override("panel", UIStyle.flat_border(
 		Color(0.105, 0.12, 0.17, 0.99), Color(PlayBase.COL_ACCENT.lightened(0.18), 0.9), 2, 14,
 		Color(0, 0, 0, 0.72), 24, 8))
 
-	_style_btn(_refresh_btn, PlayBase.COL_ACCENT, Color(0.95, 0.95, 0.93))
-	_style_btn(_close_btn, PlayBase.COL_PANEL, Color(0.88, 0.86, 0.83))
-	_style_btn(_close_bottom_btn, PlayBase.COL_CRIMSON.darkened(0.55), Color(0.95, 0.90, 0.88))
-	_style_btn(_next_btn, PlayBase.COL_CRIMSON, Color(0.95, 0.90, 0.88))
+	UIStyle.style_button(_refresh_btn, PlayBase.COL_ACCENT, Color(0.95, 0.95, 0.93))
+	UIStyle.style_button(_close_btn, PlayBase.COL_PANEL, Color(0.88, 0.86, 0.83))
+	UIStyle.style_button(_close_bottom_btn, PlayBase.COL_CRIMSON.darkened(0.55), Color(0.95, 0.90, 0.88))
+	UIStyle.style_button(_next_btn, PlayBase.COL_CRIMSON, Color(0.95, 0.90, 0.88))
 
 	_style_header(%FixedHeader, PlayBase.COL_GOLD)
 	_style_header(_enchant_header, PlayBase.COL_GOLD)
@@ -75,7 +74,7 @@ func _adjust_for_mobile() -> void:
 ## ═══════════════════════════════════════════════════════════════
 
 func populate(fixed: Array[Shop.ShopItem], refreshable: Array[Shop.ShopItem],
-		enchant_items: Array, chips: int, enchant_unlocked: bool, level_spent: int,
+		enchant_items: Array[Enchant.EnchantItem], chips: int, enchant_unlocked: bool, level_spent: int,
 		unlock_threshold: int) -> void:
 	_chips = chips
 	_chips_lbl.text = "💰 %d" % chips
@@ -109,12 +108,7 @@ func populate(fixed: Array[Shop.ShopItem], refreshable: Array[Shop.ShopItem],
 		for i in enchant_items.size():
 			_enchant_box.add_child(_make_enchant_row(enchant_items[i], i, chips))
 
-	_refresh_btn.disabled = (_disabled or refreshable.is_empty())
-
-
-func set_disabled(v: bool) -> void:
-	_disabled = v
-	_refresh_btn.disabled = v
+	_refresh_btn.disabled = refreshable.is_empty()
 
 
 ## ═══════════════════════════════════════════════════════════════
@@ -151,7 +145,7 @@ func _make_row(it: Shop.ShopItem, chips: int) -> Control:
 	btn.text = "💰%d" % it.price
 	btn.disabled = (it.stock == 0) or (chips < it.price)
 	btn.custom_minimum_size = Vector2(82, 38)
-	_style_btn(btn, PlayBase.COL_GREEN, Color(0.95, 0.95, 0.93))
+	UIStyle.style_button(btn, PlayBase.COL_GREEN, Color(0.95, 0.95, 0.93))
 	var t := it
 	btn.pressed.connect(func(): item_buy_requested.emit(t))
 	row.add_child(btn)
@@ -159,7 +153,7 @@ func _make_row(it: Shop.ShopItem, chips: int) -> Control:
 	return row
 
 
-func _make_enchant_row(ei, index: int, chips: int) -> Control:
+func _make_enchant_row(ei: Enchant.EnchantItem, index: int, chips: int) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	row.custom_minimum_size = Vector2(0, 48)
@@ -183,7 +177,7 @@ func _make_enchant_row(ei, index: int, chips: int) -> Control:
 	btn.text = ei.display_price()
 	btn.disabled = ei.sold_out or chips < ei.enchant.cost_chips
 	btn.custom_minimum_size = Vector2(96, 38)
-	_style_btn(btn, PlayBase.COL_ACCENT, Color(0.95, 0.95, 0.93))
+	UIStyle.style_button(btn, PlayBase.COL_ACCENT, Color(0.95, 0.95, 0.93))
 	var idx := index
 	btn.pressed.connect(func(): enchant_buy_requested.emit(idx))
 	row.add_child(btn)
@@ -194,35 +188,6 @@ func _make_enchant_row(ei, index: int, chips: int) -> Control:
 ## ═══════════════════════════════════════════════════════════════
 ## 样式工具
 ## ═══════════════════════════════════════════════════════════════
-
-func _style_btn(btn: Button, bg: Color, text_col: Color) -> void:
-	var shadow_c := Color(0.0, 0.0, 0.0, 0.55)
-	var border_c := bg.darkened(0.18)
-	btn.add_theme_stylebox_override("normal", _flat_style(bg, border_c, 1, 6, shadow_c, 4, 4, 2))
-	btn.add_theme_stylebox_override("hover", _flat_style(bg.lightened(0.08), border_c.lightened(0.05), 1, 6, shadow_c, 5, 4, 2))
-	btn.add_theme_stylebox_override("pressed", _flat_style(bg.darkened(0.12), border_c.darkened(0.08), 1, 6, shadow_c, 1, 1, 6))
-	btn.add_theme_stylebox_override("disabled", _flat_style(Color(0.18, 0.18, 0.19), Color(0.22, 0.22, 0.23), 1, 6))
-	btn.add_theme_color_override("font_color", text_col)
-	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.97))
-	btn.add_theme_color_override("font_pressed_color", text_col.darkened(0.12))
-	btn.add_theme_color_override("font_disabled_color", Color(0.45, 0.44, 0.43))
-
-
-func _flat_style(bg_c: Color, border_c: Color, bw: int = 2, radius: int = 6,
-		shadow_c: Color = Color(0, 0, 0, 0), shadow_size: int = 0, shadow_off: int = 0, content_top: int = 0) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg_c
-	sb.border_color = border_c
-	sb.set_border_width_all(bw)
-	sb.set_corner_radius_all(radius)
-	if shadow_size > 0:
-		sb.shadow_color = shadow_c
-		sb.shadow_size = shadow_size
-		sb.shadow_offset = Vector2(0, shadow_off)
-	if content_top != 0:
-		sb.content_margin_top = content_top
-	return sb
-
 
 func _style_header(lbl: Label, c: Color) -> void:
 	lbl.add_theme_color_override("font_color", c)

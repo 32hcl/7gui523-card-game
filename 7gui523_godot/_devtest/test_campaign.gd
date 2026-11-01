@@ -6,37 +6,58 @@ const U := preload("res://_devtest/test_util.gd")
 static func _run() -> int:
 	var failed := 0
 	print("============================================================")
-	print("  Campaign 门票 / 最终挑战测试 — test_campaign.gd")
+	print("  Campaign 门票 / 筹码 / 破产测试 — test_campaign.gd")
 	print("============================================================")
 
 	failed += U.section("金币门票与筹码独立", func():
 		var campaign := Campaign.new()
-		campaign.player_chips = 50
+		campaign.player_chips = 500
 		var before_dollars := campaign.dollar
 		U.ok(not campaign.has_purchased_entry, "初始没有入园资格")
 		U.ok(campaign.purchase_entry_ticket(), "金币足够时可以购买门票")
 		U.eq(campaign.dollar, before_dollars - Campaign.ENTRY_TICKET_DOLLARS, "购买门票只扣金币")
-		U.eq(campaign.player_chips, 50, "购买门票不扣筹码")
+		U.eq(campaign.player_chips, 500, "购买门票不扣筹码")
 		U.ok(campaign.has_purchased_entry, "购买后获得入园资格")
 	)
 
 	failed += U.section("第9关不可通关", func():
 		var campaign := Campaign.new()
 		campaign.start_level(9)
-		var result := campaign.finish_level(true, 0, 0)
+		var result := campaign.finish_level(true)
 		U.ok(not result.player_won, "第9关不接受玩家胜利")
 		U.ok(not result.boss_cleared, "第9关不标记Boss被击败")
 		U.eq(campaign.cleared_level, 0, "最终挑战不推进通关进度")
 	)
 
-	failed += U.section("新战役重置门票资格", func():
+	failed += U.section("新战役重置门票与筹码", func():
 		var campaign := Campaign.new()
 		campaign.purchase_entry_ticket()
 		campaign.player_chips = 3
 		campaign.start_new()
-		U.eq(campaign.player_chips, 50, "新战役恢复初始筹码")
+		U.eq(campaign.player_chips, GameConfig.INITIAL_CHIPS, "新战役恢复初始筹码")
+		U.eq(campaign.boss_chips, GameConfig.BOSS_INITIAL_CHIPS, "新战役恢复 BOSS 筹码")
 		U.eq(campaign.dollar, Campaign.INITIAL_DOLLARS, "新战役恢复初始金币")
 		U.ok(not campaign.has_purchased_entry, "新战役必须重新购买门票")
+		U.ok(not campaign.is_game_over(), "新战役未破产")
+	)
+
+	failed += U.section("负筹码即负债/结束", func():
+		var campaign := Campaign.new()
+		campaign.player_chips = -1
+		U.ok(campaign.is_game_over(), "负筹码 → is_game_over")
+		var result := campaign.finish_level(true)
+		U.ok(not result.player_won, "还不起时即使 player_won 也不胜利")
+		U.eq(result.chips_after, -1, "筹码保持负数")
+	)
+
+	failed += U.section("过关发放奖励筹码", func():
+		var campaign := Campaign.new()
+		campaign.start_level(1)
+		var before := campaign.player_chips
+		var result := campaign.finish_level(true)
+		U.ok(result.player_won, "第1关可以胜利")
+		U.eq(result.chips_delta, Campaign.get_level_reward_chips(1), "奖励筹码正确")
+		U.eq(campaign.player_chips, before + result.chips_delta, "筹码已入账")
 	)
 
 	return U.finish(failed, "Campaign")

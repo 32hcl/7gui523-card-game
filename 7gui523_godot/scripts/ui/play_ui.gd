@@ -12,7 +12,7 @@ var _shop_panel: Control = null
 
 ## 由 play.gd 实现的关卡推进钩子。
 func _on_next_level() -> void:
-	pass
+	push_error("_on_next_level() must be overridden by subclass")
 
 
 func _show_shop_panel() -> void:
@@ -39,41 +39,36 @@ func _refresh_shop_panel() -> void:
 	if not _shop_panel or not _shop_panel.visible:
 		return
 	_shop_panel.populate(
-		_shop.get_fixed_items(),
-		_shop.get_refreshable_items(),
-		_shop.enchant_items,
-		_campaign.player_chips,
-		_shop.can_enter_enchant_shop(),
-		_shop.level_spent_chips,
-		_shop.get_enchant_unlock_threshold(),
+		_state.shop.get_fixed_items(),
+		_state.shop.get_refreshable_items(),
+		_state.shop.enchant_items,
+		_state.campaign.player_chips,
+		_state.shop.can_enter_enchant_shop(),
+		_state.shop.level_spent_chips,
+		_state.shop.get_enchant_unlock_threshold(),
 	)
 
 
 func _on_buy_item(item: Shop.ShopItem) -> void:
-	var res: Shop.PurchaseResult = _shop.buy(item, _campaign.player_chips, _campaign.player_hp, _campaign.config.player_max_hp)
+	var res: Shop.PurchaseResult = _state.shop.buy(item, _state.campaign.player_chips)
 	if not res.success:
 		_refresh_shop_panel()
 		return
 
-	_campaign.player_chips -= item.price
+	_state.campaign.player_chips -= item.price
 
-	if res.hp_healed > 0:
-		_campaign.player_hp = mini(_campaign.player_hp + res.hp_healed, _campaign.config.player_max_hp)
-		_human_hp = _campaign.player_hp
-	elif res.card != null:
-		res.card.copy_mark = _human.next_copy_mark(res.card.id)
+	if res.card != null:
+		res.card.copy_mark = _state.human.next_copy_mark(res.card.id)
 		match res.dest:
 			Shop.CardDest.TO_HAND:
-				if _human.normal_hand.size() < GameConfig.NORMAL_MAX:
-					_human.normal_hand.append(res.card)
-				else:
-					_human_deck.add_to_hidden(res.card)
+				## 留到下关开牌时进入手牌；当前关的手牌会在下关重建
+				_state.campaign.pending_hand_cards.append(res.card)
 			Shop.CardDest.TO_PLAY_DECK:
-				_human_deck.add_to_hidden(res.card)
+				_state.human_deck.add_to_hidden(res.card)
 			Shop.CardDest.TO_HIDDEN:
-				_human_deck.add_to_hidden(res.card)
+				_state.human_deck.add_to_hidden(res.card)
 			_:
-				_human_deck.add_to_hidden(res.card)
+				_state.human_deck.add_to_hidden(res.card)
 
 	_refresh_shop_panel()
 	_refresh_top()
@@ -81,12 +76,12 @@ func _on_buy_item(item: Shop.ShopItem) -> void:
 
 func _on_buy_enchant(index: int) -> void:
 	var target: Card = null
-	for c in _human.normal_hand:
+	for c in _state.human.normal_hand:
 		if c.is_joker():
 			target = c
 			break
 	if target == null:
-		for id in _human_deck.cards:
+		for id in _state.human_deck.cards:
 			var c := Card.from_id(id)
 			if c.is_joker():
 				target = c
@@ -94,20 +89,20 @@ func _on_buy_enchant(index: int) -> void:
 	if target == null:
 		return
 
-	var res: Enchant.EnchantPurchaseResult = _shop.enchant_buy(index, _campaign.player_chips, target)
+	var res: Enchant.EnchantPurchaseResult = _state.shop.enchant_buy(index, _state.campaign.player_chips, target)
 	if not res.success:
 		_refresh_shop_panel()
 		return
 
-	_campaign.player_chips -= res.enchant.cost_chips
+	_state.campaign.player_chips -= res.enchant.cost_chips
 	_refresh_shop_panel()
 	_refresh_top()
 
 
 func _on_shop_refresh() -> void:
-	if _campaign.player_chips < Shop.REFRESH_COST:
+	if _state.campaign.player_chips < Shop.REFRESH_COST:
 		return
-	_campaign.player_chips -= Shop.REFRESH_COST
-	_shop.refresh()
+	_state.campaign.player_chips -= Shop.REFRESH_COST
+	_state.shop.refresh()
 	_refresh_shop_panel()
 	_refresh_top()

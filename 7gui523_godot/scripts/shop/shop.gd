@@ -4,7 +4,7 @@ extends RefCounted
 # ═══════════════════════════════════════════════════════════════
 # Shop — 商店系统
 #
-# 一级商店：回复药水 / 卡牌（_card(point,...) 数据拼装，非枚举硬编码）
+# 一级商店：卡牌（_card(point,...) 数据拼装，非枚举硬编码）
 #   buy(item: ShopItem) 按引用定位商品，精确匹配（修了同 point 多区的购买 bug）
 #   不可刷新区 — 回复 + TO_HAND（每关结束自动补货）
 #   可刷新区   — TO_PLAY_DECK / TO_HIDDEN（花筹码手动刷新）
@@ -21,7 +21,7 @@ extends RefCounted
 
 enum Section { FIXED, REFRESHABLE }
 
-enum ItemType { HEAL_SMALL, HEAL_LARGE, CARD }
+enum ItemType { CARD }
 
 enum CardDest {
 	TO_HAND,
@@ -52,7 +52,6 @@ class PurchaseResult:
 	var message: String = ""
 	var card: Card = null
 	var dest: CardDest = CardDest.TO_PLAY_DECK
-	var hp_healed := 0
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -91,8 +90,7 @@ func reset_stock() -> void:
 	current_level = 1
 	items = [
 		# ═══════ 不可刷新区 ═══════
-		_heal(ItemType.HEAL_SMALL, "小回复药水", "回复 20 HP", 25),
-		_heal(ItemType.HEAL_LARGE, "大回复药水", "回复 50 HP", 60),
+		# 回复药水已随 HP 系统移除；这里只保留卡牌。
 
 		# TO_HAND
 		_card("5",  "5点牌",  "伤害 5HP",      40, 2, CardDest.TO_HAND,       Section.FIXED),
@@ -119,15 +117,8 @@ func reset_stock() -> void:
 	]
 
 
-func _heal(type: ItemType, name: String, desc: String, price: int) -> ShopItem:
-	var it := ShopItem.new()
-	it.type = type; it.name = name; it.desc = desc
-	it.price = price; it.stock = -1; it.max_stock = -1
-	it.section = Section.FIXED
-	return it
-
-
-func _card(point: String, name: String, desc: String, price: int, stock: int, dest: CardDest, section: Section) -> ShopItem:
+func _card(point: String, name: String, desc: String, price: int, stock: int,
+		dest: CardDest, section: Section) -> ShopItem:
 	var it := ShopItem.new()
 	it.type = ItemType.CARD; it.card_point = point
 	it.name = name; it.desc = desc
@@ -154,7 +145,7 @@ func refresh() -> void:
 # 一级商店 — 购买（item: ShopItem 引用传递，价格/点数直接从 item 读取）
 # ═══════════════════════════════════════════════════════════════
 
-func buy(item: ShopItem, current_chips: int, current_hp: int, max_hp: int) -> PurchaseResult:
+func buy(item: ShopItem, current_chips: int) -> PurchaseResult:
 	var res := PurchaseResult.new()
 
 	if item == null:
@@ -171,34 +162,17 @@ func buy(item: ShopItem, current_chips: int, current_hp: int, max_hp: int) -> Pu
 		res.message = "筹码不足！"
 		return res
 
-	match item.type:
-		ItemType.HEAL_SMALL:
-			if current_hp >= max_hp:
-				res.message = "HP 已满，无需回复！"
-				return res
-			res.success = true
-			res.hp_healed = 20
-			res.message = "回复了 20 HP！"
+	if item.card_point.is_empty():
+		res.message = "未知物品！"
+		return res
 
-		ItemType.HEAL_LARGE:
-			if current_hp >= max_hp:
-				res.message = "HP 已满，无需回复！"
-				return res
-			res.success = true
-			res.hp_healed = 50
-			res.message = "回复了 50 HP！"
-
-		ItemType.CARD:
-			if item.card_point.is_empty():
-				res.message = "未知物品！"
-				return res
-			var suit := _random_suit()
-			var id := Card.id_for(item.card_point, suit)
-			var c := Card.from_id(id)
-			res.card = c
-			res.dest = item.dest
-			res.success = true
-			res.message = "获得 %s%s！ → %s" % [suit, item.card_point, DEST_LABEL[item.dest]]
+	var suit := _random_suit()
+	var id := Card.id_for(item.card_point, suit)
+	var c := Card.from_id(id)
+	res.card = c
+	res.dest = item.dest
+	res.success = true
+	res.message = "获得 %s%s！ → %s" % [suit, item.card_point, DEST_LABEL[item.dest]]
 
 	if res.success and item.stock > 0:
 		item.stock -= 1
@@ -214,6 +188,8 @@ func buy(item: ShopItem, current_chips: int, current_hp: int, max_hp: int) -> Pu
 # ═══════════════════════════════════════════════════════════════
 
 func on_level_end() -> void:
+	## 附魔门槛按“本次商店消费”计算：每个关末商店重新累计
+	reset_level_spending()
 	for it in items:
 		if it.section == Section.FIXED and it.max_stock > 0:
 			it.stock = it.max_stock

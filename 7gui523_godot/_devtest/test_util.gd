@@ -49,7 +49,7 @@ static func finish(failed: int, label: String) -> int:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 造牌辅助 — 与 cardtype_test.gd 原 _card/_s/_pair/... 一致
+# 造牌辅助
 # ═══════════════════════════════════════════════════════════════
 
 static func card(point: String, suit: String = "") -> Card:
@@ -65,7 +65,7 @@ static func s(point: String) -> CardTypeResult:
 	return CardTypeResult.parse_card_type([card(point)])
 
 
-## 造对子原组
+## 造对子组
 static func pairs(point: String) -> Array[Card]:
 	return [card(point), card(point)]
 
@@ -75,7 +75,7 @@ static func pair(point: String) -> CardTypeResult:
 	return CardTypeResult.parse_card_type(pairs(point))
 
 
-## 三张原组
+## 三张组
 static func trips(point: String) -> Array[Card]:
 	return [card(point), card(point), card(point)]
 
@@ -85,7 +85,7 @@ static func ptrips(point: String) -> CardTypeResult:
 	return CardTypeResult.parse_card_type(trips(point))
 
 
-## 炸弹原组
+## 炸弹组
 static func bomb(point: String) -> Array[Card]:
 	return [card(point), card(point), card(point), card(point)]
 
@@ -100,7 +100,7 @@ static func rocket() -> CardTypeResult:
 	return CardTypeResult.parse_card_type([card("大鬼"), card("小鬼")])
 
 
-## 同点 n 张原组（用于五同点）
+## 同点 n 张组（用于五同点）
 static func five(point: String, n: int) -> Array[Card]:
 	var arr: Array[Card] = []
 	for i in n:

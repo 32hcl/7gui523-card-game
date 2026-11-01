@@ -5,7 +5,7 @@ const GAMES := 500
 
 func _init() -> void:
 	print("═══════════════════════════════════════════════")
-	print("  AI3(训练权重) vs AI2(硬编码基线)  —  %d 局" % GAMES)
+	print("  AI3(训练权重) vs AI2(GA权重, 关卡BOSS)  —  %d 局" % GAMES)
 	print("═══════════════════════════════════════════════")
 
 	var weights: AIWeights = null

@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="AIWeights" load_steps=2 format=3 uid="uid://ai2_weights_trained"]
+
+[ext_resource type="Script" path="res://scripts/ai/ai_weights.gd" id="1_weights"]
+
+[resource]
+script = ExtResource("1_weights")
+finish_hand_reward = 92063.0
+finish_round_reward = 1010.74
+clear_table_reward = 92.0075
+reduce_hand_size_reward = 0.103172
+play_card_count_cost = 0.91917
+rank_cost = 10.7568
+high_card_cost = 9.98358
+low_card_release_reward = 1.05904
+break_pair_cost = 1172.87
+break_triple_cost = 765.925
+break_bomb_cost = 1065.96
+break_five_kind_cost = 851.936
+break_rocket_cost = 901.595
+preserve_same_point_reward = 90.6783
+preserve_bomb_reward = 992.271
+preserve_rocket_reward = 980.023
+preserve_gui523_reward = 105.031
+beat_same_type_reward = 732.196
+beat_bomb_reward = -1155.48
+opponent_low_hand_reward = 9752.42
+opponent_empty_hand_penalty = 913.42
+counter_risk_cost = 0.923374
+table_score_reward = 0.843312
+score_card_reward = 9.5046
+five_card_score_reward = 857.549
+damage_per_point_reward = 0.921474
+round_damage_reward = 0.990641
+large_damage_reward = 1031.61
+exhausted_point_reward = 11.323
+rare_point_reward = 0.999247
+known_opponent_card_reward = 100.036
+unknown_card_risk_cost = 1.02621
+remaining_deck_risk_cost = 0.109371

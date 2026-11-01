@@ -1,5 +1,5 @@
 // Balatro 原版 LÖVE 旋涡 · 逐行数学直译 · Godot canvas_item
-// 像素画版：粗像素块 → 模拟 → 颜色量化
+// 默认平滑；把 pixel_size_fac 调低、quantize_mix 调高即为像素画风格（粗像素块 + 颜色量化）
 
 shader_type canvas_item;
 
@@ -11,9 +11,9 @@ uniform vec4 colour_3 : source_color = vec4(0.086, 0.137, 0.145, 1.0);
 uniform float contrast : hint_range(0.0, 10.0) = 3.5;
 uniform float spin_amount : hint_range(0.0, 2.0) = 0.25;
 
-uniform float pixel_size_fac : hint_range(40.0, 1500.0) = 180.0;
+uniform float pixel_size_fac : hint_range(40.0, 1500.0) = 1200.0;
 uniform float color_levels : hint_range(2.0, 32.0) = 5.0;
-uniform float quantize_mix : hint_range(0.0, 1.0) = 0.7;
+uniform float quantize_mix : hint_range(0.0, 1.0) = 0.0;
 
 const float SPIN_EASE = 0.5;
 

@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c2p1ntkoikrjm"
-path="res://.godot/imported/lantern_red.svg-f5f302d39631052f385151fa15878d67.ctex"
+path="res://.godot/imported/lantern_red.svg-97c9a347ebc06e22eb6d3d6771441995.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/ui/lantern_red.svg"
-dest_files=["res://.godot/imported/lantern_red.svg-f5f302d39631052f385151fa15878d67.ctex"]
+source_file="res://_devtest/ui/lantern_red.svg"
+dest_files=["res://.godot/imported/lantern_red.svg-97c9a347ebc06e22eb6d3d6771441995.ctex"]
 
 [params]
 

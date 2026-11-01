@@ -114,7 +114,7 @@ func _sort_section(parent: Control, s: Node) -> void:
 			s.style_button_balatro(btn, Color(0.18, 0.17, 0.19), Color(0.88, 0.86, 0.83))
 
 
-func _on_sort_picked(mode: int, btns: Array, active_btn: Button, s: Node) -> void:
+func _on_sort_picked(mode: int, btns: Array[Button], active_btn: Button, s: Node) -> void:
 	s._card_sort_mode = mode
 	for b: Button in btns:
 		s.style_button_balatro(b, Color(0.18, 0.17, 0.19), Color(0.88, 0.86, 0.83))
@@ -148,7 +148,7 @@ func _pixel_section(parent: Control, s: Node) -> void:
 
 
 func _refresh_pixel_btns(on_btn: Button, off_btn: Button, s: Node) -> void:
-	if s._pixelate_enabled:
+	if s.is_pixelation_enabled():
 		s.style_button_balatro(on_btn, s.COL_GREEN, Color(0.12, 0.10, 0.08))
 		s.style_button_balatro(off_btn, Color(0.18, 0.17, 0.19), Color(0.88, 0.86, 0.83))
 	else:
@@ -157,10 +157,10 @@ func _refresh_pixel_btns(on_btn: Button, off_btn: Button, s: Node) -> void:
 
 
 func _on_pixel_on(on_btn: Button, off_btn: Button, s: Node) -> void:
-	s._pixelate_enabled = true
+	s.set_pixelation(true)
 	_refresh_pixel_btns(on_btn, off_btn, s)
 
 
 func _on_pixel_off(on_btn: Button, off_btn: Button, s: Node) -> void:
-	s._pixelate_enabled = false
+	s.set_pixelation(false)
 	_refresh_pixel_btns(on_btn, off_btn, s)

@@ -32,6 +32,7 @@ static func _run() -> int:
 	failed += U.section("PASS → 上家赢并补牌", func(): _test_pass_round_win())
 	failed += U.section("GUI523 → 直接胜", func(): _test_gui523_instant())
 	failed += U.section("第9关禁止玩家 GUI523", func(): _test_level9_gui523_ban())
+	failed += U.section("手牌+游戏牌堆空 → 结束判定", func(): _test_finish_active_deck())
 	failed += U.section("赖账鬼 ghost_cheat 规则", func(): _test_ghost_cheat())
 
 	return U.finish(failed, "AI/回合")
@@ -91,9 +92,9 @@ static func _test_free_no_pass() -> void:
 	var ctx := _make_round([U.card("7")], [U.card("5")])
 	var r: Round = ctx["round"]
 	var pass_res: Array[Card] = []
-	var res: Dictionary = r.process_play(pass_res)
-	U.eq(res["state"], "invalid", "自由局空过判为 invalid")
-	U.eq(res["reason"], "不能空过！", "原因提示不能空过")
+	var res: Round.PlayResult = r.process_play(pass_res)
+	U.eq(res.state, "invalid", "自由局空过判为 invalid")
+	U.eq(res.reason, "不能空过！", "原因提示不能空过")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -103,8 +104,8 @@ static func _test_free_no_pass() -> void:
 static func _test_lead_continue() -> void:
 	var ctx := _make_round([U.card("7"), U.card("9")], [U.card("5")])
 	var r: Round = ctx["round"]
-	var res: Dictionary = r.process_play([U.card("7")])
-	U.eq(res["state"], "continue", "合法首出进入 continue")
+	var res: Round.PlayResult = r.process_play([U.card("7")])
+	U.eq(res.state, "continue", "合法首出进入 continue")
 	U.ok(r.last_play != null, "last_play 已记录")
 	U.eq(r.table_cards.size(), 1, "桌上留 1 张牌")
 	U.eq(r.whose_turn(), ctx["b"], "轮换到对方")
@@ -119,8 +120,8 @@ static func _test_invalid_type() -> void:
 	var ctx := _make_round([U.card("3"), U.card("7")], [U.card("5")])
 	var r: Round = ctx["round"]
 	var play: Array[Card] = [U.card("3"), U.card("7")]
-	var res: Dictionary = r.process_play(play)
-	U.eq(res["state"], "invalid", "散牌判为 invalid 牌型")
+	var res: Round.PlayResult = r.process_play(play)
+	U.eq(res.state, "invalid", "散牌判为 invalid 牌型")
 	U.eq(r.whose_turn(), ctx["b"], "非法出牌后交回对方回合")
 
 
@@ -133,7 +134,7 @@ static func _test_cannot_beat() -> void:
 	var r: Round = ctx["round"]
 	r.process_play([U.card("9")])                    # A 出单张 9，轮到 B
 	var res := r.process_play([U.card("8")])         # B 想用 8 压，压不过
-	U.eq(res["state"], "cannot_beat", "较小牌压不过返回 cannot_beat")
+	U.eq(res.state, "cannot_beat", "较小牌压不过返回 cannot_beat")
 	U.eq(r.whose_turn(), ctx["a"], "压不过后回到上家回合")
 
 
@@ -145,24 +146,24 @@ static func _test_pass_round_win() -> void:
 	var ctx := _make_round([U.card("9")], [U.card("8")])
 	var r: Round = ctx["round"]
 	r.process_play([U.card("9")])                    # A 出 9，last_player=A，轮到 B
-	var res: Dictionary = r.process_play([])                    # B 不要
-	U.eq(res["state"], "round_win", "不要则上家赢")
-	U.eq(res["winner"], ctx["a"], "赢家为出牌的上家 A")
+	var res: Round.PlayResult = r.process_play([])                    # B 不要
+	U.eq(res.state, "round_win", "不要则上家赢")
+	U.eq(res.winner, ctx["a"], "赢家为出牌的上家 A")
 	U.eq(ctx["a"].normal_hand.size(), 5, "赢家 A 补牌到 5")
 	U.eq(ctx["b"].normal_hand.size(), 5, "输家 B 补牌到 5")
 	U.eq(r.table_cards.size(), 0, "桌面清空进入下一小局")
 
 
 # ═══════════════════════════════════════════════════════════════
-# 7. GUI523（7+大鬼+5+2+3）→ 直接胜
+# 7. GUI523（7+大鬼+5+2+3）→ 小回合强制胜利
 # ═══════════════════════════════════════════════════════════════
 
 static func _test_gui523_instant() -> void:
 	var gui: Array[Card] = [U.card("7"), U.card("大鬼"), U.card("5"), U.card("2"), U.card("3")]
 	var ctx2 := _make_round(gui, [U.card("K")])
-	var res: Dictionary = ctx2["round"].process_play(gui)
-	U.eq(res["state"], "instant_win", "GUI523 直接获胜")
-	U.eq(res["winner"], ctx2["a"], "胜利者为首出者 A")
+	var res: Round.PlayResult = ctx2["round"].process_play(gui)
+	U.eq(res.state, "round_win", "GUI523 只赢下当前小回合")
+	U.eq(res.winner, ctx2["a"], "小回合胜者为首出者 A")
 
 
 static func _test_level9_gui523_ban() -> void:
@@ -172,8 +173,42 @@ static func _test_level9_gui523_ban() -> void:
 	r._boss = ctx["b"]
 	r.level_rule = Campaign.level_rule(9)
 	var res := r.process_play(gui)
-	U.eq(res["state"], "invalid", "第9关玩家打出 GUI523 被拒绝")
-	U.eq(res["reason"], "本关禁止打出 7gui523！", "第9关提示禁止 GUI523")
+	U.eq(res.state, "invalid", "第9关玩家打出 GUI523 被拒绝")
+	U.eq(res.reason, "本关禁止打出 7gui523！", "第9关提示禁止 GUI523")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 7-b. 手牌 + 游戏牌堆(active) 空 → 结束判定
+#      设计：隐藏区只在关卡开始补入游戏牌堆，关内抽干后不补牌。
+# ═══════════════════════════════════════════════════════════════
+
+static func _test_finish_active_deck() -> void:
+	# 玩家：手牌 1 张，游戏牌堆 active=0，隐藏区仍有牌 → instant_win
+	var ctx := _make_round([U.card("7")], [U.card("5")])
+	var r: Round = ctx["round"]
+	var deck_a: Deck.DeckManager = ctx["deck_a"]
+	deck_a.active_count = 0
+	var res: Round.PlayResult = r.process_play([ctx["a"].normal_hand[0]])
+	U.eq(res.state, "instant_win", "玩家手牌+active 空 → instant_win")
+	U.eq(res.winner, ctx["a"], "玩家为胜者")
+	U.ok(deck_a.total() > 0, "隐藏区仍有牌，但不参与关内抽牌")
+
+	# BOSS：手牌 1 张，游戏牌堆 active=0，隐藏区仍有牌 → boss_finish
+	var deck_h := Deck.DeckManager.new()
+	var deck_b := Deck.DeckManager.new()
+	deck_h.init_standard()
+	deck_b.init_standard()
+	deck_b.active_count = 0
+	var human := Player.PlayerData.new()
+	var boss := Player.PlayerData.new()
+	human.name = "H"
+	boss.name = "B"
+	boss.normal_hand = [U.card("7")]
+	var r2 := Round.new(boss, human, deck_b, deck_h, null, null, boss)
+	var res2: Round.PlayResult = r2.process_play([boss.normal_hand[0]])
+	U.eq(res2.state, "boss_finish", "BOSS 手牌+active 空 → boss_finish")
+	U.eq(res2.winner, boss, "BOSS 为出完牌的一方")
+	U.ok(deck_b.total() > 0, "BOSS 隐藏区仍有牌，但不参与关内抽牌")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -211,22 +246,22 @@ static func _test_ghost_cheat() -> void:
 	var ctx2 := _make_ghost_round([U.card("10", "黑桃")], [U.card("8", "黑桃"), U.card("A", "红桃")])
 	var r2: Round = ctx2["round"]
 	r2.process_play([U.card("10", "黑桃")])                     # 玩家出黑桃 10（rank5 < J）
-	var res2: Dictionary = r2.process_play([U.card("8", "黑桃")])  # Boss 黑桃 8：点数不够但同花
-	U.eq(res2["state"], "continue", "赖账鬼同花单张压过 J 以下单张")
+	var res2: Round.PlayResult = r2.process_play([U.card("8", "黑桃")])  # Boss 黑桃 8：点数不够但同花
+	U.eq(res2.state, "continue", "赖账鬼同花单张压过 J 以下单张")
 
 	# ③ 不同花 → 正常 cannot_beat
 	var ctx3 := _make_ghost_round([U.card("10", "黑桃")], [U.card("8", "红桃")])
 	var r3: Round = ctx3["round"]
 	r3.process_play([U.card("10", "黑桃")])
-	var res3: Dictionary = r3.process_play([U.card("8", "红桃")])
-	U.eq(res3["state"], "cannot_beat", "不同花正常判压不过")
+	var res3: Round.PlayResult = r3.process_play([U.card("8", "红桃")])
+	U.eq(res3.state, "cannot_beat", "不同花正常判压不过")
 
 	# ④ 上家是 J（rank6）及以上 → 特权失效
 	var ctx4 := _make_ghost_round([U.card("J", "黑桃")], [U.card("8", "黑桃")])
 	var r4: Round = ctx4["round"]
 	r4.process_play([U.card("J", "黑桃")])
-	var res4: Dictionary = r4.process_play([U.card("8", "黑桃")])
-	U.eq(res4["state"], "cannot_beat", "J 及以上单张同花也压不过")
+	var res4: Round.PlayResult = r4.process_play([U.card("8", "黑桃")])
+	U.eq(res4.state, "cannot_beat", "J 及以上单张同花也压不过")
 
 	# ⑤ tryForcePlay：Boss Pass 前找同花单张强压（手工布置 last_play）
 	var ctx5 := _make_ghost_round([], [U.card("8", "黑桃"), U.card("A", "红桃")])

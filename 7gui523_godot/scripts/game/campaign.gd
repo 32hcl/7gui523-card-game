@@ -2,7 +2,12 @@ class_name Campaign
 extends RefCounted
 
 # ═══════════════════════════════════════════════════════════════
-# Campaign — 关卡模式
+# Campaign — 关卡模式（筹码版）
+#
+# 数值统一：HP / 得分 / 筹码 全部 1:1 合并为筹码。
+#   玩家筹码跨关保留；BOSS 每关重置为 BOSS_INITIAL_CHIPS。
+#   小回合的输赢由 Round 直接结算到 PlayerData.chips / debt；
+#   本类只负责关卡推进、奖励与“破产即结束”的判定。
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -11,19 +16,13 @@ extends RefCounted
 # ═══════════════════════════════════════════════════════════════
 
 class CampaignConfig:
-	var player_init_hp   := GameConfig.PLAYER_INIT_HP
-	var player_max_hp    := GameConfig.PLAYER_MAX_HP
-	var boss_max_hp      := GameConfig.BOSS_MAX_HP
-	var total_levels     := GameConfig.TOTAL_LEVELS
-	var heal_per_card    := GameConfig.HEAL_PER_CARD
+	var initial_chips      := GameConfig.INITIAL_CHIPS
+	var boss_initial_chips := GameConfig.BOSS_INITIAL_CHIPS
+	var total_levels       := GameConfig.TOTAL_LEVELS
 
 
 class LevelResult:
 	var player_won: bool
-	var player_remain_cards: int
-	var boss_remain_cards: int
-	var player_hp_delta: int
-	var boss_hp_delta: int
 	var boss_cleared: bool
 	var chips_delta: int
 	var chips_after: int
@@ -59,7 +58,7 @@ class LevelRule:
 	var boss_swap_low_cards := false ## 换牌鬼(8)：BOSS 可把4/6换成指定牌
 	var _boss_swapped_cards: Dictionary = {}
 	var boss_always_first := false   ## 急眼雀(3)：每轮 boss 先手
-	var boss_bite_damage  := false   ## 疯狗(4)：每张牌 ×3 额外伤害
+	var boss_bite_damage  := false   ## 疯狗(4)：每张牌 ×3 额外负债
 	var ghost_cheat       := false   ## 赖账鬼(5)：同花可压 + 禁同点
 	var blind_mix         := false   ## 不识数(6)：50% 概率蒙混过关
 	var boss_steal_max    := false   ## 黑老大(7)：先出完时弃玩家最大牌
@@ -135,9 +134,9 @@ class LevelRule:
 			loser.remove_cards_from_hand([max_card])
 
 
-	## 疯狗：Boss 出牌立刻咬噬玩家，每张牌造成 3 点额外伤害
+	## 疯狗：Boss 赢下小局时，每张出牌给输家追加多少负债
 	func bite_damage(num_cards: int) -> int:
-		return num_cards * 3 if boss_bite_damage else 0
+		return num_cards * GameConfig.BITE_CHIPS_PER_CARD if boss_bite_damage else 0
 
 	func mutate_boss_hand(hand: Array[Card]) -> void:
 		if not boss_swap_low_cards:
@@ -147,7 +146,12 @@ class LevelRule:
 			if not _boss_swapped_cards.has(card) and (card.point == "4" or card.point == "6"):
 				_boss_swapped_cards[card] = true
 				card.point = replacements[randi() % replacements.size()]
-				card.score = Card.score_from_point(card.point)
+
+
+	func reset_boss_swaps() -> void:
+		for card in _boss_swapped_cards:
+			card.reset_to_def()
+		_boss_swapped_cards.clear()
 
 
 ## 获取关卡规则（工厂：九关特殊规则表）
@@ -170,17 +174,17 @@ static func level_rule(level: int) -> LevelRule:
 # ═══════════════════════════════════════════════════════════════
 
 static func get_level_entry_chips(level: int) -> int:
-	if level < 1 or level > 9:
+	if level < 1 or level > GameConfig.TOTAL_LEVELS:
 		return 0
 	return ENTRY_CHIPS[level]
 
 static func get_level_reward_chips(level: int) -> int:
-	if level < 1 or level > 9:
+	if level < 1 or level > GameConfig.TOTAL_LEVELS:
 		return 0
 	return REWARD_CHIPS[level]
 
 static func get_boss_name(level: int) -> String:
-	if level < 1 or level > 9:
+	if level < 1 or level > GameConfig.TOTAL_LEVELS:
 		return "???"
 	return BOSS_NAMES[level]
 
@@ -190,13 +194,14 @@ static func get_boss_name(level: int) -> String:
 # ═══════════════════════════════════════════════════════════════
 
 var config: CampaignConfig
-var player_hp: int
-var boss_hp: int
+var player_chips: int = GameConfig.INITIAL_CHIPS
+var boss_chips: int = GameConfig.BOSS_INITIAL_CHIPS
 var current_level: int
-var player_chips: int = 50
 var dollar: int = INITIAL_DOLLARS
 var cleared_level: int
 var has_purchased_entry: bool
+## 商店 TO_HAND 购买、留到下关开牌时进入手牌的牌
+var pending_hand_cards: Array[Card] = []
 
 
 func _init(cfg: CampaignConfig = CampaignConfig.new()) -> void:
@@ -205,13 +210,13 @@ func _init(cfg: CampaignConfig = CampaignConfig.new()) -> void:
 
 
 func start_new() -> void:
-	player_hp = config.player_init_hp
-	boss_hp = config.boss_max_hp
+	player_chips = config.initial_chips
+	boss_chips = config.boss_initial_chips
 	current_level = 1
-	player_chips = 50
 	dollar = INITIAL_DOLLARS
 	cleared_level = 0
 	has_purchased_entry = false
+	pending_hand_cards.clear()
 
 
 ## 购买一次赌场门票。门票金币和关卡筹码是两套独立资源。
@@ -227,70 +232,42 @@ func purchase_entry_ticket() -> bool:
 
 func start_level(level: int) -> void:
 	current_level = level
-	boss_hp = config.boss_max_hp
+	boss_chips = config.boss_initial_chips
+
+
+## 把 Round 结算后的双方筹码同步回战役（负数即负债）
+func sync_from_battle(human: Player.PlayerData, ai: Player.PlayerData) -> void:
+	player_chips = human.chips
+	boss_chips = ai.chips
 
 
 # ═══════════════════════════════════════════════════════════════
-# 关卡 9 — 赌场老板 / 通用结算
+# 关卡结算 / 判定
 # ═══════════════════════════════════════════════════════════════
 
-## 每轮扣血：伤害直接扣给输家
-## 第 9 关赌场老板：boss不掉血，所有伤害转给玩家
-func apply_round_damage(damage: int, boss_won: bool) -> void:
-	if damage <= 0:
-		return
-	var hp_loss: int = Score.damage_to_hp(damage)
-	if current_level == 9:
-		player_hp -= hp_loss
-	elif boss_won:
-		player_hp -= hp_loss
-	else:
-		boss_hp -= hp_loss
-
-
-# ═══════════════════════════════════════════════════════════════
-# 通用结算 / 判定
-# ═══════════════════════════════════════════════════════════════
-
-## 关卡结束：玩家先出完→回血，没出完→扣血（余牌 × 3）
-func finish_level(player_won: bool, player_remain: int, boss_remain: int) -> LevelResult:
+## 关卡结束：胜利发奖励筹码；玩家筹码为负（还不起）或第 9 关结束本轮
+func finish_level(player_won: bool, player_failed: bool = false) -> LevelResult:
 	var lr := LevelResult.new()
-	## 第 9 关是不可通关的最终挑战：不能推进为玩家胜利。
-	var accepted_player_win := player_won and current_level < config.total_levels
-	lr.player_won = accepted_player_win
-	lr.boss_cleared = accepted_player_win
-	lr.player_remain_cards = player_remain
-	lr.boss_remain_cards = boss_remain
+	## 第 9 关是不可通关的最终挑战；player_failed = 本小局还不起负债。
+	var accepted := player_won and not player_failed and player_chips >= 0 and current_level < config.total_levels
+	lr.player_won = accepted
+	lr.boss_cleared = accepted
 	lr.chips_delta = 0
-	lr.chips_after = player_chips
 
-	var prev_player_hp := player_hp
-	var prev_boss_hp := boss_hp
-
-	## 按输家剩余牌计算血量变化：胜→对手余牌回血，败→自己余牌扣血
-	if accepted_player_win:
-		var heal_amount: int = boss_remain * config.heal_per_card
-		player_hp += heal_amount
+	if accepted:
 		var reward := get_level_reward_chips(current_level)
 		player_chips += reward
-		lr.chips_delta += reward
+		lr.chips_delta = reward
 		if current_level > cleared_level:
 			cleared_level = current_level
-	else:
-		var hurt_amount: int = player_remain * config.heal_per_card
-		player_hp -= hurt_amount
 
 	lr.chips_after = player_chips
 
-	if is_game_over() or current_level >= config.total_levels:
+	if player_failed or player_chips < 0 or current_level >= config.total_levels:
 		has_purchased_entry = false
-
-	player_hp = mini(player_hp, config.player_max_hp)
-	lr.player_hp_delta = player_hp - prev_player_hp
-	lr.boss_hp_delta = boss_hp - prev_boss_hp
 
 	return lr
 
 
 func is_game_over() -> bool:
-	return player_hp <= 0
+	return player_chips < 0

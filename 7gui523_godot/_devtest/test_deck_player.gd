@@ -28,6 +28,7 @@ static func _run() -> int:
 	failed += U.section("refill_to_five (普通区)", func(): _test_refill_to_five())
 	failed += U.section("refill_active (牌堆内补牌)", func(): _test_refill_active())
 	failed += U.section("add_to_hidden (回收)", func(): _test_add_hidden())
+	failed += U.section("recycle 15张批次", func(): _test_recycle_batch())
 	failed += U.section("remove_cards_from_hand", func(): _test_remove_from_hand())
 	failed += U.section("sort_hand", func(): _test_sort_hand())
 
@@ -35,7 +36,6 @@ static func _run() -> int:
 
 
 ## 有序测试牌堆：ID 0-53 依序，游戏区 32 张 / 隐藏区 22 张
-## （新模型 init_standard 会洗牌，确定性断言改用手动布置）
 static func _make_ordered() -> Deck.DeckManager:
 	var d := Deck.DeckManager.new()
 	for i in 54:
@@ -152,6 +152,35 @@ static func _test_refill_active() -> void:
 	d2.active_count = 5
 	d2.refill_active()
 	U.eq(d2.active_count, 10, "隐藏不足时补到全部可用")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 5-b. recycle_played — 出牌累积 15 张后打乱进隐藏牌堆
+# ═══════════════════════════════════════════════════════════════
+
+static func _test_recycle_batch() -> void:
+	var d := _make_ordered()
+	var before := d.total()
+
+	var batch14: Array[Card] = []
+	for i in 14:
+		batch14.append(Card.from_id(i))
+	d.recycle_played(batch14)
+	U.eq(d.total(), before, "不足 15 张留在缓冲，不立即进隐藏牌堆")
+
+	var one_more: Array[Card] = [Card.from_id(14)]
+	d.recycle_played(one_more)
+	U.eq(d.total(), before + 15, "满 15 张后整批打乱进入隐藏牌堆")
+	U.eq(d.active_count, Deck.DeckManager.DECK_CAP, "回收不改变游戏区张数")
+
+	var rest5: Array[Card] = []
+	for i in range(15, 20):
+		rest5.append(Card.from_id(i))
+	d.recycle_played(rest5)
+	U.eq(d.total(), before + 15, "残余不足 15 张仍留在缓冲")
+
+	d.flush_recycle_buffer()
+	U.eq(d.total(), before + 20, "关末残余全部打乱进隐藏牌堆")
 
 
 # ═══════════════════════════════════════════════════════════════
